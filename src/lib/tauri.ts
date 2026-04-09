@@ -42,8 +42,9 @@ export const streamLuna = (
   history: ChatMessagePayload[],
   searchContext: string,
   onEvent: (e: StreamEvent) => void,
+  memories?: string[],
 ) => {
-  const systemPrompt = buildLunaSystemPrompt();
+  const systemPrompt = buildLunaSystemPrompt(memories);
   const channel = new Channel<StreamEvent>();
   channel.onmessage = onEvent;
 
