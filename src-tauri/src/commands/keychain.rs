@@ -4,6 +4,7 @@ use tauri::command;
 const SERVICE: &str = "starfield-app";
 const DEEPSEEK_KEY_ACCOUNT: &str = "deepseek-api-key";
 const TAVILY_KEY_ACCOUNT: &str = "tavily-api-key";
+const WEATHER_KEY_ACCOUNT: &str = "weather-api-key";
 
 fn ensure_persistent_backend() -> Result<(), String> {
     let persistence = default_credential_builder().persistence();
@@ -92,4 +93,19 @@ pub fn get_tavily_key() -> Result<Option<String>, String> {
 #[command]
 pub fn delete_tavily_key() -> Result<(), String> {
     delete_key(TAVILY_KEY_ACCOUNT)
+}
+
+#[command]
+pub fn save_weather_key(key: String) -> Result<(), String> {
+    save_key(WEATHER_KEY_ACCOUNT, &key)
+}
+
+#[command]
+pub fn get_weather_key() -> Result<Option<String>, String> {
+    read_key(WEATHER_KEY_ACCOUNT)
+}
+
+#[command]
+pub fn delete_weather_key() -> Result<(), String> {
+    delete_key(WEATHER_KEY_ACCOUNT)
 }

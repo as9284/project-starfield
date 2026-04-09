@@ -22,6 +22,13 @@ export const getTavilyKey = () => invoke<string | null>("get_tavily_key");
 
 export const deleteTavilyKey = () => invoke<void>("delete_tavily_key");
 
+export const saveWeatherKey = (key: string) =>
+  invoke<void>("save_weather_key", { key });
+
+export const getWeatherKey = () => invoke<string | null>("get_weather_key");
+
+export const deleteWeatherKey = () => invoke<void>("delete_weather_key");
+
 // ── Streaming chat (Luna / DeepSeek) ─────────────────────────────────────
 
 export interface ChatMessagePayload {
@@ -59,6 +66,27 @@ export const streamLuna = (
     systemPrompt,
     history,
     userMessage: userContent,
+    channel,
+  });
+};
+
+/**
+ * Lower-level stream chat that accepts a custom system prompt.
+ * Used by Beacon (and potentially other constellations) that need
+ * their own persona / context instead of Luna's default prompt.
+ */
+export const streamChat = (
+  systemPrompt: string,
+  history: ChatMessagePayload[],
+  userMessage: string,
+  onEvent: (e: StreamEvent) => void,
+) => {
+  const channel = new Channel<StreamEvent>();
+  channel.onmessage = onEvent;
+  return invoke<void>("stream_luna", {
+    systemPrompt,
+    history,
+    userMessage,
     channel,
   });
 };

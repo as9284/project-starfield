@@ -10,7 +10,7 @@ import Pulsar from "./pages/Pulsar";
 import Hyperlane from "./pages/Hyperlane";
 import Settings from "./pages/Settings";
 import { useAppStore } from "./store/useAppStore";
-import { getDeepSeekKey, getTavilyKey } from "./lib/tauri";
+import { getDeepSeekKey, getTavilyKey, getWeatherKey } from "./lib/tauri";
 
 const slideIn = {
   initial: { opacity: 0, x: 10 },
@@ -20,7 +20,7 @@ const slideIn = {
 };
 
 export default function App() {
-  const { view, showConstellations, setHasDeepSeekKey, setHasTavilyKey } =
+  const { view, showConstellations, setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey } =
     useAppStore();
 
   // Bootstrap: check if API keys are already stored in the keychain
@@ -32,7 +32,11 @@ export default function App() {
     getTavilyKey()
       .then((k) => setHasTavilyKey(!!k))
       .catch(() => setHasTavilyKey(false));
-  }, [setHasDeepSeekKey, setHasTavilyKey]);
+
+    getWeatherKey()
+      .then((k) => setHasWeatherKey(!!k))
+      .catch(() => setHasWeatherKey(false));
+  }, [setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey]);
 
   return (
     <div className="app-shell bg-cosmic">

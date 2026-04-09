@@ -2,8 +2,8 @@ mod commands;
 
 use commands::{
     keychain::{
-        delete_deepseek_key, delete_tavily_key, get_deepseek_key, get_tavily_key,
-        save_deepseek_key, save_tavily_key,
+        delete_deepseek_key, delete_tavily_key, delete_weather_key, get_deepseek_key,
+        get_tavily_key, get_weather_key, save_deepseek_key, save_tavily_key, save_weather_key,
     },
     luna::stream_luna,
     search::web_search,
@@ -33,6 +33,9 @@ pub fn run() {
             save_tavily_key,
             get_tavily_key,
             delete_tavily_key,
+            save_weather_key,
+            get_weather_key,
+            delete_weather_key,
             stream_luna,
             web_search,
         ])
