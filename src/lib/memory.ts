@@ -4,8 +4,8 @@
  */
 
 const PATTERNS: { regex: RegExp; extract: (match: RegExpMatchArray) => string }[] = [
-  { regex: /my name is ([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/i, extract: (m) => `User's name is ${m[1]}` },
-  { regex: /(?:call me|go by|i'm called) ([A-Z][a-z]+)/i, extract: (m) => `User goes by ${m[1]}` },
+  { regex: /my name is ([a-z]+(?:\s[a-z]+)?)/i, extract: (m) => `User's name is ${m[1]}` },
+  { regex: /(?:call me|go by|i'm called) ([a-z]+)/i, extract: (m) => `User goes by ${m[1]}` },
   { regex: /i work (?:at|for) (.+?)(?:\.|,|$)/i, extract: (m) => `User works at ${m[1].trim()}` },
   { regex: /i(?:'m| am) a ([a-z][\w\s]+?)(?:\.|,| and| who| at|$)/i, extract: (m) => `User is a ${m[1].trim()}` },
   { regex: /i live in (.+?)(?:\.|,|$)/i, extract: (m) => `User lives in ${m[1].trim()}` },
@@ -31,8 +31,9 @@ const MAX_MEMORY_LENGTH = 120;
 
 /**
  * Extract potential memories from a user message.
- * Only analyzes the user's message (not assistant response) to avoid
- * picking up the AI's own phrasing.
+ * The assistantResponse parameter is reserved for future use (e.g. extracting
+ * facts the AI confirms or elaborates on) but currently only the user message
+ * is analyzed to avoid picking up the AI's own phrasing.
  */
 export function extractMemories(userMessage: string, _assistantResponse: string): string[] {
   const results: string[] = [];
