@@ -7,7 +7,10 @@ use commands::{
         get_tavily_key, get_weather_key, save_deepseek_key, save_tavily_key, save_weather_key,
     },
     luna::stream_luna,
-    pulsar::{pulsar_check_ytdlp, pulsar_download, pulsar_get_downloads_dir},
+    pulsar::{
+        pulsar_cancel_download, pulsar_check_ytdlp, pulsar_download, pulsar_get_downloads_dir,
+        pulsar_install_ytdlp, PulsarState,
+    },
     search::web_search,
 };
 use tauri::Manager;
@@ -22,6 +25,8 @@ pub fn run() {
             ) {
                 let _ = window.set_icon(icon);
             }
+
+            app.manage(PulsarState::new());
 
             Ok(())
         })
@@ -45,6 +50,8 @@ pub fn run() {
             pulsar_check_ytdlp,
             pulsar_download,
             pulsar_get_downloads_dir,
+            pulsar_cancel_download,
+            pulsar_install_ytdlp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Starfield");

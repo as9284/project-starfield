@@ -134,19 +134,39 @@ export const scanLocalDirectory = (path: string) =>
 
 // ── Pulsar: yt-dlp media downloads ───────────────────────────────────────
 
-export interface PulsarResult {
-  success: boolean;
-  message: string;
-  file_path: string | null;
-}
+export type PulsarEvent =
+  | { type: "progress"; percent: number; speed: string; eta: string }
+  | { type: "playlistItem"; index: number; total: number; title: string }
+  | { type: "merging" }
+  | { type: "done"; file_path: string | null }
+  | { type: "error"; message: string };
 
 export const pulsarCheckYtdlp = () => invoke<boolean>("pulsar_check_ytdlp");
 
 export const pulsarGetDownloadsDir = () =>
   invoke<string>("pulsar_get_downloads_dir");
 
+export const pulsarInstallYtdlp = () => invoke<boolean>("pulsar_install_ytdlp");
+
 export const pulsarDownload = (
+  downloadId: string,
   url: string,
   formatArg: string,
   outputDir: string,
-) => invoke<PulsarResult>("pulsar_download", { url, formatArg, outputDir });
+  playlist: boolean,
+  onEvent: (e: PulsarEvent) => void,
+) => {
+  const channel = new Channel<PulsarEvent>();
+  channel.onmessage = onEvent;
+  return invoke<void>("pulsar_download", {
+    downloadId,
+    url,
+    formatArg,
+    outputDir,
+    playlist,
+    channel,
+  });
+};
+
+export const pulsarCancelDownload = (downloadId: string) =>
+  invoke<void>("pulsar_cancel_download", { downloadId });
