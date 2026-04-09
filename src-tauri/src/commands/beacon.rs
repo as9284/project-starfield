@@ -19,7 +19,18 @@ const TEXT_EXTENSIONS: &[&str] = &[
     "env", "gitignore", "dockerfile",
 ];
 
-/// Directories to skip when walking.
+/// Dot-prefixed files that should still be included in the scan.
+const ALLOWED_DOTFILES: &[&str] = &[
+    ".gitignore",
+    ".env",
+    ".editorconfig",
+    ".eslintrc",
+    ".prettierrc",
+    ".dockerignore",
+    ".npmrc",
+    ".nvmrc",
+    ".babelrc",
+];
 const SKIP_DIRS: &[&str] = &[
     "node_modules",
     ".git",
@@ -74,8 +85,9 @@ fn walk_dir(root: &Path, base: &Path, files: &mut Vec<ScannedFile>) {
 
         let path = entry.path();
         let file_name = entry.file_name().to_string_lossy().to_string();
+        let file_name_lower = file_name.to_lowercase();
 
-        if file_name.starts_with('.') && file_name != ".gitignore" && file_name != ".env" {
+        if file_name.starts_with('.') && !ALLOWED_DOTFILES.contains(&file_name_lower.as_str()) {
             continue;
         }
 
@@ -99,8 +111,8 @@ fn walk_dir(root: &Path, base: &Path, files: &mut Vec<ScannedFile>) {
                 .unwrap_or_default();
 
             let is_text = TEXT_EXTENSIONS.contains(&ext.as_str())
-                || file_name.to_lowercase() == "dockerfile"
-                || file_name.to_lowercase() == "makefile";
+                || file_name_lower == "dockerfile"
+                || file_name_lower == "makefile";
 
             files.push(ScannedFile {
                 path: path.to_string_lossy().to_string(),
