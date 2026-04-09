@@ -1,0 +1,547 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Cosmic dark-purple palette ─────────────────────────── */
+  --color-space-950: #06060e;
+  --color-space-900: #08081a;
+  --color-space-800: #0d0c22;
+  --color-space-700: #12112e;
+  --color-space-600: #19173b;
+
+  --color-surface-900: #100f2e;
+  --color-surface-800: #171540;
+  --color-surface-700: #201d54;
+  --color-surface-600: #2b276a;
+
+  --color-border-dim: #252260;
+  --color-border-mid: #3d388e;
+  --color-border-bright: #5a52c8;
+
+  --color-purple-950: #1e0a5e;
+  --color-purple-900: #2d1380;
+  --color-purple-800: #3d1ca3;
+  --color-purple-700: #5028c8;
+  --color-purple-600: #6637e0;
+  --color-purple-500: #7c4ff0;
+  --color-purple-400: #9b78f8;
+  --color-purple-300: #bba9fb;
+  --color-purple-200: #d9d0fd;
+  --color-purple-100: #ece9fe;
+
+  --color-star-bright: #ffffff;
+  --color-star-mid: #c8c0f0;
+  --color-star-dim: #8880c0;
+
+  --color-nebula-pink: #d946ef;
+  --color-nebula-blue: #6366f1;
+  --color-nebula-teal: #14b8a6;
+
+  --color-text-primary: #ede9fe;
+  --color-text-secondary: #a89dcc;
+  --color-text-muted: #6b60a0;
+  --color-text-dim: #3a3468;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-sans: "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+
+  /* ── Shadows / glows ────────────────────────────────────── */
+  --shadow-glow-purple: 0 0 28px 6px rgba(124, 79, 240, 0.35);
+  --shadow-glow-star: 0 0 12px 3px rgba(155, 120, 248, 0.4);
+  --shadow-panel: 0 8px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dim);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-mid);
+}
+
+/* Selection */
+::selection {
+  background: rgba(124, 79, 240, 0.35);
+  color: var(--color-text-primary);
+}
+
+/* ── App shell ──────────────────────────────────────────────────────────── */
+.app-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-space-900);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-dim);
+  position: relative;
+}
+
+.app-shell::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-border-dim);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Cosmic gradient background ─────────────────────────────────────────── */
+.bg-cosmic {
+  background:
+    radial-gradient(
+      ellipse at 15% 0%,
+      rgba(100, 55, 224, 0.22) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 85% 100%,
+      rgba(217, 70, 239, 0.12) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      rgba(80, 40, 200, 0.08) 0%,
+      transparent 75%
+    ),
+    var(--color-space-900);
+}
+
+/* ── Animated star canvas ───────────────────────────────────────────────── */
+.starfield-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Content above starfield ────────────────────────────────────────────── */
+.above-stars {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+.topbar {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 12px;
+  background: rgba(8, 8, 26, 0.85);
+  border-bottom: 1px solid var(--color-border-dim);
+  backdrop-filter: blur(16px);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.topbar-nodrag {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Glass card ─────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(16, 15, 46, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-dim);
+}
+
+/* ── Constellation card ─────────────────────────────────────────────────── */
+.constellation-card {
+  background: rgba(16, 15, 46, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.constellation-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(124, 79, 240, 0.12) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.constellation-card:hover {
+  border-color: rgba(124, 79, 240, 0.5);
+  background: rgba(124, 79, 240, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(100, 55, 224, 0.2);
+}
+
+.constellation-card:hover::before {
+  opacity: 1;
+}
+
+.constellation-card:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Glow text ──────────────────────────────────────────────────────────── */
+.text-glow-purple {
+  text-shadow: 0 0 24px rgba(124, 79, 240, 0.7);
+}
+
+.text-glow-star {
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.8),
+    0 0 24px rgba(155, 120, 248, 0.6);
+}
+
+/* ── Chat input ─────────────────────────────────────────────────────────── */
+.chat-input {
+  background: rgba(16, 15, 46, 0.85);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  width: 100%;
+  padding: 12px 18px;
+}
+
+.chat-input:focus {
+  border-color: var(--color-purple-600);
+  box-shadow:
+    0 0 0 2px rgba(102, 55, 224, 0.2),
+    var(--shadow-glow-purple);
+}
+
+.chat-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ── Send button ────────────────────────────────────────────────────────── */
+.btn-send {
+  flex-shrink: 0;
+  align-self: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  background: var(--color-purple-700);
+  border: 1px solid rgba(102, 55, 224, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.18s,
+    transform 0.1s,
+    box-shadow 0.18s;
+  color: white;
+}
+
+.btn-send:hover:not(:disabled) {
+  background: var(--color-purple-600);
+  box-shadow: var(--shadow-glow-purple);
+  transform: scale(1.04);
+}
+
+.btn-send:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.btn-send:disabled {
+  background: var(--color-surface-700);
+  border-color: transparent;
+  cursor: not-allowed;
+  color: var(--color-text-dim);
+}
+
+/* ── Window control buttons ─────────────────────────────────────────────── */
+.win-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+  opacity: 0.6;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.win-btn:hover {
+  opacity: 1;
+}
+
+.win-btn-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.win-btn-minimize:hover {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.win-btn-maximize:hover {
+  background: rgba(124, 79, 240, 0.2);
+  color: var(--color-purple-400);
+}
+
+/* ── Message bubbles ────────────────────────────────────────────────────── */
+.msg-user {
+  background: rgba(80, 40, 200, 0.2);
+  border: 1px solid rgba(80, 40, 200, 0.35);
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+}
+
+.msg-assistant {
+  background: rgba(16, 15, 46, 0.75);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+}
+
+/* ── Typing indicator ───────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-purple-400);
+  animation: pulse-dot 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ── Prose markdown ─────────────────────────────────────────────────────── */
+.prose-starfield {
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.prose-starfield p {
+  margin: 0.5em 0;
+}
+
+.prose-starfield h1,
+.prose-starfield h2,
+.prose-starfield h3 {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+
+.prose-starfield code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgba(80, 40, 200, 0.15);
+  border: 1px solid rgba(80, 40, 200, 0.28);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--color-purple-300);
+}
+
+.prose-starfield pre {
+  background: rgba(6, 6, 14, 0.85);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.prose-starfield pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.prose-starfield ul,
+.prose-starfield ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.prose-starfield li {
+  margin: 0.2em 0;
+}
+
+.prose-starfield a {
+  color: var(--color-nebula-teal);
+  text-decoration: none;
+}
+
+.prose-starfield a:hover {
+  text-decoration: underline;
+}
+
+.prose-starfield blockquote {
+  border-left: 3px solid var(--color-purple-600);
+  padding-left: 1em;
+  color: var(--color-text-secondary);
+  margin: 0.5em 0;
+  font-style: italic;
+}
+
+.prose-starfield hr {
+  border: none;
+  border-top: 1px solid var(--color-border-dim);
+  margin: 1em 0;
+}
+
+/* ── Fade / slide animations ────────────────────────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease forwards;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ── Settings input ─────────────────────────────────────────────────────── */
+.settings-input {
+  background: rgba(16, 15, 46, 0.75);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  width: 100%;
+}
+
+.settings-input:focus {
+  border-color: var(--color-purple-600);
+  box-shadow: 0 0 0 2px rgba(102, 55, 224, 0.18);
+}
+
+.settings-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ── Luna badge / status dot ────────────────────────────────────────────── */
+@keyframes status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 79, 240, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(124, 79, 240, 0);
+  }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-purple-500);
+  animation: status-pulse 2.5s infinite;
+}
