@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Eye, EyeOff, Save, Trash2, Download, Upload, X, Brain, Keyboard, Command } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
+import { modKey } from "../lib/platform";
 import {
   saveDeepSeekKey,
   deleteDeepSeekKey,
@@ -446,8 +447,6 @@ export default function Settings() {
 }
 
 // ── Shortcut row helper ─────────────────────────────────────────────────────
-
-const modKey = navigator.platform.includes("Mac") ? "⌘" : "Ctrl";
 
 function ShortcutRow({
   keys,

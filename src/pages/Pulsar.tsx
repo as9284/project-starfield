@@ -61,6 +61,11 @@ export default function Pulsar() {
   const handleDownload = async () => {
     if (!url.trim() || downloading) return;
 
+    if (!outputDir.trim()) {
+      setError("Output directory is required. Please set a download location.");
+      return;
+    }
+
     setDownloading(true);
     setError(null);
     setSuccess(null);

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import type { AppView } from "../store/useAppStore";
+import { modLabel } from "../lib/platform";
 
 type ConstellationView = Exclude<AppView, "luna" | "settings">;
 
@@ -66,8 +67,6 @@ const CONSTELLATIONS: ConstellationItem[] = [
     shortcutNum: "6",
   },
 ];
-
-const modLabel = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
 
 const container = {
   hidden: { opacity: 0 },

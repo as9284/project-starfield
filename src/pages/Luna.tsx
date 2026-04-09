@@ -11,6 +11,7 @@ import { streamLuna, webSearch } from "../lib/tauri";
 import type { ChatMessagePayload } from "../lib/tauri";
 import { extractMemories } from "../lib/memory";
 import type { OrbitContext } from "../lib/luna-prompt";
+import { modLabel } from "../lib/platform";
 
 // ── Orbit command parser ─────────────────────────────────────────────────────
 
@@ -409,7 +410,7 @@ export default function Luna() {
                 </button>
                 <button
                   onClick={toggleConstellations}
-                  title={`Constellations (${navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}K)`}
+                  title={`Constellations (${modLabel}K)`}
                   className={`luna-tool-btn ${showConstellations ? "luna-tool-btn-active" : ""}`}
                 >
                   <Sparkles size={13} />

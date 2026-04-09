@@ -2,8 +2,7 @@ import { Minus, Maximize2, X } from "lucide-react";
 import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
 import { CosmicLogoMini } from "./CosmicLogo";
-
-const modLabel = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
+import { modLabel } from "../lib/platform";
 
 export default function TitleBar() {
   const {
