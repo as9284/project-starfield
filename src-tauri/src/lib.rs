@@ -7,6 +7,7 @@ use commands::{
         get_tavily_key, get_weather_key, save_deepseek_key, save_tavily_key, save_weather_key,
     },
     luna::stream_luna,
+    pulsar::{pulsar_check_ytdlp, pulsar_download, pulsar_get_downloads_dir},
     search::web_search,
 };
 use tauri::Manager;
@@ -41,6 +42,9 @@ pub fn run() {
             stream_luna,
             web_search,
             scan_local_directory,
+            pulsar_check_ytdlp,
+            pulsar_download,
+            pulsar_get_downloads_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Starfield");
