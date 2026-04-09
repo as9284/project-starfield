@@ -2,37 +2,90 @@
   <!-- Background -->
   <rect width="256" height="256" rx="48" fill="#08081a"/>
 
-  <!-- Outer glow ring -->
-  <circle cx="128" cy="128" r="80" stroke="url(#ring-grad)" stroke-width="1.5" fill="none" opacity="0.5"/>
+  <!-- Deep nebula glow -->
+  <circle cx="128" cy="128" r="70" fill="url(#nebula-core)" opacity="0.35"/>
+  <circle cx="128" cy="128" r="50" fill="url(#nebula-inner)" opacity="0.5"/>
 
-  <!-- Star shape -->
-  <path d="M128 60 L136 110 L186 110 L147 140 L161 190 L128 162 L95 190 L109 140 L70 110 L120 110 Z"
-        fill="url(#star-grad)" opacity="0.9"/>
+  <!-- Outer orbital ring (tilted via ellipse) -->
+  <ellipse cx="128" cy="128" rx="88" ry="34" stroke="url(#ring1)" stroke-width="1.2" fill="none" opacity="0.5" transform="rotate(-25 128 128)"/>
 
-  <!-- Center sparkle -->
-  <circle cx="128" cy="128" r="10" fill="white" opacity="0.95"/>
-  <circle cx="128" cy="128" r="5" fill="url(#glow-grad)"/>
+  <!-- Middle orbital ring -->
+  <ellipse cx="128" cy="128" rx="70" ry="70" stroke="url(#ring2)" stroke-width="0.8" fill="none" opacity="0.3"/>
 
-  <!-- Accent stars -->
-  <circle cx="68" cy="72" r="2.5" fill="#9b78f8" opacity="0.8"/>
-  <circle cx="190" cy="85" r="2" fill="#c4b5fd" opacity="0.7"/>
-  <circle cx="80" cy="190" r="2" fill="#9b78f8" opacity="0.6"/>
-  <circle cx="200" cy="175" r="1.5" fill="#c4b5fd" opacity="0.6"/>
-  <circle cx="45" cy="140" r="1.5" fill="#ddd6fe" opacity="0.5"/>
-  <circle cx="215" cy="130" r="1.5" fill="#ddd6fe" opacity="0.5"/>
+  <!-- Inner orbital ring (opposite tilt) -->
+  <ellipse cx="128" cy="128" rx="78" ry="28" stroke="url(#ring3)" stroke-width="1" fill="none" opacity="0.45" transform="rotate(35 128 128)"/>
+
+  <!-- Portal / warp core -->
+  <circle cx="128" cy="128" r="22" fill="url(#portal-grad)" opacity="0.9"/>
+  <circle cx="128" cy="128" r="14" fill="url(#portal-inner)" opacity="0.95"/>
+
+  <!-- Bright center point -->
+  <circle cx="128" cy="128" r="5" fill="white" opacity="0.97"/>
+  <circle cx="128" cy="128" r="3" fill="url(#center-glow)"/>
+
+  <!-- Light rays from center -->
+  <line x1="128" y1="100" x2="128" y2="80" stroke="url(#ray-v)" stroke-width="1" opacity="0.3" stroke-linecap="round"/>
+  <line x1="128" y1="156" x2="128" y2="176" stroke="url(#ray-v)" stroke-width="1" opacity="0.3" stroke-linecap="round"/>
+  <line x1="100" y1="128" x2="80" y2="128" stroke="url(#ray-h)" stroke-width="1" opacity="0.3" stroke-linecap="round"/>
+  <line x1="156" y1="128" x2="176" y2="128" stroke="url(#ray-h)" stroke-width="1" opacity="0.3" stroke-linecap="round"/>
+
+  <!-- Orbital dots (planets/satellites) -->
+  <circle cx="62" cy="107" r="3" fill="#c4b5fd" opacity="0.85"/>
+  <circle cx="194" cy="149" r="2.5" fill="#9b78f8" opacity="0.75"/>
+  <circle cx="155" cy="60" r="2" fill="#d946ef" opacity="0.6"/>
+
+  <!-- Distant stars -->
+  <circle cx="42" cy="58" r="1.5" fill="#ddd6fe" opacity="0.5"/>
+  <circle cx="208" cy="72" r="1.2" fill="#c4b5fd" opacity="0.45"/>
+  <circle cx="215" cy="195" r="1.5" fill="#9b78f8" opacity="0.4"/>
+  <circle cx="50" cy="200" r="1.8" fill="#ddd6fe" opacity="0.35"/>
+  <circle cx="178" cy="42" r="1" fill="#ece9fe" opacity="0.5"/>
+  <circle cx="80" cy="215" r="1" fill="#bba9fb" opacity="0.4"/>
 
   <defs>
-    <radialGradient id="star-grad" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#c4b5fd"/>
+    <radialGradient id="nebula-core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7c4ff0" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#5028c8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#08081a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nebula-inner" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d946ef" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#5028c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="portal-grad" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#bba9fb"/>
+      <stop offset="60%" stop-color="#7c4ff0"/>
+      <stop offset="100%" stop-color="#3d1ca3"/>
+    </radialGradient>
+    <radialGradient id="portal-inner" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#ece9fe"/>
+      <stop offset="50%" stop-color="#9b78f8"/>
       <stop offset="100%" stop-color="#5028c8"/>
     </radialGradient>
-    <radialGradient id="glow-grad" cx="50%" cy="50%" r="50%">
+    <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#9b78f8"/>
+      <stop offset="100%" stop-color="#bba9fb"/>
     </radialGradient>
-    <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="ring1" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#7c4ff0"/>
-      <stop offset="100%" stop-color="#d946ef"/>
+      <stop offset="50%" stop-color="#d946ef"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="ring2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5028c8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#d946ef" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="ring3" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d946ef"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="ray-v" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#9b78f8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ray-h" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#9b78f8" stop-opacity="0"/>
     </linearGradient>
   </defs>
 </svg>

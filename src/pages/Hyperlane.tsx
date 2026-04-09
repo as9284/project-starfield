@@ -15,11 +15,18 @@ export default function Hyperlane() {
           className="flex items-center gap-3 px-5 py-3"
           style={{ borderBottom: "1px solid var(--color-border-dim)" }}
         >
-          <button className="win-btn" onClick={() => setView("home")} title="Back to Home">
+          <button
+            className="win-btn"
+            onClick={() => setView("luna")}
+            title="Back to Luna"
+          >
             <ArrowLeft size={14} />
           </button>
           <Link size={16} style={{ color: "var(--color-purple-400)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          <span
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Hyperlane
           </span>
           <span
@@ -44,12 +51,19 @@ export default function Hyperlane() {
           >
             <Link size={32} style={{ color: "var(--color-purple-400)" }} />
           </div>
-          <h2 className="text-2xl font-bold text-glow-purple" style={{ color: "var(--color-text-primary)" }}>
+          <h2
+            className="text-2xl font-bold text-glow-purple"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Hyperlane
           </h2>
-          <p className="text-sm text-center max-w-md" style={{ color: "var(--color-text-secondary)" }}>
-            URL shortener — collapse long links into compact, shareable hyperspace jumps.
-            Ask Luna to shorten a URL or manage your link history directly in Hyperlane.
+          <p
+            className="text-sm text-center max-w-md"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            URL shortener — collapse long links into compact, shareable
+            hyperspace jumps. Ask Luna to shorten a URL or manage your link
+            history directly in Hyperlane.
           </p>
           <div
             className="glass rounded-xl px-5 py-3 text-xs flex items-center gap-2"

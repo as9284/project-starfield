@@ -15,11 +15,18 @@ export default function Pulsar() {
           className="flex items-center gap-3 px-5 py-3"
           style={{ borderBottom: "1px solid var(--color-border-dim)" }}
         >
-          <button className="win-btn" onClick={() => setView("home")} title="Back to Home">
+          <button
+            className="win-btn"
+            onClick={() => setView("luna")}
+            title="Back to Luna"
+          >
             <ArrowLeft size={14} />
           </button>
           <Download size={16} style={{ color: "var(--color-purple-400)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          <span
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Pulsar
           </span>
           <span
@@ -44,12 +51,19 @@ export default function Pulsar() {
           >
             <Download size={32} style={{ color: "var(--color-purple-400)" }} />
           </div>
-          <h2 className="text-2xl font-bold text-glow-purple" style={{ color: "var(--color-text-primary)" }}>
+          <h2
+            className="text-2xl font-bold text-glow-purple"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Pulsar
           </h2>
-          <p className="text-sm text-center max-w-md" style={{ color: "var(--color-text-secondary)" }}>
-            Media downloader — grab videos, music, and playlists from YouTube with a single pulse.
-            Ask Luna to download something or use Pulsar's dedicated interface.
+          <p
+            className="text-sm text-center max-w-md"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Media downloader — grab videos, music, and playlists from YouTube
+            with a single pulse. Ask Luna to download something or use Pulsar's
+            dedicated interface.
           </p>
           <div
             className="glass rounded-xl px-5 py-3 text-xs flex items-center gap-2"

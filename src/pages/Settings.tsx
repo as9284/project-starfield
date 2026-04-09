@@ -16,7 +16,13 @@ interface KeyFieldProps {
   onDelete: () => Promise<void>;
 }
 
-function KeyField({ label, placeholder, hasKey, onSave, onDelete }: KeyFieldProps) {
+function KeyField({
+  label,
+  placeholder,
+  hasKey,
+  onSave,
+  onDelete,
+}: KeyFieldProps) {
   const [value, setValue] = useState("");
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -48,13 +54,19 @@ function KeyField({ label, placeholder, hasKey, onSave, onDelete }: KeyFieldProp
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
+        <label
+          className="text-sm font-medium"
+          style={{ color: "var(--color-text-primary)" }}
+        >
           {label}
         </label>
         {hasKey && (
           <span
             className="text-xs px-2 py-0.5 rounded"
-            style={{ background: "rgba(124,79,240,0.15)", color: "var(--color-purple-300)" }}
+            style={{
+              background: "rgba(124,79,240,0.15)",
+              color: "var(--color-purple-300)",
+            }}
           >
             Saved
           </span>
@@ -93,7 +105,12 @@ function KeyField({ label, placeholder, hasKey, onSave, onDelete }: KeyFieldProp
         {hasKey && (
           <button
             className="win-btn win-btn-close"
-            style={{ width: 38, height: 38, borderRadius: "var(--radius-md)", opacity: 1 }}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "var(--radius-md)",
+              opacity: 1,
+            }}
             onClick={() => void handleDelete()}
             title="Remove key"
           >
@@ -119,17 +136,27 @@ export default function Settings() {
     <div className="flex-1 overflow-y-auto px-6 py-6">
       <div className="max-w-lg mx-auto flex flex-col gap-8 animate-fade-up">
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Settings
           </h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            API keys are stored securely in your OS keychain and never written to disk.
+          <p
+            className="mt-1 text-sm"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            API keys are stored securely in your OS keychain and never written
+            to disk.
           </p>
         </div>
 
         {/* AI */}
         <section className="glass rounded-xl p-5 flex flex-col gap-5">
-          <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             AI — Luna (DeepSeek)
           </h3>
 
@@ -149,14 +176,20 @@ export default function Settings() {
 
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Luna uses{" "}
-            <span style={{ color: "var(--color-purple-300)" }}>DeepSeek-V3</span>{" "}
-            (deepseek-chat) with automatic prefix caching for fast, cost-efficient
-            responses. Get a key at{" "}
+            <span style={{ color: "var(--color-purple-300)" }}>
+              DeepSeek-V3.2
+            </span>{" "}
+            in non-thinking mode via the official <code>deepseek-chat</code>{" "}
+            alias, with thinking explicitly disabled in the request payload. Get
+            a key at{" "}
             <a
               href="https://platform.deepseek.com"
               target="_blank"
               rel="noreferrer"
-              style={{ color: "var(--color-nebula-teal)", textDecoration: "underline" }}
+              style={{
+                color: "var(--color-nebula-teal)",
+                textDecoration: "underline",
+              }}
             >
               platform.deepseek.com
             </a>
@@ -166,7 +199,10 @@ export default function Settings() {
 
         {/* Web search */}
         <section className="glass rounded-xl p-5 flex flex-col gap-5">
-          <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             Web Search — Tavily
           </h3>
 
@@ -185,13 +221,16 @@ export default function Settings() {
           />
 
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Enable the web search toggle in Luna to let her fetch live results via Tavily.
-            Get a free key at{" "}
+            Enable the web search toggle in Luna to let her fetch live results
+            via Tavily. Get a free key at{" "}
             <a
               href="https://tavily.com"
               target="_blank"
               rel="noreferrer"
-              style={{ color: "var(--color-nebula-teal)", textDecoration: "underline" }}
+              style={{
+                color: "var(--color-nebula-teal)",
+                textDecoration: "underline",
+              }}
             >
               tavily.com
             </a>

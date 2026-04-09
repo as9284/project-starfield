@@ -8,14 +8,25 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type AppView = "home" | "luna" | "orbit" | "solaris" | "beacon" | "pulsar" | "hyperlane" | "settings";
+export type AppView =
+  | "luna"
+  | "orbit"
+  | "solaris"
+  | "beacon"
+  | "pulsar"
+  | "hyperlane"
+  | "settings";
 
 interface AppState {
   // Navigation
   view: AppView;
   previousView: Exclude<AppView, "settings">;
+  showConstellations: boolean;
   setView: (v: AppView) => void;
   goBack: () => void;
+  openConstellations: () => void;
+  closeConstellations: () => void;
+  toggleConstellations: () => void;
 
   // API keys (stored in OS keychain; these flags track presence)
   hasDeepSeekKey: boolean;
@@ -37,23 +48,32 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      view: "home",
-      previousView: "home",
+      view: "luna",
+      previousView: "luna",
+      showConstellations: false,
       setView: (v) =>
         set((state) => {
           if (v === "settings") {
             return {
               view: v,
+              showConstellations: false,
               previousView:
-                state.view === "settings" ? state.previousView : (state.view as Exclude<AppView, "settings">),
+                state.view === "settings"
+                  ? state.previousView
+                  : (state.view as Exclude<AppView, "settings">),
             };
           }
-          return { view: v, previousView: v };
+          return { view: v, previousView: v, showConstellations: false };
         }),
       goBack: () =>
         set((state) => ({
-          view: state.view === "settings" ? state.previousView : "home",
+          view: state.view === "settings" ? state.previousView : "luna",
+          showConstellations: false,
         })),
+      openConstellations: () => set({ showConstellations: true }),
+      closeConstellations: () => set({ showConstellations: false }),
+      toggleConstellations: () =>
+        set((state) => ({ showConstellations: !state.showConstellations })),
 
       hasDeepSeekKey: false,
       setHasDeepSeekKey: (v) => set({ hasDeepSeekKey: v }),

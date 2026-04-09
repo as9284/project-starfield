@@ -15,11 +15,21 @@ export default function Beacon() {
           className="flex items-center gap-3 px-5 py-3"
           style={{ borderBottom: "1px solid var(--color-border-dim)" }}
         >
-          <button className="win-btn" onClick={() => setView("home")} title="Back to Home">
+          <button
+            className="win-btn"
+            onClick={() => setView("luna")}
+            title="Back to Luna"
+          >
             <ArrowLeft size={14} />
           </button>
-          <FolderSearch size={16} style={{ color: "var(--color-purple-400)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          <FolderSearch
+            size={16}
+            style={{ color: "var(--color-purple-400)" }}
+          />
+          <span
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Beacon
           </span>
           <span
@@ -42,14 +52,24 @@ export default function Beacon() {
               border: "1px solid rgba(124, 79, 240, 0.25)",
             }}
           >
-            <FolderSearch size={32} style={{ color: "var(--color-purple-400)" }} />
+            <FolderSearch
+              size={32}
+              style={{ color: "var(--color-purple-400)" }}
+            />
           </div>
-          <h2 className="text-2xl font-bold text-glow-purple" style={{ color: "var(--color-text-primary)" }}>
+          <h2
+            className="text-2xl font-bold text-glow-purple"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Beacon
           </h2>
-          <p className="text-sm text-center max-w-md" style={{ color: "var(--color-text-secondary)" }}>
-            Code explorer — import local folders, projects, or GitHub repos and explore them with Luna.
-            Navigate codebases, understand architecture, and get AI-powered answers about any project.
+          <p
+            className="text-sm text-center max-w-md"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Code explorer — import local folders, projects, or GitHub repos and
+            explore them with Luna. Navigate codebases, understand architecture,
+            and get AI-powered answers about any project.
           </p>
           <div
             className="glass rounded-xl px-5 py-3 text-xs flex items-center gap-2"

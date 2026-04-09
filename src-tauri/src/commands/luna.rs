@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tauri::{command, ipc::Channel};
 
-const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/v1";
+const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
 const DEEPSEEK_MODEL: &str = "deepseek-chat";
 
 // ── Request / response types ──────────────────────────────────────────────
@@ -19,9 +19,16 @@ pub struct ChatMessage {
 struct DeepSeekRequest {
     model: String,
     messages: Vec<DeepSeekMessage>,
+    thinking: ThinkingConfig,
     stream: bool,
     temperature: f32,
     max_tokens: u32,
+}
+
+#[derive(Debug, Serialize)]
+struct ThinkingConfig {
+    #[serde(rename = "type")]
+    mode: &'static str,
 }
 
 /// A single message in the DeepSeek API format.
@@ -95,6 +102,7 @@ pub async fn stream_luna(
     let body = DeepSeekRequest {
         model: DEEPSEEK_MODEL.to_string(),
         messages,
+        thinking: ThinkingConfig { mode: "disabled" },
         stream: true,
         temperature: 0.7,
         max_tokens: 8192,
