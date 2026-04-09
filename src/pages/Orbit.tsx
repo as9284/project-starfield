@@ -492,7 +492,7 @@ function NoteModal({ note, onSave, onClose }: NoteModalProps) {
 // ── Main Orbit Page ──────────────────────────────────────────────────────────
 
 export default function Orbit() {
-  const { setView } = useAppStore();
+  const { goBack } = useAppStore();
   const {
     tasks,
     notes,
@@ -619,8 +619,8 @@ export default function Orbit() {
         >
           <button
             className="win-btn"
-            onClick={() => setView("luna")}
-            title="Back to Luna"
+            onClick={goBack}
+            title="Back"
           >
             <ArrowLeft size={14} />
           </button>

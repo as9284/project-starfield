@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trash2, Globe, ArrowUp, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, X } from "lucide-react";
+import { Trash2, Globe, ArrowUp, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, X, Sparkles } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -112,6 +112,8 @@ export default function Luna() {
     hasDeepSeekKey,
     hasTavilyKey,
     setView,
+    toggleConstellations,
+    showConstellations,
   } = useAppStore();
 
   const {
@@ -404,6 +406,14 @@ export default function Luna() {
                 >
                   <Globe size={13} />
                   <span>Search</span>
+                </button>
+                <button
+                  onClick={toggleConstellations}
+                  title="Constellations"
+                  className={`luna-tool-btn ${showConstellations ? "luna-tool-btn-active" : ""}`}
+                >
+                  <Sparkles size={13} />
+                  <span>Constellations</span>
                 </button>
               </div>
               {messages.length > 0 && (

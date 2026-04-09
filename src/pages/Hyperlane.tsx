@@ -3,7 +3,7 @@ import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 
 export default function Hyperlane() {
-  const { setView } = useAppStore();
+  const { goBack } = useAppStore();
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -17,8 +17,8 @@ export default function Hyperlane() {
         >
           <button
             className="win-btn"
-            onClick={() => setView("luna")}
-            title="Back to Luna"
+            onClick={goBack}
+            title="Back"
           >
             <ArrowLeft size={14} />
           </button>
