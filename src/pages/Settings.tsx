@@ -7,6 +7,8 @@ import {
   deleteDeepSeekKey,
   saveTavilyKey,
   deleteTavilyKey,
+  saveWeatherKey,
+  deleteWeatherKey,
 } from "../lib/tauri";
 
 interface KeyFieldProps {
@@ -130,7 +132,7 @@ function KeyField({
 }
 
 export default function Settings() {
-  const { hasDeepSeekKey, setHasDeepSeekKey, hasTavilyKey, setHasTavilyKey, memories, removeMemory, clearMemories, importMemories } =
+  const { hasDeepSeekKey, setHasDeepSeekKey, hasTavilyKey, setHasTavilyKey, hasWeatherKey, setHasWeatherKey, memories, removeMemory, clearMemories, importMemories } =
     useAppStore();
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -277,6 +279,51 @@ export default function Settings() {
               }}
             >
               tavily.com
+            </a>
+            .
+          </p>
+        </section>
+
+        {/* Weather */}
+        <section className="glass rounded-xl p-5 flex flex-col gap-5">
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Solaris — Weather API
+          </h3>
+
+          <KeyField
+            label="Weather API Key"
+            placeholder="Enter API key (optional)"
+            hasKey={hasWeatherKey}
+            onSave={async (key) => {
+              await saveWeatherKey(key);
+              setHasWeatherKey(true);
+            }}
+            onDelete={async () => {
+              await deleteWeatherKey();
+              setHasWeatherKey(false);
+            }}
+          />
+
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Solaris uses{" "}
+            <span style={{ color: "var(--color-purple-300)" }}>
+              Open-Meteo
+            </span>{" "}
+            for weather data, which is free and works without a key. An optional
+            API key is available for commercial use or higher rate limits at{" "}
+            <a
+              href="https://open-meteo.com"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "var(--color-nebula-teal)",
+                textDecoration: "underline",
+              }}
+            >
+              open-meteo.com
             </a>
             .
           </p>

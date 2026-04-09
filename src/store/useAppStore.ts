@@ -47,6 +47,8 @@ interface AppState {
   setHasDeepSeekKey: (v: boolean) => void;
   hasTavilyKey: boolean;
   setHasTavilyKey: (v: boolean) => void;
+  hasWeatherKey: boolean;
+  setHasWeatherKey: (v: boolean) => void;
 
   // Conversations
   conversations: Conversation[];
@@ -142,6 +144,8 @@ export const useAppStore = create<AppState>()(
         setHasDeepSeekKey: (v) => set({ hasDeepSeekKey: v }),
         hasTavilyKey: false,
         setHasTavilyKey: (v) => set({ hasTavilyKey: v }),
+        hasWeatherKey: false,
+        setHasWeatherKey: (v) => set({ hasWeatherKey: v }),
 
         // Conversations
         conversations: [initial],
