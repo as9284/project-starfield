@@ -25,6 +25,8 @@
     "store:allow-load",
     "store:allow-clear",
     "store:allow-keys",
-    "store:allow-has"
+    "store:allow-has",
+    "dialog:default",
+    "dialog:allow-open"
   ]
 }

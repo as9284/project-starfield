@@ -21,7 +21,8 @@ import {
   type BeaconProject,
   type BeaconChatMessage,
 } from "../store/useBeaconStore";
-import { streamChat, getDeepSeekKey } from "../lib/tauri";
+import { streamChat, getDeepSeekKey, scanLocalDirectory } from "../lib/tauri";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -208,6 +209,44 @@ function BeaconHome() {
   const [mode, setMode] = useState<"none" | "github">("none");
   const hasRecent = recentProjects.length > 0;
 
+  const handleLocalFolder = async () => {
+    if (!hasDeepSeekKey) {
+      setIndexError("Enter your DeepSeek API key in Settings first.");
+      return;
+    }
+    setIndexError(null);
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Select a project folder",
+      });
+      if (!selected) return; // user cancelled
+
+      setIsIndexing(true);
+      const result = await scanLocalDirectory(selected);
+
+      setActiveProject({
+        name: result.name,
+        root: result.root,
+        source: "local",
+        fileCount: result.fileCount,
+        indexedAt: Date.now(),
+        files: result.files.map((f) => ({
+          path: f.path,
+          relativePath: f.relativePath,
+          size: f.size,
+          isText: f.isText,
+          content: f.content,
+        })),
+      });
+    } catch (e) {
+      setIndexError(String(e));
+    } finally {
+      setIsIndexing(false);
+    }
+  };
+
   const handleGithubImport = async () => {
     if (!hasDeepSeekKey) {
       setIndexError("Enter your DeepSeek API key in Settings first.");
@@ -314,12 +353,39 @@ function BeaconHome() {
     }
   };
 
-  const handleOpenRecent = (project: BeaconProject) => {
+  const handleOpenRecent = async (project: BeaconProject) => {
     if (!hasDeepSeekKey) {
       setIndexError("Enter your DeepSeek API key in Settings first.");
       return;
     }
-    // For recent projects, just reopen them with cached data
+    // For local projects, re-scan the directory to get fresh file contents
+    if (project.source === "local") {
+      setIndexError(null);
+      setIsIndexing(true);
+      try {
+        const result = await scanLocalDirectory(project.root);
+        setActiveProject({
+          name: result.name,
+          root: result.root,
+          source: "local",
+          fileCount: result.fileCount,
+          indexedAt: Date.now(),
+          files: result.files.map((f) => ({
+            path: f.path,
+            relativePath: f.relativePath,
+            size: f.size,
+            isText: f.isText,
+            content: f.content,
+          })),
+        });
+      } catch (e) {
+        setIndexError(String(e));
+      } finally {
+        setIsIndexing(false);
+      }
+      return;
+    }
+    // For GitHub projects, just reopen them with cached data
     setActiveProject({
       ...project,
       files: project.files || [],
@@ -365,6 +431,48 @@ function BeaconHome() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
       >
+        {/* Open local folder */}
+        <div className="glass rounded-xl overflow-hidden">
+          <button
+            className="flex items-center gap-3.5 px-4 py-3.5 text-left w-full transition-colors duration-200 group"
+            onClick={() => { handleLocalFolder(); }}
+            disabled={isIndexing}
+          >
+            <FolderOpen
+              size={19}
+              className="shrink-0"
+              style={{ color: "var(--color-purple-400)" }}
+            />
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-sm font-medium"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                Open local folder
+              </p>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Browse and select a project on your machine
+              </p>
+            </div>
+            {isIndexing ? (
+              <Loader2
+                size={14}
+                className="shrink-0 animate-spin"
+                style={{ color: "var(--color-purple-400)" }}
+              />
+            ) : (
+              <ArrowRight
+                size={14}
+                className="shrink-0 opacity-0 group-hover:opacity-50 transition-all"
+                style={{ color: "var(--color-purple-400)" }}
+              />
+            )}
+          </button>
+        </div>
+
         {/* Import GitHub repository */}
         <div className="glass rounded-xl overflow-hidden">
           <button
@@ -845,7 +953,7 @@ function BeaconChat() {
 // ── Main Beacon Page ─────────────────────────────────────────────────────────
 
 export default function Beacon() {
-  const { setView } = useAppStore();
+  const { goBack } = useAppStore();
   const { activeProject } = useBeaconStore();
 
   return (
@@ -860,8 +968,8 @@ export default function Beacon() {
         >
           <button
             className="win-btn"
-            onClick={() => setView("luna")}
-            title="Back to Luna"
+            onClick={goBack}
+            title="Back"
           >
             <ArrowLeft size={14} />
           </button>

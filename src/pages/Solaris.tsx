@@ -483,7 +483,7 @@ function LocationSearchInput() {
 // ── Main Solaris Page ────────────────────────────────────────────────────────
 
 export default function Solaris() {
-  const { setView } = useAppStore();
+  const { goBack } = useAppStore();
   const { weatherData, isLoading, error, fetchWeather, selectedLocation } =
     useSolarisStore();
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
@@ -513,8 +513,8 @@ export default function Solaris() {
         >
           <button
             className="win-btn"
-            onClick={() => setView("luna")}
-            title="Back to Luna"
+            onClick={goBack}
+            title="Back"
           >
             <ArrowLeft size={14} />
           </button>

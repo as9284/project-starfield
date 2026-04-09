@@ -7,12 +7,8 @@ export default function TitleBar() {
   const {
     view,
     setView,
-    showConstellations,
     closeConstellations,
-    toggleConstellations,
   } = useAppStore();
-
-  const isConstellation = view !== "luna" && view !== "settings";
 
   return (
     <div className="topbar">
@@ -37,33 +33,16 @@ export default function TitleBar() {
           className="px-3 py-1 rounded-md transition-colors"
           style={{
             color:
-              view === "luna" && !showConstellations
+              view === "luna"
                 ? "var(--color-purple-400)"
                 : "var(--color-text-muted)",
             background:
-              view === "luna" && !showConstellations
+              view === "luna"
                 ? "rgba(124, 79, 240, 0.12)"
                 : "transparent",
           }}
         >
           Luna
-        </button>
-
-        <button
-          onClick={toggleConstellations}
-          className="px-3 py-1 rounded-md transition-colors"
-          style={{
-            color:
-              showConstellations || isConstellation
-                ? "var(--color-purple-400)"
-                : "var(--color-text-muted)",
-            background:
-              showConstellations || isConstellation
-                ? "rgba(124, 79, 240, 0.12)"
-                : "transparent",
-          }}
-        >
-          Constellations
         </button>
 
         <button

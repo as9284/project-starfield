@@ -113,3 +113,21 @@ export const webSearch = (query: string) =>
 export const minimizeWindow = () => win().minimize();
 export const maximizeWindow = () => win().toggleMaximize();
 export const closeWindow = () => win().close();
+
+// ── Beacon: local directory scanning ──────────────────────────────────────
+
+export interface ScanResult {
+  name: string;
+  root: string;
+  fileCount: number;
+  files: {
+    path: string;
+    relativePath: string;
+    size: number;
+    isText: boolean;
+    content?: string;
+  }[];
+}
+
+export const scanLocalDirectory = (path: string) =>
+  invoke<ScanResult>("scan_local_directory", { path });
