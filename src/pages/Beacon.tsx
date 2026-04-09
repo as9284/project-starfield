@@ -14,6 +14,8 @@ import {
   Trash2,
   ChevronLeft,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import {
@@ -897,8 +899,14 @@ function BeaconChat() {
                       }}
                     />
                   </span>
+                ) : msg.role === "assistant" ? (
+                  <div className="prose-starfield">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
                 ) : (
-                  <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
+                  <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
                 )}
               </div>
             </motion.div>
