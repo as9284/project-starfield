@@ -99,7 +99,7 @@ function statusLabel(item: DownloadItem): string {
     case "queued":
       return "Queued";
     case "downloading":
-      if (item.playlistTotal && item.playlistIndex) {
+      if (item.playlistTotal != null && item.playlistIndex != null) {
         return `Item ${item.playlistIndex} of ${item.playlistTotal}`;
       }
       return item.progress > 0 ? `${item.progress.toFixed(1)}%` : "Starting…";
@@ -335,6 +335,7 @@ export default function Pulsar() {
       id,
       url: downloadUrl,
       format: downloadFormat,
+      playlist: isPlaylist,
       status: "queued",
       progress: 0,
       speed: "",
@@ -419,7 +420,7 @@ export default function Pulsar() {
   };
 
   const handleRetry = (item: DownloadItem) => {
-    void startDownload(item.url, item.format, false);
+    void startDownload(item.url, item.format, item.playlist);
   };
 
   const noOutputDir = !outputDir.trim();

@@ -232,13 +232,10 @@ export const useAppStore = create<AppState>()(
           set((s) => {
             if (!getActiveConvo(s)) return s;
             return { conversations: updateActiveConvo(s, (c) => {
-              const msgs = [...c.messages];
-              for (let i = msgs.length - 1; i >= 0; i--) {
-                if (msgs[i].role === "assistant") {
-                  msgs.splice(i, 1);
-                  break;
-                }
-              }
+              const lastAssistantIdx = [...c.messages].reverse().findIndex(m => m.role === "assistant");
+              if (lastAssistantIdx === -1) return c;
+              const idx = c.messages.length - 1 - lastAssistantIdx;
+              const msgs = [...c.messages.slice(0, idx), ...c.messages.slice(idx + 1)];
               return { ...c, messages: msgs, updatedAt: Date.now() };
             }) };
           }),

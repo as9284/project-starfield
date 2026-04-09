@@ -15,6 +15,8 @@ export interface DownloadItem {
   id: string;
   url: string;
   format: FormatOption;
+  /** Whether this was a playlist download */
+  playlist: boolean;
   status: DownloadStatus;
   /** 0–100 */
   progress: number;
