@@ -43,15 +43,21 @@ function parseAndExecuteOrbitCommands(
     try {
       const args = JSON.parse(jsonStr) as Record<string, unknown>;
       switch (command) {
-        case "CREATE_TASK":
+        case "CREATE_TASK": {
+          const rawDue = args.due_date;
+          const dueDate =
+            rawDue != null && rawDue !== "null" && typeof rawDue === "string" && rawDue.trim() !== ""
+              ? rawDue
+              : null;
           orbitActions.createTask({
             title: String(args.title ?? ""),
-            description: args.description != null ? String(args.description) : null,
-            priority: (args.priority as "low" | "medium" | "high") ?? "medium",
-            due_date: args.due_date != null && args.due_date !== "null" ? String(args.due_date) : null,
+            description: args.description != null && args.description !== "null" ? String(args.description) : null,
+            priority: (["low", "medium", "high"].includes(String(args.priority)) ? args.priority : "medium") as "low" | "medium" | "high",
+            due_date: dueDate,
           });
           executed = true;
           break;
+        }
         case "COMPLETE_TASK":
           orbitActions.completeTask(String(args.id ?? ""));
           executed = true;

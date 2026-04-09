@@ -1,3 +1,11 @@
+/** Strip control characters and backtick sequences to prevent prompt injection. */
+function sanitizeForPrompt(text: string, maxLen = 120): string {
+  return text
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/`{3,}/g, "```")
+    .slice(0, maxLen);
+}
+
 export interface OrbitContext {
   activeTasks: Array<{
     id: string;
@@ -137,7 +145,7 @@ ${
 ${orbit.activeTasks
   .map(
     (t) =>
-      `- [${t.id}] "${t.title}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${t.description}` : ""}`,
+      `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`,
   )
   .join("\n")}`
     : "**No active tasks.**"
@@ -146,7 +154,7 @@ ${orbit.activeTasks
 ${
   orbit.notes.length > 0
     ? `**Notes (${orbit.notes.length}):**
-${orbit.notes.map((n) => `- [${n.id}] "${n.title}"${n.content ? `: ${n.content.slice(0, 80)}${n.content.length > 80 ? "…" : ""}` : ""}`).join("\n")}`
+${orbit.notes.map((n) => `- [${n.id}] "${sanitizeForPrompt(n.title)}"${n.content ? `: ${sanitizeForPrompt(n.content)}` : ""}`).join("\n")}`
     : "**No notes.**"
 }
 
