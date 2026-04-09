@@ -6,9 +6,87 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CosmicLogo } from "../components/CosmicLogo";
 import { useAppStore, MAX_CONVERSATION_TITLE_LENGTH } from "../store/useAppStore";
+import { useOrbitStore } from "../store/useOrbitStore";
 import { streamLuna, webSearch } from "../lib/tauri";
 import type { ChatMessagePayload } from "../lib/tauri";
 import { extractMemories } from "../lib/memory";
+import type { OrbitContext } from "../lib/luna-prompt";
+
+// ── Orbit command parser ─────────────────────────────────────────────────────
+
+function parseAndExecuteOrbitCommands(
+  response: string,
+  orbitActions: {
+    createTask: (data: { title: string; description?: string | null; priority?: "low" | "medium" | "high"; due_date?: string | null }) => string;
+    completeTask: (id: string) => void;
+    uncompleteTask: (id: string) => void;
+    archiveTask: (id: string) => void;
+    deleteTask: (id: string) => void;
+    createNote: (data: { title: string; content?: string | null }) => string;
+    deleteNote: (id: string) => void;
+  },
+): boolean {
+  const blockMatch = response.match(/```orbit-commands\n([\s\S]*?)```/);
+  if (!blockMatch) return false;
+
+  const lines = blockMatch[1].trim().split("\n");
+  let executed = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const spaceIdx = trimmed.indexOf(" ");
+    const command = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+    const jsonStr = spaceIdx === -1 ? "{}" : trimmed.slice(spaceIdx + 1);
+
+    try {
+      const args = JSON.parse(jsonStr) as Record<string, unknown>;
+      switch (command) {
+        case "CREATE_TASK":
+          orbitActions.createTask({
+            title: String(args.title ?? ""),
+            description: args.description != null ? String(args.description) : null,
+            priority: (args.priority as "low" | "medium" | "high") ?? "medium",
+            due_date: args.due_date != null && args.due_date !== "null" ? String(args.due_date) : null,
+          });
+          executed = true;
+          break;
+        case "COMPLETE_TASK":
+          orbitActions.completeTask(String(args.id ?? ""));
+          executed = true;
+          break;
+        case "UNCOMPLETE_TASK":
+          orbitActions.uncompleteTask(String(args.id ?? ""));
+          executed = true;
+          break;
+        case "ARCHIVE_TASK":
+          orbitActions.archiveTask(String(args.id ?? ""));
+          executed = true;
+          break;
+        case "DELETE_TASK":
+          orbitActions.deleteTask(String(args.id ?? ""));
+          executed = true;
+          break;
+        case "CREATE_NOTE":
+          orbitActions.createNote({
+            title: String(args.title ?? ""),
+            content: args.content != null ? String(args.content) : null,
+          });
+          executed = true;
+          break;
+        case "DELETE_NOTE":
+          orbitActions.deleteNote(String(args.id ?? ""));
+          executed = true;
+          break;
+      }
+    } catch {
+      // skip malformed command lines
+    }
+  }
+
+  return executed;
+}
 
 export default function Luna() {
   const {
@@ -30,6 +108,18 @@ export default function Luna() {
     setView,
   } = useAppStore();
 
+  const {
+    tasks,
+    notes,
+    createTask,
+    completeTask,
+    uncompleteTask,
+    archiveTask,
+    deleteTask,
+    createNote,
+    deleteNote,
+  } = useOrbitStore();
+
   const activeConvo = conversations.find((c) => c.id === activeConversationId);
   const messages = activeConvo?.messages ?? [];
 
@@ -47,6 +137,24 @@ export default function Luna() {
     () => memories.map((m) => m.content),
     [memories],
   );
+
+  // Build orbit context for Luna's system prompt
+  const orbitContext = useMemo((): OrbitContext => ({
+    activeTasks: tasks
+      .filter((t) => !t.archived)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        priority: t.priority,
+        due_date: t.due_date,
+      })),
+    notes: notes.map((n) => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+    })),
+  }), [tasks, notes]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -102,7 +210,19 @@ export default function Luna() {
           }
         },
         memoryStrings,
+        orbitContext,
       );
+
+      // Parse and execute any orbit commands in the response
+      parseAndExecuteOrbitCommands(accumulated, {
+        createTask,
+        completeTask,
+        uncompleteTask,
+        archiveTask,
+        deleteTask,
+        createNote,
+        deleteNote,
+      });
 
       // Auto-title: use first ~40 chars of first user message
       if (isFirstMessage && activeConversationId) {
@@ -244,7 +364,7 @@ export default function Luna() {
                       ) : msg.role === "assistant" ? (
                         <div className="prose-starfield">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {msg.content}
+                            {msg.content.replace(/```orbit-commands[\s\S]*?```/g, "").trimEnd()}
                           </ReactMarkdown>
                         </div>
                       ) : (
