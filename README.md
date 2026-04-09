@@ -11,7 +11,7 @@ Built with [Tauri v2](https://tauri.app), React 19, TypeScript, and Tailwind CSS
 | Constellation | Source Project | Status | Description |
 | ------------- | -------------- | ------ | ----------- |
 | **Luna** | Luna AI | ✅ Active | Central AI companion — ask anything, control every constellation, get instant answers with live web search |
-| **Orbit** | Orbit | 🔜 Coming soon | Task management and notes — plan missions, track goals, keep ideas in orbit |
+| **Orbit** | Orbit | ✅ Active | Task management and notes — plan missions, track goals, keep ideas in orbit; Luna has full control |
 | **Solaris** | Star Weather | 🔜 Coming soon | Weather intelligence — real-time forecasts, 7-day outlooks, atmospheric insights |
 | **Beacon** | Beacon | 🔜 Coming soon | Code explorer — import local folders, GitHub repos, and explore codebases with Luna |
 | **Pulsar** | Pulsar | 🔜 Coming soon | Media downloader — grab videos, music, and playlists from YouTube |

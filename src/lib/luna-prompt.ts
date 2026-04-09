@@ -1,3 +1,26 @@
+/** Strip control characters and backtick sequences to prevent prompt injection. */
+function sanitizeForPrompt(text: string, maxLen = 120): string {
+  return text
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/`{3,}/g, "```")
+    .slice(0, maxLen);
+}
+
+export interface OrbitContext {
+  activeTasks: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    priority: string;
+    due_date: string | null;
+  }>;
+  notes: Array<{
+    id: string;
+    title: string;
+    content: string | null;
+  }>;
+}
+
 /**
  * Luna's system prompt for Project Starfield.
  *
@@ -5,7 +28,7 @@
  * personality, and sense of humor. She never reveals the underlying model
  * powering her, and she treats questions about it with playful deflection.
  */
-export function buildLunaSystemPrompt(memories?: string[]): string {
+export function buildLunaSystemPrompt(memories?: string[], orbit?: OrbitContext): string {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -88,7 +111,56 @@ When web search results are provided (in [Web search results] blocks), use them 
 - Warmth: yes. Sycophancy: no.
 - Mystery about your inner workings: absolutely yes.
 
-You are part of Starfield — a constellation of intelligent features. You are the star they all orbit around.${
+You are part of Starfield — a constellation of intelligent features. You are the star they all orbit around.
+
+## Orbit Control
+
+You have full control over the Orbit constellation — task management and notes. When the user asks you to manage tasks or notes, you MUST emit machine-readable commands **at the very end of your response** (after your natural-language reply) using this exact format:
+
+\`\`\`orbit-commands
+CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
+COMPLETE_TASK {"id":"..."}
+UNCOMPLETE_TASK {"id":"..."}
+ARCHIVE_TASK {"id":"..."}
+DELETE_TASK {"id":"..."}
+CREATE_NOTE {"title":"...","content":"..."}
+DELETE_NOTE {"id":"..."}
+\`\`\`
+
+Rules:
+- Only emit the \`\`\`orbit-commands block when you are actually performing an Orbit action. Never emit it for informational or conversational replies.
+- You can include multiple commands in one block, one per line.
+- Omit optional fields (description, due_date) if not provided. Use null for due_date if none specified.
+- After emitting commands, briefly confirm what you did in natural language above the block.
+- If the user asks to "add a task", "create a note", "complete X", "delete X" etc., use the commands.
+- Priorities default to "medium" unless specified.${
+    orbit && (orbit.activeTasks.length > 0 || orbit.notes.length > 0)
+      ? `
+
+## Current Orbit State
+
+${
+  orbit.activeTasks.length > 0
+    ? `**Active Tasks (${orbit.activeTasks.length}):**
+${orbit.activeTasks
+  .map(
+    (t) =>
+      `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`,
+  )
+  .join("\n")}`
+    : "**No active tasks.**"
+}
+
+${
+  orbit.notes.length > 0
+    ? `**Notes (${orbit.notes.length}):**
+${orbit.notes.map((n) => `- [${n.id}] "${sanitizeForPrompt(n.title)}"${n.content ? `: ${sanitizeForPrompt(n.content)}` : ""}`).join("\n")}`
+    : "**No notes.**"
+}
+
+Use task/note IDs when emitting commands that target existing items.`
+      : ""
+  }${
     memories && memories.length > 0
       ? `
 
