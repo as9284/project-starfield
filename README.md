@@ -8,10 +8,14 @@ Built with [Tauri v2](https://tauri.app), React 19, TypeScript, and Tailwind CSS
 
 ## Constellations
 
-| Constellation | Status | Description |
-| ------------- | ------ | ----------- |
-| **Luna** | ✅ Active | Central AI chat — ask anything, get instant answers with optional live web search |
-| **Aurora** | 🔜 Coming soon | Intelligent document analysis and summarisation |
+| Constellation | Source Project | Status | Description |
+| ------------- | -------------- | ------ | ----------- |
+| **Luna** | Luna AI | ✅ Active | Central AI companion — ask anything, control every constellation, get instant answers with live web search |
+| **Orbit** | Orbit | 🔜 Coming soon | Task management and notes — plan missions, track goals, keep ideas in orbit |
+| **Solaris** | Star Weather | 🔜 Coming soon | Weather intelligence — real-time forecasts, 7-day outlooks, atmospheric insights |
+| **Beacon** | Beacon | 🔜 Coming soon | Code explorer — import local folders, GitHub repos, and explore codebases with Luna |
+| **Pulsar** | Pulsar | 🔜 Coming soon | Media downloader — grab videos, music, and playlists from YouTube |
+| **Hyperlane** | Hyperlane | 🔜 Coming soon | URL shortener — collapse long links into compact hyperspace jumps |
 
 ---
 
@@ -84,6 +88,11 @@ starfield/
 │   ├── pages/
 │   │   ├── Home.tsx            # Starfield home — Constellations hub
 │   │   ├── Luna.tsx            # Luna AI chat page
+│   │   ├── Orbit.tsx           # Orbit — task management & notes
+│   │   ├── Solaris.tsx         # Solaris — weather intelligence
+│   │   ├── Beacon.tsx          # Beacon — AI code explorer
+│   │   ├── Pulsar.tsx          # Pulsar — media downloader
+│   │   ├── Hyperlane.tsx       # Hyperlane — URL shortener
 │   │   └── Settings.tsx        # API key management
 │   ├── components/
 │   │   ├── TitleBar.tsx        # Frameless window title bar + nav

@@ -1,9 +1,11 @@
-import { Minus, Maximize2, X, Star } from "lucide-react";
+import { Minus, Maximize2, X, Star, Home } from "lucide-react";
 import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
 
 export default function TitleBar() {
   const { view, setView } = useAppStore();
+
+  const isConstellation = view !== "home" && view !== "luna" && view !== "settings";
 
   return (
     <div className="topbar">
@@ -23,11 +25,26 @@ export default function TitleBar() {
             onClick={() => setView(v)}
             className="px-3 py-1 rounded-md transition-colors capitalize"
             style={{
-              color: view === v ? "var(--color-purple-400)" : "var(--color-text-muted)",
-              background: view === v ? "rgba(124, 79, 240, 0.12)" : "transparent",
+              color:
+                view === v || (v === "home" && isConstellation)
+                  ? "var(--color-purple-400)"
+                  : "var(--color-text-muted)",
+              background:
+                view === v || (v === "home" && isConstellation)
+                  ? "rgba(124, 79, 240, 0.12)"
+                  : "transparent",
             }}
           >
-            {v === "luna" ? "Luna" : v.charAt(0).toUpperCase() + v.slice(1)}
+            {v === "home" ? (
+              <span className="flex items-center gap-1">
+                <Home size={11} />
+                Home
+              </span>
+            ) : v === "luna" ? (
+              "Luna"
+            ) : (
+              v.charAt(0).toUpperCase() + v.slice(1)
+            )}
           </button>
         ))}
       </nav>
