@@ -43,8 +43,9 @@ export const useSolarisStore = create<SolarisState>()(
       selectedLocation: DEFAULT_LOCATION,
       setSelectedLocation: (loc) => {
         set({ selectedLocation: loc, searchResults: [], searchQuery: "" });
-        // Auto-fetch weather when location changes
-        setTimeout(() => get().fetchWeather(), 0);
+        // Fetch weather for the new location
+        const { fetchWeather } = get();
+        void fetchWeather();
       },
 
       weatherData: null,

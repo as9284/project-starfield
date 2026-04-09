@@ -29,6 +29,10 @@ function uid() {
   return crypto.randomUUID();
 }
 
+const MAX_FILE_TREE_SIZE = 300;
+const MAX_CODE_CONTEXT_FILES = 40;
+const MAX_REPO_FILES = 500;
+
 function timeAgo(ts: number | undefined): string {
   if (!ts) return "—";
   const diff = Date.now() - ts;
@@ -49,13 +53,13 @@ function buildSystemPrompt(project: BeaconProject): string {
     : `It is a local project at ${project.root}.`;
 
   const fileTree = project.files
-    .slice(0, 300)
+    .slice(0, MAX_FILE_TREE_SIZE)
     .map((f) => f.relativePath)
     .join("\n");
 
   const codeContext = project.files
     .filter((f) => f.isText && f.content)
-    .slice(0, 40)
+    .slice(0, MAX_CODE_CONTEXT_FILES)
     .map((f) => {
       const ext = f.relativePath.split(".").pop() ?? "";
       return `\`\`\`${ext}\n// ${f.relativePath}\n${f.content}\n\`\`\``;
@@ -244,7 +248,7 @@ function BeaconHome() {
 
       const files = treeData.tree
         .filter((item) => item.type === "blob")
-        .slice(0, 500)
+        .slice(0, MAX_REPO_FILES)
         .map((item) => {
           const ext = item.path.split(".").pop()?.toLowerCase() ?? "";
           return {
@@ -270,7 +274,7 @@ function BeaconHome() {
           };
           return priority(a.path) - priority(b.path);
         })
-        .slice(0, 40);
+        .slice(0, MAX_CODE_CONTEXT_FILES);
 
       const enrichedFiles = await Promise.all(
         priorityFiles.map(async (f) => {

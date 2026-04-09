@@ -74,6 +74,11 @@ export const streamLuna = (
  * Lower-level stream chat that accepts a custom system prompt.
  * Used by Beacon (and potentially other constellations) that need
  * their own persona / context instead of Luna's default prompt.
+ *
+ * @param systemPrompt - The full system prompt including persona and context
+ * @param history - Previous conversation messages for context
+ * @param userMessage - The current user message to respond to
+ * @param onEvent - Callback receiving streaming chunks, done, or error events
  */
 export const streamChat = (
   systemPrompt: string,
