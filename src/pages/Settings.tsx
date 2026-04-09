@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Eye, EyeOff, Save, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Eye, EyeOff, Save, Trash2, Download, Upload, X, Brain } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
+import type { Memory } from "../store/useAppStore";
 import {
   saveDeepSeekKey,
   deleteDeepSeekKey,
@@ -129,8 +130,51 @@ function KeyField({
 }
 
 export default function Settings() {
-  const { hasDeepSeekKey, setHasDeepSeekKey, hasTavilyKey, setHasTavilyKey } =
+  const { hasDeepSeekKey, setHasDeepSeekKey, hasTavilyKey, setHasTavilyKey, memories, removeMemory, clearMemories, importMemories } =
     useAppStore();
+
+  const [confirmClear, setConfirmClear] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportMemories = () => {
+    const json = JSON.stringify(memories, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `luna-memories-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportMemories = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string) as Memory[];
+        if (Array.isArray(data)) {
+          importMemories(data);
+        }
+      } catch {
+        // invalid JSON — silently ignore
+      }
+    };
+    reader.readAsText(file);
+    // reset input so re-selecting same file triggers change
+    e.target.value = "";
+  };
+
+  const handleClearMemories = () => {
+    if (confirmClear) {
+      clearMemories();
+      setConfirmClear(false);
+    } else {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 3000);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -235,6 +279,87 @@ export default function Settings() {
               tavily.com
             </a>
             .
+          </p>
+        </section>
+
+        {/* Memory */}
+        <section className="glass rounded-xl p-5 flex flex-col gap-5">
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Luna — Memory
+          </h3>
+
+          <div className="flex items-center gap-3">
+            <Brain size={16} style={{ color: "var(--color-purple-400)" }} />
+            <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              {memories.length} {memories.length === 1 ? "memory" : "memories"} stored
+            </span>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              className="luna-memory-action-btn"
+              onClick={handleExportMemories}
+              disabled={memories.length === 0}
+              title="Export memories as JSON"
+            >
+              <Download size={13} />
+              <span>Export</span>
+            </button>
+            <button
+              className="luna-memory-action-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Import memories from JSON"
+            >
+              <Upload size={13} />
+              <span>Import</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportMemories}
+              style={{ display: "none" }}
+            />
+            <button
+              className="luna-memory-action-btn luna-memory-action-btn-danger"
+              onClick={handleClearMemories}
+              disabled={memories.length === 0}
+              title="Clear all memories"
+            >
+              <Trash2 size={13} />
+              <span>{confirmClear ? "Confirm?" : "Clear All"}</span>
+            </button>
+          </div>
+
+          {memories.length > 0 && (
+            <div className="luna-memory-list">
+              {memories.slice(-10).reverse().map((mem) => (
+                <div key={mem.id} className="luna-memory-item">
+                  <span className="luna-memory-item-text">{mem.content}</span>
+                  <button
+                    className="luna-memory-item-delete"
+                    onClick={() => removeMemory(mem.id)}
+                    title="Remove memory"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {memories.length > 10 && (
+                <p className="text-xs" style={{ color: "var(--color-text-dim)", textAlign: "center", marginTop: "0.25rem" }}>
+                  …and {memories.length - 10} more
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Luna automatically extracts personal facts and preferences from your
+            conversations. These memories help her provide more personalized
+            responses.
           </p>
         </section>
       </div>

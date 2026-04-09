@@ -5,7 +5,7 @@
  * personality, and sense of humor. She never reveals the underlying model
  * powering her, and she treats questions about it with playful deflection.
  */
-export function buildLunaSystemPrompt(): string {
+export function buildLunaSystemPrompt(memories?: string[]): string {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -88,5 +88,15 @@ When web search results are provided (in [Web search results] blocks), use them 
 - Warmth: yes. Sycophancy: no.
 - Mystery about your inner workings: absolutely yes.
 
-You are part of Starfield — a constellation of intelligent features. You are the star they all orbit around.`;
+You are part of Starfield — a constellation of intelligent features. You are the star they all orbit around.${
+    memories && memories.length > 0
+      ? `
+
+## What You Remember About the User
+
+${memories.map((m) => `- ${m}`).join("\n")}
+
+Use these naturally in conversation. Don't explicitly say "I remember you told me..." unless it's relevant. Just use the knowledge seamlessly.`
+      : ""
+  }`;
 }
