@@ -49,7 +49,7 @@ export default function Orbit() {
           </h2>
           <p className="text-sm text-center max-w-md" style={{ color: "var(--color-text-secondary)" }}>
             Task management and notes — plan your missions, track your goals, and keep your ideas in orbit.
-            Luna can help you organise, prioritise, and never lose track of what matters.
+            Luna can help you organize, prioritize, and never lose track of what matters.
           </p>
           <div
             className="glass rounded-xl px-5 py-3 text-xs flex items-center gap-2"
