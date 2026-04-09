@@ -4,7 +4,7 @@ import { Trash2, Globe, ArrowUp, PanelLeftOpen, PanelLeftClose, Plus, MessageSqu
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { CosmicLogo } from "../components/CosmicLogo";
+import { AiGlobe } from "../components/AiGlobe";
 import { useAppStore, MAX_CONVERSATION_TITLE_LENGTH } from "../store/useAppStore";
 import { useOrbitStore } from "../store/useOrbitStore";
 import { streamLuna, webSearch } from "../lib/tauri";
@@ -327,9 +327,7 @@ export default function Luna() {
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.35 }}
               >
-                <div className="luna-orb">
-                  <CosmicLogo size={120} />
-                </div>
+                <AiGlobe size={160} />
                 <p className="luna-greeting">
                   {hasDeepSeekKey
                     ? "What can I help you with?"
