@@ -131,3 +131,22 @@ export interface ScanResult {
 
 export const scanLocalDirectory = (path: string) =>
   invoke<ScanResult>("scan_local_directory", { path });
+
+// ── Pulsar: yt-dlp media downloads ───────────────────────────────────────
+
+export interface PulsarResult {
+  success: boolean;
+  message: string;
+  file_path: string | null;
+}
+
+export const pulsarCheckYtdlp = () => invoke<boolean>("pulsar_check_ytdlp");
+
+export const pulsarGetDownloadsDir = () =>
+  invoke<string>("pulsar_get_downloads_dir");
+
+export const pulsarDownload = (
+  url: string,
+  formatArg: string,
+  outputDir: string,
+) => invoke<PulsarResult>("pulsar_download", { url, formatArg, outputDir });

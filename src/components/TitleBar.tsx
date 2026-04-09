@@ -2,6 +2,7 @@ import { Minus, Maximize2, X } from "lucide-react";
 import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
 import { CosmicLogoMini } from "./CosmicLogo";
+import { modLabel } from "../lib/platform";
 
 export default function TitleBar() {
   const {
@@ -41,6 +42,7 @@ export default function TitleBar() {
                 ? "rgba(124, 79, 240, 0.12)"
                 : "transparent",
           }}
+          title={`Luna (${modLabel}1)`}
         >
           Luna
         </button>
@@ -59,6 +61,7 @@ export default function TitleBar() {
             background:
               view === "settings" ? "rgba(124, 79, 240, 0.12)" : "transparent",
           }}
+          title={`Settings (${modLabel},)`}
         >
           Settings
         </button>

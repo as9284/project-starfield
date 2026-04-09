@@ -514,7 +514,7 @@ export default function Solaris() {
           <button
             className="win-btn"
             onClick={goBack}
-            title="Back"
+            title="Back (Esc)"
           >
             <ArrowLeft size={14} />
           </button>
