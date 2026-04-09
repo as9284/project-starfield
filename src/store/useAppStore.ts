@@ -73,6 +73,8 @@ interface AppState {
   setIsStreaming: (v: boolean) => void;
 }
 
+export const MAX_CONVERSATION_TITLE_LENGTH = 40;
+
 function makeConversation(): Conversation {
   return {
     id: crypto.randomUUID(),
@@ -268,7 +270,7 @@ export const useAppStore = create<AppState>()(
             convo.messages = msgs;
             if (msgs.length > 0) {
               const firstUser = msgs.find((m) => m.role === "user");
-              if (firstUser) convo.title = firstUser.content.slice(0, 40);
+              if (firstUser) convo.title = firstUser.content.slice(0, MAX_CONVERSATION_TITLE_LENGTH);
             }
             return {
               ...state,

@@ -5,7 +5,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CosmicLogo } from "../components/CosmicLogo";
-import { useAppStore } from "../store/useAppStore";
+import { useAppStore, MAX_CONVERSATION_TITLE_LENGTH } from "../store/useAppStore";
 import { streamLuna, webSearch } from "../lib/tauri";
 import type { ChatMessagePayload } from "../lib/tauri";
 import { extractMemories } from "../lib/memory";
@@ -106,7 +106,7 @@ export default function Luna() {
 
       // Auto-title: use first ~40 chars of first user message
       if (isFirstMessage && activeConversationId) {
-        renameConversation(activeConversationId, text.slice(0, 40));
+        renameConversation(activeConversationId, text.slice(0, MAX_CONVERSATION_TITLE_LENGTH));
       }
 
       // Auto-extract memories
