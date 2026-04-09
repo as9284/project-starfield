@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Trash2, Globe, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trash2, Globe, ArrowUp } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import StarField from "../components/StarField";
+import { CosmicLogo } from "../components/CosmicLogo";
 import { useAppStore } from "../store/useAppStore";
 import { streamLuna, webSearch } from "../lib/tauri";
 
@@ -39,7 +40,6 @@ export default function Luna() {
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: "", timestamp: Date.now() });
 
     try {
-      // Optionally run a web search first
       let searchContext = "";
       if (webSearchEnabled && hasTavilyKey) {
         try {
@@ -89,135 +89,126 @@ export default function Luna() {
     }
   };
 
+  const isEmpty = messages.length === 0;
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
-      <StarField />
-
-      <div className="above-stars flex-1 flex flex-col min-h-0">
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 py-3"
-          style={{ borderBottom: "1px solid var(--color-border-dim)" }}
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} style={{ color: "var(--color-purple-400)" }} />
-            <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-              Luna
-            </span>
-            <span className="status-dot ml-1" />
-          </div>
-
-          {messages.length > 0 && (
-            <button
-              onClick={clearMessages}
-              className="win-btn"
-              title="Clear conversation"
+    <div className="luna-shell">
+      {/* Messages area */}
+      <div className="luna-messages">
+        <AnimatePresence mode="wait">
+          {isEmpty ? (
+            <motion.div
+              key="empty"
+              className="luna-empty"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.35 }}
             >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 min-h-0">
-          {messages.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-              <Sparkles
-                size={40}
-                style={{ color: "var(--color-purple-500)", opacity: 0.6 }}
-              />
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              <div className="luna-orb">
+                <CosmicLogo size={120} />
+              </div>
+              <p className="luna-greeting">
                 {hasDeepSeekKey
-                  ? "Ask Luna anything…"
-                  : "Add a DeepSeek API key in Settings to start."}
+                  ? "What can I help you with?"
+                  : "Add a DeepSeek API key to get started."}
               </p>
               {!hasDeepSeekKey && (
                 <button
-                  className="text-xs underline"
-                  style={{ color: "var(--color-purple-400)", background: "none", border: "none", cursor: "pointer" }}
+                  className="luna-settings-link"
                   onClick={() => setView("settings")}
                 >
                   Open Settings
                 </button>
               )}
-            </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="chat"
+              className="luna-chat-list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              {messages.map((msg, i) => (
+                <motion.div
+                  key={msg.id}
+                  className={`luna-msg ${msg.role === "user" ? "luna-msg-user" : "luna-msg-ai"}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.15) }}
+                >
+                  <div className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}>
+                    {msg.role === "assistant" && !msg.content && i === messages.length - 1 && isStreaming ? (
+                      <div className="flex gap-1 items-center h-4">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                      </div>
+                    ) : msg.role === "assistant" ? (
+                      <div className="prose-starfield">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <span>{msg.content}</span>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              <div ref={bottomRef} />
+            </motion.div>
           )}
+        </AnimatePresence>
+      </div>
 
-          {messages.map((msg, i) => (
-            <div
-              key={msg.id}
-              className={`animate-fade-up flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[80%] px-4 py-3 text-sm ${
-                  msg.role === "user" ? "msg-user" : "msg-assistant"
-                }`}
+      {/* Input area */}
+      <div className="luna-input-area">
+        <div className="luna-input-container">
+          {/* Toolbar row */}
+          <div className="luna-toolbar">
+            <div className="luna-toolbar-left">
+              <button
+                onClick={() => hasTavilyKey && setWebSearchEnabled((v) => !v)}
+                title={hasTavilyKey ? "Toggle web search" : "Add Tavily key in Settings"}
+                className={`luna-tool-btn ${webSearchEnabled && hasTavilyKey ? "luna-tool-btn-active" : ""}`}
+                style={{ cursor: hasTavilyKey ? "pointer" : "not-allowed", opacity: hasTavilyKey ? 1 : 0.4 }}
               >
-                {msg.role === "assistant" && !msg.content && i === messages.length - 1 && isStreaming ? (
-                  <div className="flex gap-1 items-center h-4">
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                  </div>
-                ) : msg.role === "assistant" ? (
-                  <div className="prose-starfield">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {msg.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <span style={{ color: "var(--color-text-primary)" }}>{msg.content}</span>
-                )}
-              </div>
+                <Globe size={13} />
+                <span>Search</span>
+              </button>
             </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Input bar */}
-        <div
-          className="px-4 py-3 flex flex-col gap-2"
-          style={{ borderTop: "1px solid var(--color-border-dim)", background: "rgba(8,8,26,0.7)" }}
-        >
-          {/* Toolbar */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => hasTavilyKey && setWebSearchEnabled((v) => !v)}
-              title={hasTavilyKey ? "Toggle web search" : "Add Tavily key in Settings"}
-              className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors"
-              style={{
-                color: webSearchEnabled && hasTavilyKey ? "var(--color-purple-400)" : "var(--color-text-muted)",
-                background: webSearchEnabled && hasTavilyKey ? "rgba(124,79,240,0.12)" : "transparent",
-                border: "1px solid",
-                borderColor: webSearchEnabled && hasTavilyKey ? "rgba(124,79,240,0.3)" : "var(--color-border-dim)",
-                cursor: hasTavilyKey ? "pointer" : "not-allowed",
-                opacity: hasTavilyKey ? 1 : 0.5,
-              }}
-            >
-              <Globe size={12} />
-              Web search
-            </button>
+            {messages.length > 0 && (
+              <button
+                onClick={clearMessages}
+                className="luna-tool-btn"
+                title="Clear conversation"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </div>
 
           {/* Input row */}
-          <div className="flex gap-2 items-end">
+          <div className="luna-input-row">
             <TextareaAutosize
-              className="chat-input flex-1"
-              placeholder="Message Luna…"
+              className="luna-textarea"
+              placeholder={hasDeepSeekKey ? "Message Luna…" : "API key required…"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               minRows={1}
-              maxRows={6}
+              maxRows={5}
               disabled={isStreaming || !hasDeepSeekKey}
             />
             <button
-              className="btn-send"
+              className="luna-send-btn"
               onClick={() => void handleSend()}
               disabled={!input.trim() || isStreaming || !hasDeepSeekKey}
               title="Send"
             >
-              <Send size={16} />
+              <ArrowUp size={16} />
             </button>
           </div>
         </div>
