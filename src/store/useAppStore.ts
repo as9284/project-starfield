@@ -8,7 +8,7 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type AppView = "home" | "luna" | "settings";
+export type AppView = "home" | "luna" | "orbit" | "solaris" | "beacon" | "pulsar" | "hyperlane" | "settings";
 
 interface AppState {
   // Navigation

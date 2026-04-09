@@ -1,13 +1,14 @@
-import { Sparkles, Search, Settings as SettingsIcon, Star } from "lucide-react";
+import { Sparkles, ListTodo, CloudSun, FolderSearch, Download, Link, Settings as SettingsIcon, Star } from "lucide-react";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
+import type { AppView } from "../store/useAppStore";
 
 interface Constellation {
   id: string;
   name: string;
   description: string;
   icon: React.ReactNode;
-  view: "luna";
+  view: AppView;
   available: boolean;
 }
 
@@ -16,17 +17,54 @@ const CONSTELLATIONS: Constellation[] = [
     id: "luna",
     name: "Luna",
     description:
-      "Your central AI companion powered by DeepSeek V3. Ask anything, explore ideas, get instant answers with live web search.",
+      "Your central AI companion — ask anything, explore ideas, control every constellation, and get instant answers with live web search.",
     icon: <Sparkles size={28} />,
     view: "luna",
     available: true,
   },
   {
-    id: "aurora",
-    name: "Aurora",
-    description: "Intelligent document analysis and summarisation. Coming soon.",
-    icon: <Search size={28} />,
-    view: "luna",
+    id: "orbit",
+    name: "Orbit",
+    description:
+      "Task management and notes — plan missions, track goals, and keep your ideas in orbit around what matters.",
+    icon: <ListTodo size={28} />,
+    view: "orbit",
+    available: false,
+  },
+  {
+    id: "solaris",
+    name: "Solaris",
+    description:
+      "Weather intelligence — real-time forecasts, 7-day outlooks, and atmospheric insights powered by the sun.",
+    icon: <CloudSun size={28} />,
+    view: "solaris",
+    available: false,
+  },
+  {
+    id: "beacon",
+    name: "Beacon",
+    description:
+      "Code explorer — import local folders, GitHub repos, and explore any codebase with Luna's AI guidance.",
+    icon: <FolderSearch size={28} />,
+    view: "beacon",
+    available: false,
+  },
+  {
+    id: "pulsar",
+    name: "Pulsar",
+    description:
+      "Media downloader — grab videos, music, and playlists from YouTube with a single pulse.",
+    icon: <Download size={28} />,
+    view: "pulsar",
+    available: false,
+  },
+  {
+    id: "hyperlane",
+    name: "Hyperlane",
+    description:
+      "URL shortener — collapse long links into compact, shareable hyperspace jumps in an instant.",
+    icon: <Link size={28} />,
+    view: "hyperlane",
     available: false,
   },
 ];
@@ -86,7 +124,7 @@ export default function Home() {
         )}
 
         {/* Constellations grid */}
-        <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-up">
+        <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-up">
           {CONSTELLATIONS.map((c) => (
             <button
               key={c.id}
