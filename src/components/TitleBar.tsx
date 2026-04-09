@@ -3,6 +3,8 @@ import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
 import { CosmicLogoMini } from "./CosmicLogo";
 
+const modLabel = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
+
 export default function TitleBar() {
   const {
     view,
@@ -41,6 +43,7 @@ export default function TitleBar() {
                 ? "rgba(124, 79, 240, 0.12)"
                 : "transparent",
           }}
+          title={`Luna (${modLabel}1)`}
         >
           Luna
         </button>
@@ -59,6 +62,7 @@ export default function TitleBar() {
             background:
               view === "settings" ? "rgba(124, 79, 240, 0.12)" : "transparent",
           }}
+          title={`Settings (${modLabel},)`}
         >
           Settings
         </button>

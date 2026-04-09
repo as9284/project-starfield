@@ -21,6 +21,7 @@ interface ConstellationItem {
   description: string;
   icon: LucideIcon;
   accentColor: string;
+  shortcutNum: string;
 }
 
 const CONSTELLATIONS: ConstellationItem[] = [
@@ -30,6 +31,7 @@ const CONSTELLATIONS: ConstellationItem[] = [
     description: "Tasks & notes that stay in formation.",
     icon: ListTodo,
     accentColor: "rgba(124, 79, 240, 0.55)",
+    shortcutNum: "2",
   },
   {
     id: "solaris",
@@ -37,6 +39,7 @@ const CONSTELLATIONS: ConstellationItem[] = [
     description: "Weather intelligence, solar-powered.",
     icon: CloudSun,
     accentColor: "rgba(217, 70, 239, 0.55)",
+    shortcutNum: "3",
   },
   {
     id: "beacon",
@@ -44,6 +47,7 @@ const CONSTELLATIONS: ConstellationItem[] = [
     description: "Codebase exploration, lit from orbit.",
     icon: FolderSearch,
     accentColor: "rgba(99, 102, 241, 0.55)",
+    shortcutNum: "4",
   },
   {
     id: "hyperlane",
@@ -51,6 +55,7 @@ const CONSTELLATIONS: ConstellationItem[] = [
     description: "Links compressed into tiny jumps.",
     icon: LinkIcon,
     accentColor: "rgba(20, 184, 166, 0.55)",
+    shortcutNum: "5",
   },
   {
     id: "pulsar",
@@ -58,8 +63,11 @@ const CONSTELLATIONS: ConstellationItem[] = [
     description: "Media downloads with glow on demand.",
     icon: Download,
     accentColor: "rgba(155, 120, 248, 0.55)",
+    shortcutNum: "6",
   },
 ];
+
+const modLabel = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
 
 const container = {
   hidden: { opacity: 0 },
@@ -131,7 +139,7 @@ export default function ConstellationOverlay() {
               <motion.button
                 key={item.id}
                 type="button"
-                className="cst-card"
+                className="cst-card group"
                 variants={cardVariant}
                 whileHover={{ y: -3, scale: 1.015 }}
                 whileTap={{ scale: 0.985 }}
@@ -148,6 +156,18 @@ export default function ConstellationOverlay() {
                   <span className="cst-card-name">{item.name}</span>
                   <span className="cst-card-desc">{item.description}</span>
                 </span>
+                <kbd
+                  className="text-xs font-mono px-1.5 py-0.5 rounded shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline-block"
+                  style={{
+                    background: "rgba(124, 79, 240, 0.08)",
+                    border: "1px solid rgba(124, 79, 240, 0.15)",
+                    color: "var(--color-text-dim)",
+                    fontSize: "0.65rem",
+                  }}
+                  title={`${modLabel}${item.shortcutNum}`}
+                >
+                  {modLabel}{item.shortcutNum}
+                </kbd>
                 <ArrowRight size={14} className="cst-card-arrow" />
               </motion.button>
             );

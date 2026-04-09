@@ -409,7 +409,7 @@ export default function Luna() {
                 </button>
                 <button
                   onClick={toggleConstellations}
-                  title="Constellations"
+                  title={`Constellations (${navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}K)`}
                   className={`luna-tool-btn ${showConstellations ? "luna-tool-btn-active" : ""}`}
                 >
                   <Sparkles size={13} />

@@ -10,6 +10,7 @@ import Pulsar from "./pages/Pulsar";
 import Hyperlane from "./pages/Hyperlane";
 import Settings from "./pages/Settings";
 import { useAppStore } from "./store/useAppStore";
+import type { AppView } from "./store/useAppStore";
 import { getDeepSeekKey, getTavilyKey, getWeatherKey } from "./lib/tauri";
 
 const slideIn = {
@@ -20,7 +21,7 @@ const slideIn = {
 };
 
 export default function App() {
-  const { view, showConstellations, setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey } =
+  const { view, showConstellations, setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey, setView, goBack, toggleConstellations, isStreaming } =
     useAppStore();
 
   // Bootstrap: check if API keys are already stored in the keychain
@@ -37,6 +38,68 @@ export default function App() {
       .then((k) => setHasWeatherKey(!!k))
       .catch(() => setHasWeatherKey(false));
   }, [setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey]);
+
+  // ── Global keyboard shortcuts ──────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Skip during AI streaming
+      if (isStreaming) return;
+
+      const isMod = e.ctrlKey || e.metaKey;
+
+      // Escape: go back (close constellations if open, else go back)
+      if (e.key === "Escape") {
+        if (showConstellations) {
+          // ConstellationOverlay already handles its own Escape,
+          // but this catches it globally too
+          return;
+        }
+        if (view !== "luna") {
+          e.preventDefault();
+          goBack();
+        }
+        return;
+      }
+
+      // Ctrl/Cmd+K: toggle constellations
+      if (isMod && e.key === "k") {
+        e.preventDefault();
+        toggleConstellations();
+        return;
+      }
+
+      // Ctrl/Cmd+,: settings
+      if (isMod && e.key === ",") {
+        e.preventDefault();
+        setView("settings");
+        return;
+      }
+
+      // Ctrl/Cmd + number: jump to constellation
+      if (isMod && !e.shiftKey && !e.altKey) {
+        const constellationMap: Record<string, AppView> = {
+          "1": "luna",
+          "2": "orbit",
+          "3": "solaris",
+          "4": "beacon",
+          "5": "hyperlane",
+          "6": "pulsar",
+        };
+        const target = constellationMap[e.key];
+        if (target) {
+          e.preventDefault();
+          setView(target);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [view, showConstellations, isStreaming, goBack, setView, toggleConstellations]);
 
   return (
     <div className="app-shell bg-cosmic">

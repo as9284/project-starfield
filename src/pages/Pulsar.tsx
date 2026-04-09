@@ -94,7 +94,7 @@ export default function Pulsar() {
           className="flex items-center gap-3 px-5 py-3"
           style={{ borderBottom: "1px solid var(--color-border-dim)" }}
         >
-          <button className="win-btn" onClick={goBack} title="Back">
+          <button className="win-btn" onClick={goBack} title="Back (Esc)">
             <ArrowLeft size={14} />
           </button>
           <Download size={16} style={{ color: "var(--color-purple-400)" }} />

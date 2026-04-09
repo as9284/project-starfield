@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Eye, EyeOff, Save, Trash2, Download, Upload, X, Brain } from "lucide-react";
+import { Eye, EyeOff, Save, Trash2, Download, Upload, X, Brain, Keyboard, Command } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
 import {
@@ -409,6 +409,90 @@ export default function Settings() {
             responses.
           </p>
         </section>
+
+        {/* Keyboard Shortcuts */}
+        <section className="glass rounded-xl p-5 flex flex-col gap-5">
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest flex items-center gap-2"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            <Keyboard size={14} />
+            Keyboard Shortcuts
+          </h3>
+
+          <div className="flex flex-col gap-1">
+            <ShortcutRow keys={[modKey, "K"]} description="Open constellations" />
+            <ShortcutRow keys={[modKey, ","]} description="Open settings" />
+            <ShortcutRow keys={["Esc"]} description="Go back / close overlay" />
+            <ShortcutRow keys={[modKey, "1"]} description="Go to Luna" />
+            <ShortcutRow keys={[modKey, "2"]} description="Go to Orbit" />
+            <ShortcutRow keys={[modKey, "3"]} description="Go to Solaris" />
+            <ShortcutRow keys={[modKey, "4"]} description="Go to Beacon" />
+            <ShortcutRow keys={[modKey, "5"]} description="Go to Hyperlane" />
+            <ShortcutRow keys={[modKey, "6"]} description="Go to Pulsar" />
+            <ShortcutRow keys={["Enter"]} description="Send message (in chat)" />
+            <ShortcutRow keys={["Shift", "Enter"]} description="New line (in chat)" />
+          </div>
+
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Shortcuts are disabled while typing in input fields or during AI
+            streaming. On macOS, use <Command size={10} className="inline" /> Cmd; on
+            Windows/Linux, use Ctrl.
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ── Shortcut row helper ─────────────────────────────────────────────────────
+
+const modKey = navigator.platform.includes("Mac") ? "⌘" : "Ctrl";
+
+function ShortcutRow({
+  keys,
+  description,
+}: {
+  keys: string[];
+  description: string;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between py-1.5"
+      style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
+    >
+      <span
+        className="text-xs"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        {description}
+      </span>
+      <div className="flex items-center gap-1">
+        {keys.map((key, i) => (
+          <span key={i}>
+            <kbd
+              className="inline-block text-xs font-mono px-1.5 py-0.5 rounded"
+              style={{
+                background: "rgba(124, 79, 240, 0.1)",
+                border: "1px solid rgba(124, 79, 240, 0.2)",
+                color: "var(--color-purple-300)",
+                fontSize: "0.68rem",
+                minWidth: "1.5rem",
+                textAlign: "center",
+              }}
+            >
+              {key}
+            </kbd>
+            {i < keys.length - 1 && (
+              <span
+                className="text-xs mx-0.5"
+                style={{ color: "var(--color-text-dim)" }}
+              >
+                +
+              </span>
+            )}
+          </span>
+        ))}
       </div>
     </div>
   );
