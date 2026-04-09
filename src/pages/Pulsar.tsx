@@ -1,24 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Download,
   ArrowLeft,
-  Loader2,
   AlertCircle,
   CheckCircle2,
   Music,
   Film,
   Sparkles,
   FolderOpen,
+  X,
+  List,
+  RotateCcw,
+  Loader2,
+  Package,
+  Clock,
+  Zap,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
+import { usePulsarStore } from "../store/usePulsarStore";
+import type { FormatOption, DownloadItem } from "../store/usePulsarStore";
 import {
   pulsarCheckYtdlp,
   pulsarDownload,
   pulsarGetDownloadsDir,
+  pulsarCancelDownload,
+  pulsarInstallYtdlp,
 } from "../lib/tauri";
-
-type FormatOption = "best" | "audio" | "720" | "1080";
+import { open } from "@tauri-apps/plugin-dialog";
 
 interface FormatChoice {
   id: FormatOption;
@@ -28,66 +39,390 @@ interface FormatChoice {
 }
 
 const FORMAT_OPTIONS: FormatChoice[] = [
-  { id: "best", label: "Best quality", description: "Highest available video + audio", icon: Sparkles },
+  {
+    id: "best",
+    label: "Best quality",
+    description: "Highest available video + audio",
+    icon: Sparkles,
+  },
   { id: "1080", label: "1080p", description: "Full HD video", icon: Film },
-  { id: "720", label: "720p", description: "HD video, smaller file", icon: Film },
+  {
+    id: "720",
+    label: "720p",
+    description: "HD video, smaller file",
+    icon: Film,
+  },
   { id: "audio", label: "Audio only", description: "Extract as MP3", icon: Music },
 ];
 
+function formatBytes(str: string) {
+  return str;
+}
+
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <div
+      className="w-full rounded-full overflow-hidden"
+      style={{
+        height: 4,
+        background: "rgba(37, 34, 96, 0.6)",
+      }}
+    >
+      <div
+        className="h-full rounded-full transition-all duration-300"
+        style={{
+          width: `${Math.min(100, Math.max(0, percent))}%`,
+          background:
+            "linear-gradient(90deg, var(--color-purple-400), #a78bfa)",
+        }}
+      />
+    </div>
+  );
+}
+
+function statusColor(status: DownloadItem["status"]): string {
+  switch (status) {
+    case "done":
+      return "#86efac";
+    case "error":
+    case "cancelled":
+      return "#fca5a5";
+    case "downloading":
+    case "merging":
+    case "queued":
+      return "var(--color-purple-400)";
+  }
+}
+
+function statusLabel(item: DownloadItem): string {
+  switch (item.status) {
+    case "queued":
+      return "Queued";
+    case "downloading":
+      if (item.playlistTotal && item.playlistIndex) {
+        return `Item ${item.playlistIndex} of ${item.playlistTotal}`;
+      }
+      return item.progress > 0 ? `${item.progress.toFixed(1)}%` : "Starting…";
+    case "merging":
+      return "Merging…";
+    case "done":
+      return "Complete";
+    case "error":
+      return item.error ? "Error" : "Failed";
+    case "cancelled":
+      return "Cancelled";
+  }
+}
+
+function DownloadCard({
+  item,
+  onCancel,
+  onRemove,
+  onRetry,
+}: {
+  item: DownloadItem;
+  onCancel: (id: string) => void;
+  onRemove: (id: string) => void;
+  onRetry: (item: DownloadItem) => void;
+}) {
+  const isActive =
+    item.status === "downloading" ||
+    item.status === "queued" ||
+    item.status === "merging";
+
+  const displayName =
+    item.filename
+      ? item.filename.split("/").pop() ?? item.filename
+      : item.url.length > 60
+        ? item.url.slice(0, 60) + "…"
+        : item.url;
+
+  return (
+    <div
+      className="glass rounded-xl px-4 py-3 flex flex-col gap-2"
+      style={{
+        borderColor: isActive
+          ? "rgba(124, 79, 240, 0.3)"
+          : item.status === "done"
+            ? "rgba(34,197,94,0.2)"
+            : "rgba(239,68,68,0.2)",
+      }}
+    >
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p
+            className="text-xs font-medium truncate"
+            style={{ color: "var(--color-text-primary)" }}
+            title={displayName}
+          >
+            {displayName}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span
+              className="text-xs"
+              style={{ color: statusColor(item.status) }}
+            >
+              {statusLabel(item)}
+            </span>
+            {item.status === "downloading" && item.speed && item.speed !== "?" && (
+              <>
+                <span style={{ color: "var(--color-text-dim)" }}>·</span>
+                <span
+                  className="text-xs flex items-center gap-1"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  <Zap size={9} />
+                  {formatBytes(item.speed)}
+                </span>
+              </>
+            )}
+            {item.status === "downloading" && item.eta && (
+              <>
+                <span style={{ color: "var(--color-text-dim)" }}>·</span>
+                <span
+                  className="text-xs flex items-center gap-1"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  <Clock size={9} />
+                  {item.eta}
+                </span>
+              </>
+            )}
+          </div>
+          {item.status === "error" && item.error && (
+            <p
+              className="text-xs mt-1 line-clamp-2"
+              style={{ color: "#fca5a5" }}
+            >
+              {item.error}
+            </p>
+          )}
+          {item.status === "done" && item.filePath && (
+            <p
+              className="text-xs mt-0.5 truncate"
+              style={{ color: "var(--color-text-dim)" }}
+              title={item.filePath}
+            >
+              {item.filePath.split("/").pop() ?? item.filePath}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {isActive && (
+            <button
+              className="win-btn"
+              title="Cancel download"
+              onClick={() => onCancel(item.id)}
+            >
+              <X size={12} />
+            </button>
+          )}
+          {(item.status === "error" || item.status === "cancelled") && (
+            <button
+              className="win-btn"
+              title="Retry"
+              onClick={() => onRetry(item)}
+            >
+              <RotateCcw size={12} />
+            </button>
+          )}
+          {!isActive && (
+            <button
+              className="win-btn"
+              title="Remove"
+              onClick={() => onRemove(item.id)}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {(item.status === "downloading" || item.status === "merging") && (
+        <ProgressBar
+          percent={item.status === "merging" ? 100 : item.progress}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Pulsar() {
   const { goBack } = useAppStore();
+  const {
+    downloads,
+    outputDir,
+    setOutputDir,
+    addDownload,
+    updateDownload,
+    removeDownload,
+    clearCompleted,
+  } = usePulsarStore();
 
   const [hasYtdlp, setHasYtdlp] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState(false);
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<FormatOption>("best");
-  const [outputDir, setOutputDir] = useState("");
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [playlist, setPlaylist] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
 
-  // Check for yt-dlp on mount
+  const activeDownloads = downloads.filter(
+    (d) =>
+      d.status === "downloading" ||
+      d.status === "queued" ||
+      d.status === "merging",
+  );
+  const historyDownloads = downloads.filter(
+    (d) =>
+      d.status === "done" ||
+      d.status === "error" ||
+      d.status === "cancelled",
+  );
+
+  // Refs so callbacks always see latest state
+  const updateDownloadRef = useRef(updateDownload);
+  updateDownloadRef.current = updateDownload;
+
   useEffect(() => {
     pulsarCheckYtdlp()
       .then(setHasYtdlp)
       .catch(() => setHasYtdlp(false));
 
-    pulsarGetDownloadsDir()
-      .then(setOutputDir)
-      .catch(() => {
-        // ignore — user can set manually
-      });
-  }, []);
-
-  const handleDownload = async () => {
-    if (!url.trim() || downloading) return;
-
-    if (!outputDir.trim()) {
-      setError("Output directory is required. Please set a download location.");
-      return;
+    if (!outputDir) {
+      pulsarGetDownloadsDir()
+        .then(setOutputDir)
+        .catch(() => {});
     }
+  }, [outputDir, setOutputDir]);
 
-    setDownloading(true);
-    setError(null);
-    setSuccess(null);
-
+  const handleInstallYtdlp = async () => {
+    setInstalling(true);
     try {
-      const result = await pulsarDownload(url.trim(), format, outputDir);
-      if (result.success) {
-        setSuccess(
-          result.file_path
-            ? `Downloaded to ${result.file_path}`
-            : result.message,
-        );
-        setUrl("");
+      const ok = await pulsarInstallYtdlp();
+      if (ok) {
+        setHasYtdlp(true);
       } else {
-        setError(result.message);
+        setHasYtdlp(false);
       }
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      // ignore
     } finally {
-      setDownloading(false);
+      setInstalling(false);
     }
   };
+
+  const handlePickDir = async () => {
+    try {
+      const result = await open({ directory: true, multiple: false });
+      if (typeof result === "string" && result) {
+        setOutputDir(result);
+      }
+    } catch {
+      // user cancelled
+    }
+  };
+
+  const startDownload = async (
+    downloadUrl: string,
+    downloadFormat: FormatOption,
+    isPlaylist: boolean,
+  ) => {
+    if (!outputDir.trim()) return;
+
+    const id = crypto.randomUUID();
+    const item: DownloadItem = {
+      id,
+      url: downloadUrl,
+      format: downloadFormat,
+      status: "queued",
+      progress: 0,
+      speed: "",
+      eta: "",
+      createdAt: Date.now(),
+    };
+    addDownload(item);
+
+    try {
+      await pulsarDownload(
+        id,
+        downloadUrl,
+        downloadFormat,
+        outputDir,
+        isPlaylist,
+        (event) => {
+          switch (event.type) {
+            case "progress":
+              updateDownloadRef.current(id, {
+                status: "downloading",
+                progress: event.percent,
+                speed: event.speed,
+                eta: event.eta,
+              });
+              break;
+            case "playlistItem":
+              updateDownloadRef.current(id, {
+                status: "downloading",
+                playlistIndex: event.index,
+                playlistTotal: event.total,
+                progress: 0,
+              });
+              break;
+            case "merging":
+              updateDownloadRef.current(id, { status: "merging", progress: 100 });
+              break;
+            case "done":
+              updateDownloadRef.current(id, {
+                status: "done",
+                progress: 100,
+                speed: "",
+                eta: "",
+                filePath: event.file_path ?? undefined,
+                filename: event.file_path ?? undefined,
+              });
+              break;
+            case "error":
+              updateDownloadRef.current(id, {
+                status:
+                  event.message === "Download cancelled" ? "cancelled" : "error",
+                error: event.message,
+                speed: "",
+                eta: "",
+              });
+              break;
+          }
+        },
+      );
+    } catch (e) {
+      updateDownload(id, {
+        status: "error",
+        error: String(e),
+      });
+    }
+  };
+
+  const handleDownload = async () => {
+    const trimmed = url.trim();
+    if (!trimmed || hasYtdlp === false) return;
+    if (!outputDir.trim()) return;
+
+    setUrl("");
+    await startDownload(trimmed, format, playlist);
+  };
+
+  const handleCancel = async (id: string) => {
+    try {
+      await pulsarCancelDownload(id);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleRetry = (item: DownloadItem) => {
+    void startDownload(item.url, item.format, false);
+  };
+
+  const noOutputDir = !outputDir.trim();
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -102,7 +437,10 @@ export default function Pulsar() {
           <button className="win-btn" onClick={goBack} title="Back (Esc)">
             <ArrowLeft size={14} />
           </button>
-          <Download size={16} style={{ color: "var(--color-purple-400)" }} />
+          <Download
+            size={16}
+            style={{ color: "var(--color-purple-400)" }}
+          />
           <span
             className="text-sm font-semibold"
             style={{ color: "var(--color-text-primary)" }}
@@ -122,7 +460,7 @@ export default function Pulsar() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col items-center px-6 py-10 gap-8 max-w-xl mx-auto w-full">
+          <div className="flex flex-col px-6 py-8 gap-6 max-w-xl mx-auto w-full">
             {/* Title */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2.5 mb-2">
@@ -153,10 +491,10 @@ export default function Pulsar() {
               </p>
             </div>
 
-            {/* yt-dlp not found warning */}
+            {/* yt-dlp not found */}
             {hasYtdlp === false && (
               <div
-                className="glass rounded-xl px-5 py-4 w-full flex flex-col gap-2"
+                className="glass rounded-xl px-5 py-4 w-full flex flex-col gap-3"
                 style={{ borderColor: "rgba(234, 179, 8, 0.25)" }}
               >
                 <div className="flex items-center gap-2">
@@ -187,55 +525,112 @@ export default function Pulsar() {
                   >
                     yt-dlp
                   </a>{" "}
-                  to be installed on your system. Install it and restart
-                  Starfield.
+                  to be installed. You can install it via pip, brew, or the
+                  link above.
                 </p>
+                <button
+                  className="btn-send"
+                  style={{
+                    position: "static",
+                    height: 34,
+                    borderRadius: "var(--radius-md)",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    gap: "0.4rem",
+                    width: "fit-content",
+                    padding: "0 16px",
+                  }}
+                  onClick={() => void handleInstallYtdlp()}
+                  disabled={installing}
+                >
+                  {installing ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      Installing…
+                    </>
+                  ) : (
+                    <>
+                      <Package size={13} />
+                      Auto-install via pip
+                    </>
+                  )}
+                </button>
               </div>
             )}
 
-            {/* URL input */}
-            <div className="w-full flex flex-col gap-3">
+            {/* URL input + output dir */}
+            <div className="w-full flex flex-col gap-2.5">
               <input
                 className="settings-input"
                 placeholder="Paste a YouTube or video URL…"
                 value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value);
-                  if (error) setError(null);
-                  if (success) setSuccess(null);
-                }}
+                onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void handleDownload();
                 }}
-                disabled={downloading || hasYtdlp === false}
+                disabled={hasYtdlp === false}
                 spellCheck={false}
               />
 
               {/* Output directory */}
               <div className="flex items-center gap-2">
-                <FolderOpen
-                  size={13}
-                  style={{ color: "var(--color-text-dim)", flexShrink: 0 }}
-                />
+                <button
+                  className="win-btn shrink-0"
+                  title="Pick folder"
+                  onClick={() => void handlePickDir()}
+                >
+                  <FolderOpen size={13} />
+                </button>
                 <input
-                  className="settings-input text-xs"
+                  className="settings-input text-xs flex-1"
                   style={{ fontSize: "0.75rem", padding: "6px 10px" }}
-                  placeholder="Output directory"
+                  placeholder="Output directory (click folder icon to browse)"
                   value={outputDir}
                   onChange={(e) => setOutputDir(e.target.value)}
-                  disabled={downloading}
                 />
               </div>
+
+              {noOutputDir && (
+                <p
+                  className="text-xs"
+                  style={{ color: "#fca5a5" }}
+                >
+                  Set an output directory before downloading.
+                </p>
+              )}
             </div>
 
-            {/* Format selection */}
-            <div className="w-full">
-              <span
-                className="text-xs font-semibold uppercase tracking-widest block mb-2.5"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                Format
-              </span>
+            {/* Format + Playlist row */}
+            <div className="w-full flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Format
+                </span>
+                {/* Playlist toggle */}
+                <button
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all`}
+                  style={{
+                    background: playlist
+                      ? "rgba(124, 79, 240, 0.15)"
+                      : "rgba(16,15,46,0.5)",
+                    border: playlist
+                      ? "1px solid rgba(124, 79, 240, 0.35)"
+                      : "1px solid rgba(37,34,96,0.4)",
+                    color: playlist
+                      ? "var(--color-purple-400)"
+                      : "var(--color-text-muted)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setPlaylist((v) => !v)}
+                >
+                  <List size={12} />
+                  Playlist
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 {FORMAT_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
@@ -304,58 +699,102 @@ export default function Pulsar() {
                 gap: "0.5rem",
               }}
               onClick={() => void handleDownload()}
-              disabled={!url.trim() || downloading || hasYtdlp === false}
+              disabled={
+                !url.trim() ||
+                hasYtdlp === false ||
+                noOutputDir
+              }
             >
-              {downloading ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Downloading…
-                </>
-              ) : (
-                <>
-                  <Download size={15} />
-                  Download
-                </>
-              )}
+              <Download size={15} />
+              {playlist ? "Download Playlist" : "Download"}
             </button>
 
-            {/* Error */}
-            {error && (
-              <div
-                className="flex items-start gap-2 text-sm px-4 py-3 rounded-lg w-full"
-                style={{
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.25)",
-                  color: "#fca5a5",
-                }}
-              >
-                <AlertCircle
-                  size={14}
-                  className="shrink-0"
-                  style={{ marginTop: 2 }}
-                />
-                <span className="text-xs">{error}</span>
+            {/* Active downloads */}
+            {activeDownloads.length > 0 && (
+              <div className="w-full flex flex-col gap-2">
+                <span
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Active ({activeDownloads.length})
+                </span>
+                {activeDownloads.map((d) => (
+                  <DownloadCard
+                    key={d.id}
+                    item={d}
+                    onCancel={handleCancel}
+                    onRemove={removeDownload}
+                    onRetry={handleRetry}
+                  />
+                ))}
               </div>
             )}
 
-            {/* Success */}
-            {success && (
-              <div
-                className="flex items-start gap-2 text-sm px-4 py-3 rounded-lg w-full"
-                style={{
-                  background: "rgba(34,197,94,0.08)",
-                  border: "1px solid rgba(34,197,94,0.25)",
-                  color: "#86efac",
-                }}
-              >
-                <CheckCircle2
-                  size={14}
-                  className="shrink-0"
-                  style={{ marginTop: 2 }}
-                />
-                <span className="text-xs">{success}</span>
+            {/* History */}
+            {historyDownloads.length > 0 && (
+              <div className="w-full flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <button
+                    className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--color-text-muted)", cursor: "pointer" }}
+                    onClick={() => setShowHistory((v) => !v)}
+                  >
+                    {showHistory ? (
+                      <ChevronUp size={12} />
+                    ) : (
+                      <ChevronDown size={12} />
+                    )}
+                    History ({historyDownloads.length})
+                  </button>
+                  {showHistory && (
+                    <button
+                      className="text-xs"
+                      style={{
+                        color: "var(--color-text-dim)",
+                        cursor: "pointer",
+                      }}
+                      onClick={clearCompleted}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {showHistory &&
+                  historyDownloads.map((d) => (
+                    <DownloadCard
+                      key={d.id}
+                      item={d}
+                      onCancel={handleCancel}
+                      onRemove={removeDownload}
+                      onRetry={handleRetry}
+                    />
+                  ))}
               </div>
             )}
+
+            {/* yt-dlp missing + no downloads yet */}
+            {hasYtdlp === null && (
+              <div className="flex justify-center">
+                <Loader2
+                  size={18}
+                  className="animate-spin"
+                  style={{ color: "var(--color-text-dim)" }}
+                />
+              </div>
+            )}
+
+            {hasYtdlp === true &&
+              downloads.length === 0 && (
+                <div
+                  className="flex flex-col items-center gap-2 py-6"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  <CheckCircle2 size={24} style={{ opacity: 0.3 }} />
+                  <p className="text-xs text-center" style={{ opacity: 0.5 }}>
+                    No downloads yet. Paste a URL above to get started.
+                  </p>
+                </div>
+              )}
           </div>
         </div>
       </div>

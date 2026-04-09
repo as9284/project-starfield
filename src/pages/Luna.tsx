@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trash2, Globe, ArrowUp, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, X, Sparkles } from "lucide-react";
+import { Trash2, Globe, ArrowUp, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, X, Sparkles, RotateCcw, Pencil } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -106,6 +106,8 @@ export default function Luna() {
     addMessage,
     updateLastAssistantMessage,
     clearMessages,
+    removeLastAssistantMessage,
+    removeFromLastUserMessage,
     memories,
     addMemory,
     isStreaming,
@@ -135,6 +137,7 @@ export default function Luna() {
   const [input, setInput] = useState("");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const sortedConversations = useMemo(
@@ -257,6 +260,69 @@ export default function Luna() {
     }
   };
 
+  /** Re-run the last user message (removes the last assistant reply first). */
+  const handleRetry = async () => {
+    if (isStreaming) return;
+    // Find the last user message in the snapshot
+    let lastUserIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { lastUserIndex = i; break; }
+    }
+    if (lastUserIndex === -1) return;
+    const lastUser = messages[lastUserIndex];
+
+    removeLastAssistantMessage();
+    setIsStreaming(true);
+    addMessage({ id: crypto.randomUUID(), role: "assistant", content: "", timestamp: Date.now() });
+
+    try {
+      let searchContext = "";
+      if (webSearchEnabled && hasTavilyKey) {
+        try {
+          const results = await webSearch(lastUser.content);
+          if (results.length > 0) {
+            searchContext =
+              "\n\n[Web search results]\n" +
+              results.slice(0, 5).map((r, i) => `${i + 1}. **${r.title}** (${r.url})\n${r.content}`).join("\n\n") +
+              "\n[End of web search results]\n\n";
+          }
+        } catch { /* skip */ }
+      }
+
+      // History = everything before the last user message (exclude the retry target and prior AI response)
+      const historyMessages: ChatMessagePayload[] = messages
+        .slice(0, lastUserIndex)
+        .filter((m) => m.content.length > 0)
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      let accumulated = "";
+      await streamLuna(lastUser.content, historyMessages, searchContext, (event) => {
+        if (event.type === "chunk") {
+          accumulated += event.text;
+          updateLastAssistantMessage(accumulated);
+        }
+      }, memoryStrings, orbitContext);
+
+      parseAndExecuteOrbitCommands(accumulated, {
+        createTask, completeTask, uncompleteTask, archiveTask, deleteTask, createNote, deleteNote,
+      });
+    } catch (e) {
+      updateLastAssistantMessage(`Error: ${String(e)}`);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  /** Put the last user message back into the input for editing. */
+  const handleEdit = () => {
+    if (isStreaming) return;
+    const content = removeFromLastUserMessage();
+    if (content) {
+      setInput(content);
+    }
+  };
+
   const handleNewConversation = () => {
     createConversation();
   };
@@ -267,6 +333,10 @@ export default function Luna() {
   };
 
   const isEmpty = messages.length === 0;
+
+  // Identify the last assistant and last user message IDs for action buttons
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
 
   return (
     <div className="luna-shell">
@@ -360,6 +430,9 @@ export default function Luna() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.15) }}
+                    onMouseEnter={() => setHoveredMessageId(msg.id)}
+                    onMouseLeave={() => setHoveredMessageId(null)}
+                    style={{ position: "relative" }}
                   >
                     <div className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}>
                       {msg.role === "assistant" && !msg.content && i === messages.length - 1 && isStreaming ? (
@@ -378,6 +451,37 @@ export default function Luna() {
                         <span>{msg.content}</span>
                       )}
                     </div>
+
+                    {/* Action buttons — only on last messages, visible on hover */}
+                    {hoveredMessageId === msg.id && !isStreaming && (
+                      <div
+                        className="flex items-center gap-1"
+                        style={{
+                          position: "absolute",
+                          bottom: -6,
+                          ...(msg.role === "user" ? { right: 4 } : { left: 4 }),
+                        }}
+                      >
+                        {msg.id === lastAssistantId && (
+                          <button
+                            className="luna-msg-action-btn"
+                            title="Retry"
+                            onClick={() => void handleRetry()}
+                          >
+                            <RotateCcw size={11} />
+                          </button>
+                        )}
+                        {msg.id === lastUserId && (
+                          <button
+                            className="luna-msg-action-btn"
+                            title="Edit"
+                            onClick={handleEdit}
+                          >
+                            <Pencil size={11} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 ))}
                 <div ref={bottomRef} />

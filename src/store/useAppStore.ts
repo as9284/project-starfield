@@ -62,6 +62,10 @@ interface AppState {
   addMessage: (m: ChatMessage) => void;
   updateLastAssistantMessage: (text: string) => void;
   clearMessages: () => void;
+  /** Remove the last assistant message (for retry). */
+  removeLastAssistantMessage: () => void;
+  /** Remove the last user message and everything after it. Returns removed user content. */
+  removeFromLastUserMessage: () => string;
 
   // Memories
   memories: Memory[];
@@ -223,6 +227,42 @@ export const useAppStore = create<AppState>()(
               updatedAt: Date.now(),
             })) };
           }),
+
+        removeLastAssistantMessage: () =>
+          set((s) => {
+            if (!getActiveConvo(s)) return s;
+            return { conversations: updateActiveConvo(s, (c) => {
+              const msgs = [...c.messages];
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === "assistant") {
+                  msgs.splice(i, 1);
+                  break;
+                }
+              }
+              return { ...c, messages: msgs, updatedAt: Date.now() };
+            }) };
+          }),
+
+        removeFromLastUserMessage: () => {
+          let content = "";
+          set((s) => {
+            if (!getActiveConvo(s)) return s;
+            return { conversations: updateActiveConvo(s, (c) => {
+              const msgs = [...c.messages];
+              let lastUserIdx = -1;
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === "user") {
+                  lastUserIdx = i;
+                  content = msgs[i].content;
+                  break;
+                }
+              }
+              if (lastUserIdx === -1) return c;
+              return { ...c, messages: msgs.slice(0, lastUserIdx), updatedAt: Date.now() };
+            }) };
+          });
+          return content;
+        },
 
         // Memories
         memories: [],

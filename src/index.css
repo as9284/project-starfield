@@ -768,6 +768,7 @@ body {
 
 .luna-msg {
   padding: 0 1.25rem;
+  padding-bottom: 0.75rem;
 }
 
 .luna-msg-user {
@@ -800,6 +801,27 @@ body {
   border: none;
   color: var(--color-text-primary);
   padding-left: 0.25rem;
+}
+
+.luna-msg-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-dim);
+  background: rgba(14, 13, 36, 0.85);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.luna-msg-action-btn:hover {
+  color: var(--color-text-primary);
+  border-color: rgba(124, 79, 240, 0.4);
+  background: rgba(124, 79, 240, 0.1);
 }
 
 /* ── Luna input ────────────────────────────────────────────────────────── */
