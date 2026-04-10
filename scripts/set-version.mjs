@@ -220,6 +220,7 @@ const versionFiles = [
   "package-lock.json",
   "src-tauri/tauri.conf.json",
   "src-tauri/Cargo.toml",
+  "src-tauri/Cargo.lock",
 ];
 
 if (publish) {

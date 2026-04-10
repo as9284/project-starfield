@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
 import { modKey } from "../lib/platform";
@@ -60,7 +61,14 @@ const SECTIONS: {
     id: "updates",
     label: "App Updates",
     icon: RefreshCw,
-    keywords: ["update", "version", "download", "install", "restart", "relaunch"],
+    keywords: [
+      "update",
+      "version",
+      "download",
+      "install",
+      "restart",
+      "relaunch",
+    ],
   },
   {
     id: "ai",
@@ -84,7 +92,15 @@ const SECTIONS: {
     id: "pulsar",
     label: "Pulsar",
     icon: Zap,
-    keywords: ["pulsar", "yt-dlp", "ytdlp", "video", "audio", "download", "media"],
+    keywords: [
+      "pulsar",
+      "yt-dlp",
+      "ytdlp",
+      "video",
+      "audio",
+      "download",
+      "media",
+    ],
   },
   {
     id: "memory",
@@ -190,7 +206,11 @@ function KeyField({
           disabled={!value.trim() || saving}
           title="Save key"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Save size={14} />
+          )}
           Save
         </button>
 
@@ -275,7 +295,10 @@ function ShortcutRow({
       className="flex items-center justify-between py-1.5"
       style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
     >
-      <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+      <span
+        className="text-xs"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
         {description}
       </span>
       <div className="flex items-center gap-1">
@@ -329,8 +352,17 @@ export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeSection, setActiveSection] = useState<SectionId>("updates");
-  const sectionRefs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({});
+  const sectionRefs = useRef<Partial<Record<SectionId, HTMLElement | null>>>(
+    {},
+  );
   const contentRef = useRef<HTMLDivElement>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then((v) => setAppVersion(v))
+      .catch(() => {});
+  }, []);
 
   // ── yt-dlp status ──────────────────────────────────────────────────────────
   const [ytdlpStatus, setYtdlpStatus] = useState<
@@ -463,7 +495,7 @@ export default function Settings() {
     return SECTIONS.filter(
       (s) =>
         s.label.toLowerCase().includes(q) ||
-        s.keywords.some((k) => k.includes(q))
+        s.keywords.some((k) => k.includes(q)),
     );
   }, [q]);
 
@@ -472,20 +504,35 @@ export default function Settings() {
     const container = contentRef.current;
     if (!container) return;
     const onScroll = () => {
+      // If scrolled to the very top, always highlight the first section
+      if (container.scrollTop < 8) {
+        setActiveSection(visibleSections[0]?.id ?? "updates");
+        return;
+      }
+      // If scrolled to the very bottom, highlight the last section
+      const atBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        8;
+      if (atBottom) {
+        setActiveSection(
+          visibleSections[visibleSections.length - 1]?.id ?? "shortcuts",
+        );
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const threshold = containerRect.top + containerRect.height * 0.35;
       for (const sec of [...SECTIONS].reverse()) {
         const el = sectionRefs.current[sec.id];
         if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        if (rect.top - containerRect.top <= containerRect.height * 0.4) {
+        if (el.getBoundingClientRect().top <= threshold) {
           setActiveSection(sec.id);
-          break;
+          return;
         }
       }
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     return () => container.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [visibleSections]);
 
   const scrollToSection = (id: SectionId) => {
     const el = sectionRefs.current[id];
@@ -501,7 +548,10 @@ export default function Settings() {
         {/* Header */}
         <div className="settings-sidebar-header">
           <div className="settings-sidebar-title-row">
-            <SettingsIcon size={16} style={{ color: "var(--color-purple-400)" }} />
+            <SettingsIcon
+              size={16}
+              style={{ color: "var(--color-purple-400)" }}
+            />
             <span className="settings-sidebar-title">Settings</span>
           </div>
           <p className="settings-sidebar-subtitle">
@@ -551,7 +601,9 @@ export default function Settings() {
             );
           })}
           {visibleSections.length === 0 && (
-            <p className="settings-nav-empty">No results for &ldquo;{query}&rdquo;</p>
+            <p className="settings-nav-empty">
+              No results for &ldquo;{query}&rdquo;
+            </p>
           )}
         </nav>
       </aside>
@@ -559,34 +611,64 @@ export default function Settings() {
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <div className="settings-content" ref={contentRef}>
         <div className="settings-content-inner">
-
           {/* ── App Updates ─────────────────────────────────────────── */}
           {visibleSections.some((s) => s.id === "updates") && (
             <section
               id="settings-updates"
-              ref={(el) => { sectionRefs.current["updates"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["updates"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={RefreshCw} label="App Updates" color="purple" />
+              <SectionHeader
+                icon={RefreshCw}
+                label="App Updates"
+                color="purple"
+              />
 
               <div className="settings-update-row">
                 <div className="settings-update-status">
-                  {updateStatus === "checking" || updateStatus === "downloading" ? (
+                  {updateStatus === "checking" ||
+                  updateStatus === "downloading" ? (
                     <Loader2
                       size={15}
                       className="animate-spin"
-                      style={{ color: "var(--color-purple-400)", flexShrink: 0 }}
+                      style={{
+                        color: "var(--color-purple-400)",
+                        flexShrink: 0,
+                      }}
                     />
                   ) : updateStatus === "up-to-date" ? (
-                    <CheckCircle2 size={15} style={{ color: "#86efac", flexShrink: 0 }} />
+                    <CheckCircle2
+                      size={15}
+                      style={{ color: "#86efac", flexShrink: 0 }}
+                    />
                   ) : updateStatus === "available" ? (
-                    <Rocket size={15} style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }} />
+                    <Rocket
+                      size={15}
+                      style={{
+                        color: "var(--color-nebula-teal)",
+                        flexShrink: 0,
+                      }}
+                    />
                   ) : updateStatus === "ready" ? (
-                    <CheckCircle2 size={15} style={{ color: "#86efac", flexShrink: 0 }} />
+                    <CheckCircle2
+                      size={15}
+                      style={{ color: "#86efac", flexShrink: 0 }}
+                    />
                   ) : updateStatus === "error" ? (
-                    <AlertCircle size={15} style={{ color: "#fca5a5", flexShrink: 0 }} />
+                    <AlertCircle
+                      size={15}
+                      style={{ color: "#fca5a5", flexShrink: 0 }}
+                    />
                   ) : (
-                    <RefreshCw size={15} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
+                    <RefreshCw
+                      size={15}
+                      style={{
+                        color: "var(--color-text-muted)",
+                        flexShrink: 0,
+                      }}
+                    />
                   )}
                   <span
                     className="settings-update-status-text"
@@ -604,7 +686,9 @@ export default function Settings() {
                               ? `v${updateVersion} ready — restart to apply`
                               : updateStatus === "error"
                                 ? "Update check failed"
-                                : "v1.0.0"}
+                                : appVersion
+                                  ? `v${appVersion}`
+                                  : "Starfield"}
                   </span>
                 </div>
 
@@ -663,8 +747,8 @@ export default function Settings() {
               )}
 
               <p className="settings-desc">
-                Starfield checks for new versions from GitHub releases. Updates are
-                downloaded and applied seamlessly — just restart when ready.
+                Starfield checks for new versions from GitHub releases. Updates
+                are downloaded and applied seamlessly — just restart when ready.
               </p>
             </section>
           )}
@@ -673,10 +757,16 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "ai") && (
             <section
               id="settings-ai"
-              ref={(el) => { sectionRefs.current["ai"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["ai"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={Cpu} label="AI — Luna (DeepSeek)" color="purple" />
+              <SectionHeader
+                icon={Cpu}
+                label="AI — Luna (DeepSeek)"
+                color="purple"
+              />
 
               <KeyField
                 label="DeepSeek API Key"
@@ -698,7 +788,8 @@ export default function Settings() {
                   DeepSeek-V3.2
                 </span>{" "}
                 in non-thinking mode via the official <code>deepseek-chat</code>{" "}
-                alias, with thinking explicitly disabled in the request payload. Get a key at{" "}
+                alias, with thinking explicitly disabled in the request payload.
+                Get a key at{" "}
                 <a
                   href="https://platform.deepseek.com"
                   target="_blank"
@@ -716,10 +807,16 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "websearch") && (
             <section
               id="settings-websearch"
-              ref={(el) => { sectionRefs.current["websearch"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["websearch"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={Globe} label="Web Search — Tavily" color="teal" />
+              <SectionHeader
+                icon={Globe}
+                label="Web Search — Tavily"
+                color="teal"
+              />
 
               <KeyField
                 label="Tavily API Key"
@@ -736,8 +833,8 @@ export default function Settings() {
               />
 
               <p className="settings-desc">
-                Enable the web search toggle in Luna to let her fetch live results
-                via Tavily. Get a free key at{" "}
+                Enable the web search toggle in Luna to let her fetch live
+                results via Tavily. Get a free key at{" "}
                 <a
                   href="https://tavily.com"
                   target="_blank"
@@ -755,10 +852,16 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "weather") && (
             <section
               id="settings-weather"
-              ref={(el) => { sectionRefs.current["weather"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["weather"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={Cloud} label="Solaris — Weather API" color="blue" />
+              <SectionHeader
+                icon={Cloud}
+                label="Solaris — Weather API"
+                color="blue"
+              />
 
               <KeyField
                 label="Weather API Key"
@@ -776,9 +879,12 @@ export default function Settings() {
 
               <p className="settings-desc">
                 Solaris uses{" "}
-                <span style={{ color: "var(--color-purple-300)" }}>Open-Meteo</span>{" "}
-                for weather data, which is free and works without a key. An optional
-                key is available for commercial use or higher rate limits at{" "}
+                <span style={{ color: "var(--color-purple-300)" }}>
+                  Open-Meteo
+                </span>{" "}
+                for weather data, which is free and works without a key. An
+                optional key is available for commercial use or higher rate
+                limits at{" "}
                 <a
                   href="https://open-meteo.com"
                   target="_blank"
@@ -796,23 +902,35 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "pulsar") && (
             <section
               id="settings-pulsar"
-              ref={(el) => { sectionRefs.current["pulsar"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["pulsar"] = el;
+              }}
               className="settings-section"
             >
               <SectionHeader icon={Zap} label="Pulsar — yt-dlp" color="pink" />
 
               <div className="settings-ytdlp-row">
                 <div className="settings-ytdlp-status">
-                  {ytdlpStatus === "checking" || ytdlpStatus === "installing" ? (
+                  {ytdlpStatus === "checking" ||
+                  ytdlpStatus === "installing" ? (
                     <Loader2
                       size={16}
                       className="animate-spin"
-                      style={{ color: "var(--color-purple-400)", flexShrink: 0 }}
+                      style={{
+                        color: "var(--color-purple-400)",
+                        flexShrink: 0,
+                      }}
                     />
                   ) : ytdlpStatus === "found" ? (
-                    <CheckCircle2 size={16} style={{ color: "#86efac", flexShrink: 0 }} />
+                    <CheckCircle2
+                      size={16}
+                      style={{ color: "#86efac", flexShrink: 0 }}
+                    />
                   ) : (
-                    <AlertCircle size={16} style={{ color: "#fca5a5", flexShrink: 0 }} />
+                    <AlertCircle
+                      size={16}
+                      style={{ color: "#fca5a5", flexShrink: 0 }}
+                    />
                   )}
                   <div className="settings-ytdlp-text">
                     <span className="settings-ytdlp-label">
@@ -829,7 +947,8 @@ export default function Settings() {
                     <span className="settings-ytdlp-sublabel">
                       {ytdlpStatus === "found"
                         ? "Ready to download media"
-                        : ytdlpStatus === "checking" || ytdlpStatus === "installing"
+                        : ytdlpStatus === "checking" ||
+                            ytdlpStatus === "installing"
                           ? "Please wait…"
                           : "Required for media downloads"}
                     </span>
@@ -842,7 +961,9 @@ export default function Settings() {
                     onClick={() => void handleInstallYtdlp()}
                   >
                     <Package size={14} />
-                    {ytdlpStatus === "failed" ? "Retry install" : "Auto-install yt-dlp"}
+                    {ytdlpStatus === "failed"
+                      ? "Retry install"
+                      : "Auto-install yt-dlp"}
                   </button>
                 )}
               </div>
@@ -857,9 +978,9 @@ export default function Settings() {
                 >
                   yt-dlp
                 </a>{" "}
-                to download videos and audio. On Windows the binary is downloaded
-                directly from GitHub; on other platforms pip is used. You can also
-                install it manually via your package manager.
+                to download videos and audio. On Windows the binary is
+                downloaded directly from GitHub; on other platforms pip is used.
+                You can also install it manually via your package manager.
               </p>
             </section>
           )}
@@ -868,10 +989,16 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "memory") && (
             <section
               id="settings-memory"
-              ref={(el) => { sectionRefs.current["memory"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["memory"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={Brain} label="Luna — Memory" color="purple" />
+              <SectionHeader
+                icon={Brain}
+                label="Luna — Memory"
+                color="purple"
+              />
 
               <div className="settings-memory-count">
                 <Brain size={14} style={{ color: "var(--color-purple-400)" }} />
@@ -926,7 +1053,9 @@ export default function Settings() {
                     .reverse()
                     .map((mem) => (
                       <div key={mem.id} className="luna-memory-item">
-                        <span className="luna-memory-item-text">{mem.content}</span>
+                        <span className="luna-memory-item-text">
+                          {mem.content}
+                        </span>
                         <button
                           className="luna-memory-item-delete"
                           onClick={() => removeMemory(mem.id)}
@@ -952,9 +1081,9 @@ export default function Settings() {
               )}
 
               <p className="settings-desc">
-                Luna automatically extracts personal facts and preferences from your
-                conversations. These memories help her provide more personalized
-                responses.
+                Luna automatically extracts personal facts and preferences from
+                your conversations. These memories help her provide more
+                personalized responses.
               </p>
             </section>
           )}
@@ -963,33 +1092,54 @@ export default function Settings() {
           {visibleSections.some((s) => s.id === "shortcuts") && (
             <section
               id="settings-shortcuts"
-              ref={(el) => { sectionRefs.current["shortcuts"] = el; }}
+              ref={(el) => {
+                sectionRefs.current["shortcuts"] = el;
+              }}
               className="settings-section"
             >
-              <SectionHeader icon={Keyboard} label="Keyboard Shortcuts" color="blue" />
+              <SectionHeader
+                icon={Keyboard}
+                label="Keyboard Shortcuts"
+                color="blue"
+              />
 
               <div className="flex flex-col gap-1">
-                <ShortcutRow keys={[modKey, "K"]} description="Open constellations" />
+                <ShortcutRow
+                  keys={[modKey, "K"]}
+                  description="Open constellations"
+                />
                 <ShortcutRow keys={[modKey, ","]} description="Open settings" />
-                <ShortcutRow keys={["Esc"]} description="Go back / close overlay" />
+                <ShortcutRow
+                  keys={["Esc"]}
+                  description="Go back / close overlay"
+                />
                 <ShortcutRow keys={[modKey, "1"]} description="Go to Luna" />
                 <ShortcutRow keys={[modKey, "2"]} description="Go to Orbit" />
                 <ShortcutRow keys={[modKey, "3"]} description="Go to Solaris" />
                 <ShortcutRow keys={[modKey, "4"]} description="Go to Beacon" />
-                <ShortcutRow keys={[modKey, "5"]} description="Go to Hyperlane" />
+                <ShortcutRow
+                  keys={[modKey, "5"]}
+                  description="Go to Hyperlane"
+                />
                 <ShortcutRow keys={[modKey, "6"]} description="Go to Pulsar" />
-                <ShortcutRow keys={["Enter"]} description="Send message (in chat)" />
-                <ShortcutRow keys={["Shift", "Enter"]} description="New line (in chat)" />
+                <ShortcutRow
+                  keys={["Enter"]}
+                  description="Send message (in chat)"
+                />
+                <ShortcutRow
+                  keys={["Shift", "Enter"]}
+                  description="New line (in chat)"
+                />
               </div>
 
               <p className="settings-desc">
                 Shortcuts are disabled while typing in input fields or during AI
-                streaming. On macOS, use <Command size={10} className="inline" />{" "}
-                Cmd; on Windows/Linux, use Ctrl.
+                streaming. On macOS, use{" "}
+                <Command size={10} className="inline" /> Cmd; on Windows/Linux,
+                use Ctrl.
               </p>
             </section>
           )}
-
         </div>
       </div>
     </div>
