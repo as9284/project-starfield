@@ -152,6 +152,7 @@ export const pulsarDownload = (
   downloadId: string,
   url: string,
   formatArg: string,
+  audioFormat: string,
   outputDir: string,
   playlist: boolean,
   onEvent: (e: PulsarEvent) => void,
@@ -162,6 +163,7 @@ export const pulsarDownload = (
     downloadId,
     url,
     formatArg,
+    audioFormat,
     outputDir,
     playlist,
     channel,
@@ -170,3 +172,6 @@ export const pulsarDownload = (
 
 export const pulsarCancelDownload = (downloadId: string) =>
   invoke<void>("pulsar_cancel_download", { downloadId });
+
+export const pulsarDeleteFile = (filePath: string) =>
+  invoke<void>("pulsar_delete_file", { filePath });

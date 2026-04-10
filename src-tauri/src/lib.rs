@@ -8,8 +8,8 @@ use commands::{
     },
     luna::stream_luna,
     pulsar::{
-        pulsar_cancel_download, pulsar_check_ytdlp, pulsar_download, pulsar_get_downloads_dir,
-        pulsar_install_ytdlp, PulsarState,
+        pulsar_cancel_download, pulsar_check_ytdlp, pulsar_delete_file, pulsar_download,
+        pulsar_get_downloads_dir, pulsar_install_ytdlp, PulsarState,
     },
     search::web_search,
 };
@@ -52,6 +52,7 @@ pub fn run() {
             pulsar_get_downloads_dir,
             pulsar_cancel_download,
             pulsar_install_ytdlp,
+            pulsar_delete_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Starfield");

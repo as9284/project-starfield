@@ -17,17 +17,21 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  Pause,
+  Play,
+  Trash2,
 } from "lucide-react";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import { usePulsarStore } from "../store/usePulsarStore";
-import type { FormatOption, DownloadItem } from "../store/usePulsarStore";
+import type { FormatOption, AudioFormat, DownloadItem } from "../store/usePulsarStore";
 import {
   pulsarCheckYtdlp,
   pulsarDownload,
   pulsarGetDownloadsDir,
   pulsarCancelDownload,
   pulsarInstallYtdlp,
+  pulsarDeleteFile,
 } from "../lib/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -52,7 +56,21 @@ const FORMAT_OPTIONS: FormatChoice[] = [
     description: "HD video, smaller file",
     icon: Film,
   },
-  { id: "audio", label: "Audio only", description: "Extract as MP3", icon: Music },
+  { id: "audio", label: "Audio only", description: "Extract audio", icon: Music },
+];
+
+interface AudioFormatChoice {
+  id: AudioFormat;
+  label: string;
+}
+
+const AUDIO_FORMAT_OPTIONS: AudioFormatChoice[] = [
+  { id: "mp3", label: "MP3" },
+  { id: "flac", label: "FLAC" },
+  { id: "wav", label: "WAV" },
+  { id: "ogg", label: "OGG" },
+  { id: "m4a", label: "M4A" },
+  { id: "opus", label: "Opus" },
 ];
 
 function formatBytes(str: string) {
@@ -87,6 +105,8 @@ function statusColor(status: DownloadItem["status"]): string {
     case "error":
     case "cancelled":
       return "#fca5a5";
+    case "paused":
+      return "#fcd34d";
     case "downloading":
     case "merging":
     case "queued":
@@ -105,6 +125,8 @@ function statusLabel(item: DownloadItem): string {
       return item.progress > 0 ? `${item.progress.toFixed(1)}%` : "Starting…";
     case "merging":
       return "Merging…";
+    case "paused":
+      return item.progress > 0 ? `Paused at ${item.progress.toFixed(1)}%` : "Paused";
     case "done":
       return "Complete";
     case "error":
@@ -117,11 +139,15 @@ function statusLabel(item: DownloadItem): string {
 function DownloadCard({
   item,
   onCancel,
+  onPause,
+  onResume,
   onRemove,
   onRetry,
 }: {
   item: DownloadItem;
   onCancel: (id: string) => void;
+  onPause: (id: string) => void;
+  onResume: (item: DownloadItem) => void;
   onRemove: (id: string) => void;
   onRetry: (item: DownloadItem) => void;
 }) {
@@ -145,7 +171,9 @@ function DownloadCard({
           ? "rgba(124, 79, 240, 0.3)"
           : item.status === "done"
             ? "rgba(34,197,94,0.2)"
-            : "rgba(239,68,68,0.2)",
+            : item.status === "paused"
+              ? "rgba(252,211,77,0.25)"
+              : "rgba(239,68,68,0.2)",
       }}
     >
       <div className="flex items-start gap-2">
@@ -209,6 +237,15 @@ function DownloadCard({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {item.status === "downloading" && (
+            <button
+              className="win-btn"
+              title="Pause download"
+              onClick={() => onPause(item.id)}
+            >
+              <Pause size={12} />
+            </button>
+          )}
           {isActive && (
             <button
               className="win-btn"
@@ -216,6 +253,15 @@ function DownloadCard({
               onClick={() => onCancel(item.id)}
             >
               <X size={12} />
+            </button>
+          )}
+          {item.status === "paused" && (
+            <button
+              className="win-btn"
+              title="Resume download"
+              onClick={() => onResume(item)}
+            >
+              <Play size={12} />
             </button>
           )}
           {(item.status === "error" || item.status === "cancelled") && (
@@ -233,7 +279,7 @@ function DownloadCard({
               title="Remove"
               onClick={() => onRemove(item.id)}
             >
-              <X size={12} />
+              <Trash2 size={12} />
             </button>
           )}
         </div>
@@ -243,6 +289,9 @@ function DownloadCard({
         <ProgressBar
           percent={item.status === "merging" ? 100 : item.progress}
         />
+      )}
+      {item.status === "paused" && item.progress > 0 && (
+        <ProgressBar percent={item.progress} />
       )}
     </div>
   );
@@ -264,6 +313,7 @@ export default function Pulsar() {
   const [installing, setInstalling] = useState(false);
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<FormatOption>("best");
+  const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
   const [playlist, setPlaylist] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
 
@@ -273,6 +323,7 @@ export default function Pulsar() {
       d.status === "queued" ||
       d.status === "merging",
   );
+  const pausedDownloads = downloads.filter((d) => d.status === "paused");
   const historyDownloads = downloads.filter(
     (d) =>
       d.status === "done" ||
@@ -283,6 +334,9 @@ export default function Pulsar() {
   // Refs so callbacks always see latest state
   const updateDownloadRef = useRef(updateDownload);
   updateDownloadRef.current = updateDownload;
+
+  // Track IDs that were paused so we don't overwrite their status with "cancelled"
+  const pausedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     pulsarCheckYtdlp()
@@ -327,28 +381,52 @@ export default function Pulsar() {
     downloadUrl: string,
     downloadFormat: FormatOption,
     isPlaylist: boolean,
+    audioFmt: AudioFormat = "mp3",
+    existingId?: string,
   ) => {
     if (!outputDir.trim()) return;
 
-    const id = crypto.randomUUID();
-    const item: DownloadItem = {
-      id,
-      url: downloadUrl,
-      format: downloadFormat,
-      playlist: isPlaylist,
-      status: "queued",
-      progress: 0,
-      speed: "",
-      eta: "",
-      createdAt: Date.now(),
-    };
-    addDownload(item);
+    // Prevent duplicate downloads — skip if the same URL is already active
+    if (!existingId) {
+      const isDuplicate = downloads.some(
+        (d) =>
+          d.url === downloadUrl &&
+          (d.status === "downloading" || d.status === "queued" || d.status === "merging"),
+      );
+      if (isDuplicate) return;
+    }
+
+    const id = existingId ?? crypto.randomUUID();
+    if (existingId) {
+      updateDownload(id, {
+        status: "queued",
+        progress: 0,
+        speed: "",
+        eta: "",
+        error: undefined,
+      });
+    } else {
+      const item: DownloadItem = {
+        id,
+        url: downloadUrl,
+        format: downloadFormat,
+        audioFormat: downloadFormat === "audio" ? audioFmt : undefined,
+        playlist: isPlaylist,
+        status: "queued",
+        progress: 0,
+        speed: "",
+        eta: "",
+        createdAt: Date.now(),
+      };
+      addDownload(item);
+    }
 
     try {
       await pulsarDownload(
         id,
         downloadUrl,
         downloadFormat,
+        audioFmt,
         outputDir,
         isPlaylist,
         (event) => {
@@ -383,6 +461,12 @@ export default function Pulsar() {
               });
               break;
             case "error":
+              // Don't overwrite paused status
+              if (pausedIdsRef.current.has(id)) {
+                pausedIdsRef.current.delete(id);
+                updateDownloadRef.current(id, { speed: "", eta: "" });
+                break;
+              }
               updateDownloadRef.current(id, {
                 status:
                   event.message === "Download cancelled" ? "cancelled" : "error",
@@ -395,10 +479,15 @@ export default function Pulsar() {
         },
       );
     } catch (e) {
-      updateDownload(id, {
-        status: "error",
-        error: String(e),
-      });
+      // Don't overwrite paused status on catch either
+      if (!pausedIdsRef.current.has(id)) {
+        updateDownload(id, {
+          status: "error",
+          error: String(e),
+        });
+      } else {
+        pausedIdsRef.current.delete(id);
+      }
     }
   };
 
@@ -408,10 +497,29 @@ export default function Pulsar() {
     if (!outputDir.trim()) return;
 
     setUrl("");
-    await startDownload(trimmed, format, playlist);
+    await startDownload(trimmed, format, playlist, audioFormat);
   };
 
   const handleCancel = async (id: string) => {
+    const dl = downloads.find((d) => d.id === id);
+    try {
+      await pulsarCancelDownload(id);
+    } catch {
+      // ignore
+    }
+    // Delete partial file from disk
+    if (dl?.filePath) {
+      try {
+        await pulsarDeleteFile(dl.filePath);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handlePause = async (id: string) => {
+    pausedIdsRef.current.add(id);
+    updateDownload(id, { status: "paused" });
     try {
       await pulsarCancelDownload(id);
     } catch {
@@ -419,8 +527,31 @@ export default function Pulsar() {
     }
   };
 
+  const handleResume = (item: DownloadItem) => {
+    void startDownload(
+      item.url,
+      item.format,
+      item.playlist,
+      item.audioFormat ?? "mp3",
+      item.id,
+    );
+  };
+
+  const handleRemove = async (id: string) => {
+    const dl = downloads.find((d) => d.id === id);
+    // Delete the file from disk if it exists
+    if (dl?.filePath) {
+      try {
+        await pulsarDeleteFile(dl.filePath);
+      } catch {
+        // ignore
+      }
+    }
+    removeDownload(id);
+  };
+
   const handleRetry = (item: DownloadItem) => {
-    void startDownload(item.url, item.format, item.playlist);
+    void startDownload(item.url, item.format, item.playlist, item.audioFormat ?? "mp3");
   };
 
   const noOutputDir = !outputDir.trim();
@@ -685,6 +816,36 @@ export default function Pulsar() {
                   );
                 })}
               </div>
+
+              {/* Audio format selector — visible when audio format is selected */}
+              {format === "audio" && (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {AUDIO_FORMAT_OPTIONS.map((af) => {
+                    const isActive = audioFormat === af.id;
+                    return (
+                      <button
+                        key={af.id}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          background: isActive
+                            ? "rgba(124, 79, 240, 0.15)"
+                            : "rgba(16,15,46,0.5)",
+                          border: isActive
+                            ? "1px solid rgba(124, 79, 240, 0.35)"
+                            : "1px solid rgba(37,34,96,0.4)",
+                          color: isActive
+                            ? "var(--color-purple-400)"
+                            : "var(--color-text-muted)",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setAudioFormat(af.id)}
+                      >
+                        {af.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Download button */}
@@ -724,7 +885,32 @@ export default function Pulsar() {
                     key={d.id}
                     item={d}
                     onCancel={handleCancel}
-                    onRemove={removeDownload}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onRemove={handleRemove}
+                    onRetry={handleRetry}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Paused downloads */}
+            {pausedDownloads.length > 0 && (
+              <div className="w-full flex flex-col gap-2">
+                <span
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "#fcd34d" }}
+                >
+                  Paused ({pausedDownloads.length})
+                </span>
+                {pausedDownloads.map((d) => (
+                  <DownloadCard
+                    key={d.id}
+                    item={d}
+                    onCancel={handleCancel}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onRemove={handleRemove}
                     onRetry={handleRetry}
                   />
                 ))}
@@ -766,7 +952,9 @@ export default function Pulsar() {
                       key={d.id}
                       item={d}
                       onCancel={handleCancel}
-                      onRemove={removeDownload}
+                      onPause={handlePause}
+                      onResume={handleResume}
+                      onRemove={handleRemove}
                       onRetry={handleRetry}
                     />
                   ))}

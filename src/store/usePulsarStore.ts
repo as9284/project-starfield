@@ -5,16 +5,21 @@ export type DownloadStatus =
   | "queued"
   | "downloading"
   | "merging"
+  | "paused"
   | "done"
   | "error"
   | "cancelled";
 
 export type FormatOption = "best" | "audio" | "720" | "1080";
 
+export type AudioFormat = "mp3" | "flac" | "wav" | "ogg" | "m4a" | "opus";
+
 export interface DownloadItem {
   id: string;
   url: string;
   format: FormatOption;
+  /** Audio codec when format is "audio" */
+  audioFormat?: AudioFormat;
   /** Whether this was a playlist download */
   playlist: boolean;
   status: DownloadStatus;
@@ -67,7 +72,7 @@ export const usePulsarStore = create<PulsarStore>()(
       clearCompleted: () =>
         set((s) => ({
           downloads: s.downloads.filter(
-            (d) => d.status === "downloading" || d.status === "queued" || d.status === "merging",
+            (d) => d.status === "downloading" || d.status === "queued" || d.status === "merging" || d.status === "paused",
           ),
         })),
     }),
@@ -75,9 +80,9 @@ export const usePulsarStore = create<PulsarStore>()(
       name: "starfield-pulsar",
       partialize: (s) => ({
         outputDir: s.outputDir,
-        // Persist only terminal downloads (not active ones)
+        // Persist terminal and paused downloads (not active ones)
         downloads: s.downloads
-          .filter((d) => d.status === "done" || d.status === "error" || d.status === "cancelled")
+          .filter((d) => d.status === "done" || d.status === "error" || d.status === "cancelled" || d.status === "paused")
           .slice(0, 50),
       }),
     },
