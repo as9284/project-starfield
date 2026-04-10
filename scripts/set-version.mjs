@@ -256,6 +256,10 @@ const nextCargoToml = updateCargoTomlVersion(cargoToml, version);
 
 await fs.writeFile(cargoTomlPath, nextCargoToml, "utf8");
 
+runCommand("cargo", ["generate-lockfile"], {
+  cwd: path.join(rootDir, "src-tauri"),
+});
+
 if (!publish) {
   console.log(
     `Updated package.json, package-lock.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml to ${version}`,
@@ -270,8 +274,9 @@ runCommand("git", ["add", ...versionFiles], { cwd: rootDir });
 ensureVersionFilesChanged(rootDir);
 runCommand("git", ["commit", "-m", `chore: release ${tag}`], { cwd: rootDir });
 runCommand("git", ["tag", "-a", tag, "-m", `Release ${tag}`], { cwd: rootDir });
-runCommand("git", ["push", remote, branch], { cwd: rootDir });
-runCommand("git", ["push", remote, tag], { cwd: rootDir });
+runCommand("git", ["push", remote, branch, `refs/tags/${tag}`], {
+  cwd: rootDir,
+});
 
 console.log(`Published ${tag} from ${branch} to ${remote}.`);
 console.log(
