@@ -224,6 +224,7 @@ export const useAppStore = create<AppState>()(
             return { conversations: updateActiveConvo(s, (c) => ({
               ...c,
               messages: [],
+              title: "New Conversation",
               updatedAt: Date.now(),
             })) };
           }),

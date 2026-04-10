@@ -12,6 +12,7 @@ import {
   Sparkles,
   RotateCcw,
   Pencil,
+  Check,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
@@ -73,6 +74,9 @@ export default function Luna() {
 
   const [input, setInput] = useState("");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [confirmDeleteConvId, setConfirmDeleteConvId] = useState<string | null>(
+    null,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [actionResults, setActionResults] = useState<
@@ -367,16 +371,53 @@ export default function Luna() {
                 >
                   <MessageSquare size={13} className="luna-sidebar-item-icon" />
                   <span className="luna-sidebar-item-title">{c.title}</span>
-                  <button
-                    className="luna-sidebar-item-delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(c.id);
-                    }}
-                    title="Delete conversation"
-                  >
-                    <X size={12} />
-                  </button>
+                  {confirmDeleteConvId === c.id ? (
+                    <span
+                      className="luna-sidebar-item-delete flex items-center gap-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span
+                        className="text-[10px] mr-0.5"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
+                        Delete?
+                      </span>
+                      <button
+                        className="inline-flex items-center p-0.5 rounded"
+                        style={{ color: "rgba(248, 113, 113, 0.9)" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(c.id);
+                          setConfirmDeleteConvId(null);
+                        }}
+                        title="Confirm delete"
+                      >
+                        <Check size={11} />
+                      </button>
+                      <button
+                        className="inline-flex items-center p-0.5 rounded"
+                        style={{ color: "var(--color-text-muted)" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteConvId(null);
+                        }}
+                        title="Cancel"
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="luna-sidebar-item-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteConvId(c.id);
+                      }}
+                      title="Delete conversation"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </button>
               ))}
             </div>

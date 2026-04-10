@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { StickyNote, PenLine, Check, Copy, ExternalLink, Sparkles } from "lucide-react";
+import {
+  StickyNote,
+  PenLine,
+  Check,
+  Copy,
+  ExternalLink,
+  Sparkles,
+} from "lucide-react";
 import { useOrbitStore, VALID_PROJECT_COLORS } from "../../store/useOrbitStore";
 import { useOrbitMeetingStore } from "../../store/useOrbitMeetingStore";
 import { useAppStore } from "../../store/useAppStore";
@@ -14,7 +21,9 @@ import { sanitizeForPrompt } from "../constellation-registry";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function isValidProjectColor(color: string): color is typeof VALID_PROJECT_COLORS[number] {
+function isValidProjectColor(
+  color: string,
+): color is (typeof VALID_PROJECT_COLORS)[number] {
   return (VALID_PROJECT_COLORS as readonly string[]).includes(color);
 }
 
@@ -63,10 +72,21 @@ function WritingResultCard({ result }: { result: ActionResult }) {
   return (
     <div className="luna-action-card luna-action-card-writing">
       <div className="luna-writing-header">
-        <PenLine size={13} style={{ color: "var(--color-purple-400)", flexShrink: 0 }} />
+        <PenLine
+          size={13}
+          style={{ color: "var(--color-purple-400)", flexShrink: 0 }}
+        />
         <span className="luna-writing-label">{modeLabel}</span>
-        <button onClick={handleCopy} className="luna-writing-copy-btn" title="Copy result">
-          {copied ? <Check size={11} style={{ color: "var(--color-nebula-teal)" }} /> : <Copy size={11} />}
+        <button
+          onClick={handleCopy}
+          className="luna-writing-copy-btn"
+          title="Copy result"
+        >
+          {copied ? (
+            <Check size={11} style={{ color: "var(--color-nebula-teal)" }} />
+          ) : (
+            <Copy size={11} />
+          )}
         </button>
       </div>
       <pre className="luna-writing-result">{text}</pre>
@@ -85,12 +105,13 @@ function MeetingOpenedCard({
   return (
     <div className="luna-action-card luna-action-card-meeting">
       <div className="luna-meeting-header">
-        <Sparkles size={13} style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }} />
+        <Sparkles
+          size={13}
+          style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }}
+        />
         <span className="luna-meeting-label">Meeting mode ready</span>
       </div>
-      {title && (
-        <p className="luna-meeting-title">"{title}"</p>
-      )}
+      {title && <p className="luna-meeting-title">"{title}"</p>}
       <button
         className="luna-meeting-open-btn"
         onClick={() => onNavigate?.("orbit")}
@@ -102,9 +123,17 @@ function MeetingOpenedCard({
   );
 }
 
-function OrbitActionCard({ result, onNavigate }: { result: ActionResult; onNavigate?: (view: string) => void }) {
-  if (result.type === "writing_result") return <WritingResultCard result={result} />;
-  if (result.type === "meeting_opened") return <MeetingOpenedCard result={result} onNavigate={onNavigate} />;
+function OrbitActionCard({
+  result,
+  onNavigate,
+}: {
+  result: ActionResult;
+  onNavigate?: (view: string) => void;
+}) {
+  if (result.type === "writing_result")
+    return <WritingResultCard result={result} />;
+  if (result.type === "meeting_opened")
+    return <MeetingOpenedCard result={result} onNavigate={onNavigate} />;
   return <OrbitDoneCard result={result} />;
 }
 
@@ -119,33 +148,51 @@ export const orbitHandler: ConstellationHandler = {
 
 \`\`\`orbit-commands
 CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
+UPDATE_TASK {"id":"...","title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
 COMPLETE_TASK {"id":"..."}
 UNCOMPLETE_TASK {"id":"..."}
 ARCHIVE_TASK {"id":"..."}
+UNARCHIVE_TASK {"id":"..."}
 DELETE_TASK {"id":"..."}
 ADD_SUBTASK {"task_id":"...","title":"..."}
 TOGGLE_SUBTASK {"task_id":"...","subtask_id":"..."}
+UPDATE_SUBTASK {"task_id":"...","subtask_id":"...","title":"..."}
 DELETE_SUBTASK {"task_id":"...","subtask_id":"..."}
 CREATE_NOTE {"title":"...","content":"..."}
+UPDATE_NOTE {"id":"...","title":"...","content":"..."}
 DELETE_NOTE {"id":"..."}
 CREATE_PROJECT {"name":"...","description":"...","color":"violet|purple|blue|cyan|emerald|amber|rose|pink","deadline":"YYYY-MM-DD or null"}
+UPDATE_PROJECT {"id":"...","name":"...","description":"...","color":"violet|purple|blue|cyan|emerald|amber|rose|pink","deadline":"YYYY-MM-DD or null"}
 DELETE_PROJECT {"id":"..."}
+LINK_TASK {"project_id":"...","task_id":"..."}
+UNLINK_TASK {"project_id":"...","task_id":"..."}
+LINK_NOTE {"project_id":"...","note_id":"..."}
+UNLINK_NOTE {"project_id":"...","note_id":"..."}
 PROCESS_WRITING {"mode":"improve|grammar|rephrase|formal|casual|expand|shorten|bullets|continue|email","text":"..."}
 OPEN_MEETING {"title":"..."}
 \`\`\`
 
-Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given.
+Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given. For UPDATE_* commands, only include fields you want to change.
 
 PROCESS_WRITING: Use when the user asks you to improve, fix, rephrase, expand, shorten, convert to bullets, continue, make formal/casual, or format as email. Always use this command to show the result as a copyable card rather than writing the text in your prose response. Text must be the exact content to transform, not a summary.
 
-OPEN_MEETING: Use when the user says they want to start, begin, or open a meeting. This pre-fills the meeting title in the Orbit Meeting tab and navigates there automatically.`,
+OPEN_MEETING: Use when the user says they want to start, begin, or open a meeting. This pre-fills the meeting title in the Orbit Meeting tab and navigates there automatically.
+
+LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks and notes from projects. Always reference IDs from context.`,
 
   buildContext(): string {
     const { tasks, notes, projects } = useOrbitStore.getState();
     const { activeSession, sessions } = useOrbitMeetingStore.getState();
     const activeTasks = tasks.filter((t) => !t.archived);
 
-    if (activeTasks.length === 0 && notes.length === 0 && projects.length === 0 && !activeSession && sessions.length === 0) return "";
+    if (
+      activeTasks.length === 0 &&
+      notes.length === 0 &&
+      projects.length === 0 &&
+      !activeSession &&
+      sessions.length === 0
+    )
+      return "";
 
     let ctx = "## Current Orbit State\n\n";
 
@@ -157,7 +204,14 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
           if (t.sub_tasks && t.sub_tasks.length > 0) {
             const done = t.sub_tasks.filter((s) => s.completed).length;
             line += ` | sub-tasks: ${done}/${t.sub_tasks.length} done`;
-            line += "\n" + t.sub_tasks.map((s) => `  - [${s.id}] [${s.completed ? "x" : " "}] "${sanitizeForPrompt(s.title)}"`).join("\n");
+            line +=
+              "\n" +
+              t.sub_tasks
+                .map(
+                  (s) =>
+                    `  - [${s.id}] [${s.completed ? "x" : " "}] "${sanitizeForPrompt(s.title)}"`,
+                )
+                .join("\n");
           }
           return line;
         })
@@ -184,10 +238,16 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
       ctx += "\n\n";
       ctx += `**Projects (${projects.length}):**\n`;
       ctx += projects
-        .map(
-          (p) =>
-            `- [${p.id}] "${sanitizeForPrompt(p.name)}"${p.description ? ` — ${sanitizeForPrompt(p.description)}` : ""}${p.deadline ? `, deadline: ${p.deadline}` : ""} | tasks: ${p.taskIds.length}, notes: ${p.noteIds.length}`,
-        )
+        .map((p) => {
+          let line = `- [${p.id}] "${sanitizeForPrompt(p.name)}"${p.description ? ` — ${sanitizeForPrompt(p.description)}` : ""}${p.deadline ? `, deadline: ${p.deadline}` : ""}`;
+          if (p.taskIds.length > 0)
+            line += ` | linked task IDs: ${p.taskIds.join(", ")}`;
+          if (p.noteIds.length > 0)
+            line += ` | linked note IDs: ${p.noteIds.join(", ")}`;
+          if (p.taskIds.length === 0 && p.noteIds.length === 0)
+            line += ` | no linked items`;
+          return line;
+        })
         .join("\n");
     }
 
@@ -230,11 +290,11 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
                 args.description != null && args.description !== "null"
                   ? String(args.description)
                   : null,
-              priority: (
-                ["low", "medium", "high"].includes(String(args.priority))
-                  ? args.priority
-                  : "medium"
-              ) as "low" | "medium" | "high",
+              priority: (["low", "medium", "high"].includes(
+                String(args.priority),
+              )
+                ? args.priority
+                : "medium") as "low" | "medium" | "high",
               due_date: dueDate,
             });
             count++;
@@ -252,20 +312,66 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
             store.archiveTask(String(args.id ?? ""));
             count++;
             break;
+          case "UNARCHIVE_TASK":
+            store.unarchiveTask(String(args.id ?? ""));
+            count++;
+            break;
           case "DELETE_TASK":
             store.deleteTask(String(args.id ?? ""));
             count++;
             break;
+          case "UPDATE_TASK": {
+            const taskId = String(args.id ?? "");
+            if (!taskId) break;
+            const taskUpdates: Parameters<typeof store.updateTask>[1] = {};
+            if (args.title !== undefined)
+              taskUpdates.title = String(args.title);
+            if (args.description !== undefined)
+              taskUpdates.description =
+                args.description === "null" || args.description === null
+                  ? null
+                  : String(args.description);
+            if (
+              args.priority !== undefined &&
+              ["low", "medium", "high"].includes(String(args.priority))
+            )
+              taskUpdates.priority = args.priority as "low" | "medium" | "high";
+            if (args.due_date !== undefined)
+              taskUpdates.due_date =
+                args.due_date === "null" || args.due_date === null
+                  ? null
+                  : String(args.due_date);
+            store.updateTask(taskId, taskUpdates);
+            count++;
+            break;
+          }
           case "ADD_SUBTASK":
-            store.addSubTask(String(args.task_id ?? ""), String(args.title ?? ""));
+            store.addSubTask(
+              String(args.task_id ?? ""),
+              String(args.title ?? ""),
+            );
             count++;
             break;
           case "TOGGLE_SUBTASK":
-            store.toggleSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            store.toggleSubTask(
+              String(args.task_id ?? ""),
+              String(args.subtask_id ?? ""),
+            );
             count++;
             break;
           case "DELETE_SUBTASK":
-            store.deleteSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            store.deleteSubTask(
+              String(args.task_id ?? ""),
+              String(args.subtask_id ?? ""),
+            );
+            count++;
+            break;
+          case "UPDATE_SUBTASK":
+            store.updateSubTask(
+              String(args.task_id ?? ""),
+              String(args.subtask_id ?? ""),
+              String(args.title ?? ""),
+            );
             count++;
             break;
           case "CREATE_NOTE":
@@ -279,6 +385,21 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
             store.deleteNote(String(args.id ?? ""));
             count++;
             break;
+          case "UPDATE_NOTE": {
+            const noteId = String(args.id ?? "");
+            if (!noteId) break;
+            const noteUpdates: Parameters<typeof store.updateNote>[1] = {};
+            if (args.title !== undefined)
+              noteUpdates.title = String(args.title);
+            if (args.content !== undefined)
+              noteUpdates.content =
+                args.content === "null" || args.content === null
+                  ? null
+                  : String(args.content);
+            store.updateNote(noteId, noteUpdates);
+            count++;
+            break;
+          }
           case "CREATE_PROJECT": {
             const rawDeadline = args.deadline;
             const deadline =
@@ -290,10 +411,13 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
                 : null;
             store.createProject({
               name: String(args.name ?? ""),
-              description: args.description != null && args.description !== "null"
-                ? String(args.description)
-                : undefined,
-              color: isValidProjectColor(String(args.color)) ? String(args.color) : "violet",
+              description:
+                args.description != null && args.description !== "null"
+                  ? String(args.description)
+                  : undefined,
+              color: isValidProjectColor(String(args.color))
+                ? String(args.color)
+                : "violet",
               deadline,
             });
             count++;
@@ -301,6 +425,55 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
           }
           case "DELETE_PROJECT":
             store.deleteProject(String(args.id ?? ""));
+            count++;
+            break;
+          case "UPDATE_PROJECT": {
+            const projId = String(args.id ?? "");
+            if (!projId) break;
+            const projUpdates: Parameters<typeof store.updateProject>[1] = {};
+            if (args.name !== undefined) projUpdates.name = String(args.name);
+            if (args.description !== undefined)
+              projUpdates.description = String(args.description);
+            if (
+              args.color !== undefined &&
+              isValidProjectColor(String(args.color))
+            )
+              projUpdates.color = String(args.color);
+            if (args.deadline !== undefined)
+              projUpdates.deadline =
+                args.deadline === "null" || args.deadline === null
+                  ? null
+                  : String(args.deadline);
+            store.updateProject(projId, projUpdates);
+            count++;
+            break;
+          }
+          case "LINK_TASK":
+            store.linkTaskToProject(
+              String(args.project_id ?? ""),
+              String(args.task_id ?? ""),
+            );
+            count++;
+            break;
+          case "UNLINK_TASK":
+            store.unlinkTaskFromProject(
+              String(args.project_id ?? ""),
+              String(args.task_id ?? ""),
+            );
+            count++;
+            break;
+          case "LINK_NOTE":
+            store.linkNoteToProject(
+              String(args.project_id ?? ""),
+              String(args.note_id ?? ""),
+            );
+            count++;
+            break;
+          case "UNLINK_NOTE":
+            store.unlinkNoteFromProject(
+              String(args.project_id ?? ""),
+              String(args.note_id ?? ""),
+            );
             count++;
             break;
 
@@ -323,7 +496,9 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
           case "OPEN_MEETING": {
             const title = String(args.title ?? "").trim();
             // Signal Orbit to switch to meeting tab and pre-fill the title
-            useOrbitMeetingStore.getState().requestOrbitTab("meeting", title || undefined);
+            useOrbitMeetingStore
+              .getState()
+              .requestOrbitTab("meeting", title || undefined);
             // Navigate to Orbit
             useAppStore.getState().setView("orbit");
             results.push({

@@ -20,6 +20,7 @@ import {
   Pause,
   Play,
   Trash2,
+  Check,
 } from "lucide-react";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
@@ -172,6 +173,7 @@ function DownloadCard({
     : item.url.length > 60
       ? item.url.slice(0, 60) + "…"
       : item.url;
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
     <div
@@ -287,15 +289,34 @@ function DownloadCard({
               <RotateCcw size={12} />
             </button>
           )}
-          {!isActive && (
-            <button
-              className="win-btn"
-              title="Remove"
-              onClick={() => onRemove(item.id)}
-            >
-              <Trash2 size={12} />
-            </button>
-          )}
+          {!isActive &&
+            (confirmRemove ? (
+              <div className="flex items-center gap-1">
+                <button
+                  className="win-btn"
+                  title="Confirm remove"
+                  onClick={() => onRemove(item.id)}
+                  style={{ color: "rgba(248, 113, 113, 0.9)" }}
+                >
+                  <Check size={12} />
+                </button>
+                <button
+                  className="win-btn"
+                  title="Cancel"
+                  onClick={() => setConfirmRemove(false)}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="win-btn"
+                title="Remove"
+                onClick={() => setConfirmRemove(true)}
+              >
+                <Trash2 size={12} />
+              </button>
+            ))}
         </div>
       </div>
 
