@@ -206,24 +206,24 @@ function DownloadCard({
               item.speed &&
               item.speed !== "?" && (
                 <>
-                  <span style={{ color: "var(--color-text-dim)" }}>·</span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>·</span>
                   <span
                     className="text-xs flex items-center gap-1"
-                    style={{ color: "var(--color-text-dim)" }}
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
-                    <Zap size={9} />
+                    <Zap size={10} />
                     {formatBytes(item.speed)}
                   </span>
                 </>
               )}
             {item.status === "downloading" && item.eta && (
               <>
-                <span style={{ color: "var(--color-text-dim)" }}>·</span>
+                <span style={{ color: "var(--color-text-secondary)" }}>·</span>
                 <span
                   className="text-xs flex items-center gap-1"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
-                  <Clock size={9} />
+                  <Clock size={10} />
                   {item.eta}
                 </span>
               </>
@@ -240,7 +240,7 @@ function DownloadCard({
           {item.status === "done" && item.filePath && (
             <p
               className="text-xs mt-0.5 truncate"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--color-text-secondary)" }}
               title={item.filePath}
             >
               {item.filePath.split("/").pop() ?? item.filePath}
@@ -622,7 +622,7 @@ export default function Pulsar() {
             className="text-xs px-2 py-0.5 rounded"
             style={{
               background: "rgba(124, 79, 240, 0.12)",
-              color: "var(--color-text-muted)",
+              color: "var(--color-purple-300)",
             }}
           >
             constellation
@@ -861,7 +861,7 @@ export default function Pulsar() {
                         style={{
                           color: isActive
                             ? "var(--color-purple-400)"
-                            : "var(--color-text-dim)",
+                            : "var(--color-text-secondary)",
                           flexShrink: 0,
                         }}
                       />
@@ -879,8 +879,8 @@ export default function Pulsar() {
                         <p
                           className="text-xs"
                           style={{
-                            color: "var(--color-text-dim)",
-                            fontSize: "0.68rem",
+                            color: "var(--color-text-muted)",
+                            fontSize: "0.75rem",
                           }}
                         >
                           {opt.description}
@@ -1012,7 +1012,7 @@ export default function Pulsar() {
                     <button
                       className="text-xs"
                       style={{
-                        color: "var(--color-text-dim)",
+                        color: "var(--color-text-secondary)",
                         cursor: "pointer",
                       }}
                       onClick={clearCompleted}
@@ -1042,7 +1042,7 @@ export default function Pulsar() {
                 <Loader2
                   size={18}
                   className="animate-spin"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--color-text-secondary)" }}
                 />
               </div>
             )}
@@ -1050,10 +1050,10 @@ export default function Pulsar() {
             {hasYtdlp === true && downloads.length === 0 && (
               <div
                 className="flex flex-col items-center gap-2 py-6"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--color-text-secondary)" }}
               >
-                <CheckCircle2 size={24} style={{ opacity: 0.3 }} />
-                <p className="text-xs text-center" style={{ opacity: 0.5 }}>
+                <CheckCircle2 size={24} style={{ opacity: 0.4 }} />
+                <p className="text-xs text-center" style={{ opacity: 0.7 }}>
                   No downloads yet. Paste a URL above to get started.
                 </p>
               </div>

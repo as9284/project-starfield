@@ -730,7 +730,7 @@ export default function Settings() {
                 <p
                   className="text-xs"
                   style={{
-                    color: "var(--color-text-dim)",
+                    color: "var(--color-text-secondary)",
                     textAlign: "center",
                     marginTop: "0.25rem",
                   }}
@@ -821,7 +821,7 @@ function ShortcutRow({
                 background: "rgba(124, 79, 240, 0.1)",
                 border: "1px solid rgba(124, 79, 240, 0.2)",
                 color: "var(--color-purple-300)",
-                fontSize: "0.68rem",
+                fontSize: "0.72rem",
                 minWidth: "1.5rem",
                 textAlign: "center",
               }}

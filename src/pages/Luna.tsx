@@ -361,7 +361,7 @@ function ShortUrlCard({ result }: { result: HyperlaneActionResult }) {
         </span>
         <ArrowRight
           size={12}
-          style={{ color: "var(--color-text-dim)", flexShrink: 0 }}
+          style={{ color: "var(--color-text-secondary)", flexShrink: 0 }}
         />
         <a
           href={result.short}
@@ -1188,8 +1188,8 @@ export default function Luna() {
                         <span
                           style={{
                             marginLeft: "0.35rem",
-                            fontSize: "0.7rem",
-                            color: "var(--color-text-dim)",
+                            fontSize: "0.78rem",
+                            color: "var(--color-text-secondary)",
                           }}
                         >
                           Executing…

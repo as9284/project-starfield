@@ -75,8 +75,8 @@ function StatTile({
       }}
     >
       <span
-        className="text-[9px] uppercase tracking-[0.2em]"
-        style={{ color: "var(--color-text-dim)" }}
+        className="text-[11px] uppercase tracking-[0.15em]"
+        style={{ color: "var(--color-text-secondary)" }}
       >
         {label}
       </span>
@@ -87,7 +87,7 @@ function StatTile({
         {value}
         {unit && (
           <span
-            className="text-[10px] font-normal ml-0.5"
+            className="text-[11px] font-normal ml-0.5"
             style={{ color: "var(--color-purple-400)" }}
           >
             {unit}
@@ -96,8 +96,8 @@ function StatTile({
       </span>
       {sub && (
         <span
-          className="text-[10px] font-medium"
-          style={{ color: "var(--color-text-dim)" }}
+          className="text-[11px] font-medium"
+          style={{ color: "var(--color-text-muted)" }}
         >
           {sub}
         </span>
@@ -128,8 +128,8 @@ function DetailTile({
       }}
     >
       <span
-        className="text-[9px] uppercase tracking-[0.2em]"
-        style={{ color: "var(--color-text-dim)" }}
+        className="text-[11px] uppercase tracking-[0.15em]"
+        style={{ color: "var(--color-text-secondary)" }}
       >
         {label}
       </span>
@@ -141,7 +141,7 @@ function DetailTile({
         {value}
         {unit && (
           <span
-            className="text-[9px] font-normal"
+            className="text-[10px] font-normal"
             style={{ color: "var(--color-purple-400)" }}
           >
             {unit}
@@ -197,8 +197,8 @@ function HourlyChart({
     <div className="w-full flex flex-col gap-4">
       <div>
         <h4
-          className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-2 pl-1"
-          style={{ color: "var(--color-text-dim)" }}
+          className="text-xs uppercase tracking-[0.15em] font-semibold mb-2 pl-1"
+          style={{ color: "var(--color-text-secondary)" }}
         >
           Temperature (°C)
         </h4>
@@ -272,8 +272,8 @@ function HourlyChart({
 
       <div>
         <h4
-          className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-2 pl-1"
-          style={{ color: "var(--color-text-dim)" }}
+          className="text-xs uppercase tracking-[0.15em] font-semibold mb-2 pl-1"
+          style={{ color: "var(--color-text-secondary)" }}
         >
           Precipitation Probability (%)
         </h4>
@@ -450,7 +450,7 @@ function LocationSearchInput() {
                 <span className="font-semibold text-sm">{location.name}</span>
                 <span
                   className="text-xs mt-0.5"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   {location.admin1 && `${location.admin1}, `}
                   {location.country}
@@ -525,7 +525,7 @@ export default function Solaris() {
             className="text-xs px-2 py-0.5 rounded"
             style={{
               background: "rgba(124, 79, 240, 0.12)",
-              color: "var(--color-text-muted)",
+              color: "var(--color-purple-300)",
             }}
           >
             constellation
@@ -591,8 +591,8 @@ export default function Solaris() {
                       {selectedLocation.name}
                     </h2>
                     <p
-                      className="text-xs font-medium uppercase tracking-[0.2em]"
-                      style={{ color: "var(--color-text-dim)" }}
+                      className="text-xs font-medium uppercase tracking-[0.15em]"
+                      style={{ color: "var(--color-text-secondary)" }}
                     >
                       {selectedLocation.admin1 &&
                         `${selectedLocation.admin1}, `}
@@ -623,8 +623,8 @@ export default function Solaris() {
                           {currentWeather?.description || "Unknown"}
                         </div>
                         <div
-                          className="text-[11px] mt-1"
-                          style={{ color: "var(--color-text-dim)" }}
+                          className="text-xs mt-1"
+                          style={{ color: "var(--color-text-secondary)" }}
                         >
                           Feels like {Math.round(current.apparent_temperature)}°
                         </div>
@@ -684,8 +684,8 @@ export default function Solaris() {
             {daily && daily.time.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h3
-                  className="text-[10px] font-bold uppercase tracking-[0.25em] px-1"
-                  style={{ color: "var(--color-text-dim)" }}
+                  className="text-xs font-bold uppercase tracking-[0.2em] px-1"
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   7-Day Forecast
                 </h3>
@@ -735,7 +735,7 @@ export default function Solaris() {
                             <span
                               className="font-medium"
                               style={{
-                                color: "var(--color-text-dim)",
+                                color: "var(--color-text-secondary)",
                               }}
                             >
                               {minTemp !== undefined
@@ -764,7 +764,7 @@ export default function Solaris() {
                           <span className="w-14 text-right">
                             {precipProb !== undefined && precipProb > 0 ? (
                               <span
-                                className="text-[10px] font-bold"
+                                className="text-xs font-bold"
                                 style={{ color: "#7dd3fc" }}
                               >
                                 {getPrecipIcon(weatherCode)} {precipProb}%
@@ -777,7 +777,7 @@ export default function Solaris() {
                             className={`transition-transform duration-200 ${
                               isExpanded ? "rotate-180" : ""
                             }`}
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--color-text-secondary)" }}
                           />
                         </motion.button>
 

@@ -166,7 +166,7 @@ function HistoryList({
             style={{
               background: "rgba(124,58,237,0.15)",
               color: "var(--color-purple-400)",
-              fontSize: "0.68rem",
+              fontSize: "0.72rem",
             }}
           >
             {entries.length}
@@ -195,7 +195,7 @@ function HistoryList({
             <div className="flex-1 min-w-0">
               <p
                 className="text-xs truncate leading-tight"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--color-text-secondary)" }}
               >
                 {truncateUrl(entry.original)}
               </p>
@@ -337,7 +337,7 @@ export default function Hyperlane() {
             className="text-xs px-2 py-0.5 rounded"
             style={{
               background: "rgba(20, 184, 166, 0.12)",
-              color: "var(--color-text-muted)",
+              color: "var(--color-nebula-teal)",
             }}
           >
             constellation
