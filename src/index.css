@@ -66,13 +66,19 @@
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
   background: transparent;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-space-900);
+  border-radius: 12px;
 }
 
 body {
@@ -102,6 +108,45 @@ body {
 ::selection {
   background: rgba(124, 79, 240, 0.35);
   color: var(--color-text-primary);
+}
+
+/* ── Splash screen ──────────────────────────────────────────────────────── */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--color-space-900);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-dim);
+  pointer-events: none;
+  user-select: none;
+}
+
+.splash-icon {
+  filter: drop-shadow(0 0 24px rgba(124, 79, 240, 0.55))
+    drop-shadow(0 0 60px rgba(124, 79, 240, 0.2));
+}
+
+.splash-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-purple-200);
+}
+
+.splash-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-purple-400);
+  margin-top: 4px;
 }
 
 /* ── App shell ──────────────────────────────────────────────────────────── */
@@ -182,6 +227,63 @@ body {
 
 .topbar-nodrag {
   -webkit-app-region: no-drag;
+}
+
+.topbar-wordmark {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: linear-gradient(
+    105deg,
+    var(--color-purple-300) 0%,
+    var(--color-purple-400) 50%,
+    var(--color-purple-300) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.9;
+}
+
+.topbar-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.77rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    border-color 0.18s,
+    box-shadow 0.18s;
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+.topbar-nav-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(124, 79, 240, 0.09);
+  border-color: rgba(124, 79, 240, 0.18);
+}
+
+.topbar-nav-btn-active {
+  color: var(--color-purple-300);
+  background: rgba(124, 79, 240, 0.16);
+  border-color: rgba(124, 79, 240, 0.32);
+  box-shadow:
+    0 0 16px rgba(124, 79, 240, 0.14),
+    inset 0 1px 0 rgba(200, 180, 255, 0.07);
+}
+
+.topbar-nav-btn-active:hover {
+  background: rgba(124, 79, 240, 0.22);
+  border-color: rgba(124, 79, 240, 0.45);
 }
 
 /* ── Glass card ─────────────────────────────────────────────────────────── */
@@ -776,7 +878,7 @@ body {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0 1.25rem;
-  padding-bottom: 0.875rem;
+  padding-bottom: 2.2rem;
 }
 
 .luna-msg-user {
@@ -822,6 +924,23 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   backdrop-filter: blur(8px);
+}
+
+.luna-msg-actions {
+  position: absolute;
+  bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  z-index: 2;
+}
+
+.luna-msg-actions-ai {
+  left: 1.5rem;
+}
+
+.luna-msg-actions-user {
+  right: 1.5rem;
 }
 
 .luna-msg-action-btn:hover {
@@ -1185,6 +1304,12 @@ body {
   gap: 0.2rem;
   margin-top: 0.4rem;
   padding: 0.35rem 0.25rem;
+}
+
+.luna-action-pending-label {
+  margin-left: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
 }
 
 .luna-action-card {
@@ -1591,7 +1716,9 @@ body {
   font-size: 0.8rem;
   padding: 0.4rem 1.6rem 0.4rem 1.8rem;
   outline: none;
-  transition: border-color 0.18s, box-shadow 0.18s;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
 }
 
 .settings-search-input:focus {
@@ -1616,7 +1743,9 @@ body {
   background: rgba(124, 79, 240, 0.15);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .settings-search-clear:hover {
@@ -1643,7 +1772,9 @@ body {
   text-align: left;
   cursor: pointer;
   border-radius: 0;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   position: relative;
 }
 
@@ -1713,7 +1844,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  max-width: 640px;
+  width: 100%;
 }
 
 /* ── Section card ───────────────────────────────────────────────────────── */
@@ -1804,7 +1935,11 @@ body {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s,
+    opacity 0.15s;
   white-space: nowrap;
 }
 
@@ -1909,7 +2044,10 @@ body {
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
 }
 
 .settings-ytdlp-install-btn:hover {

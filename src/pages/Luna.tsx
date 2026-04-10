@@ -106,11 +106,28 @@ function getCommandBlockBody(response: string, tag: string): string | null {
   return match?.[1] ?? null;
 }
 
+function stripTrailingAssistantCommandStart(content: string): string {
+  const match = content.match(/\s*```([a-z-]*)$/i);
+  if (!match) return content;
+
+  const partialTag = (match[1] ?? "").toLowerCase();
+  if (
+    partialTag.length === 0 ||
+    COMMAND_BLOCK_TAGS.some((tag) => tag.startsWith(partialTag))
+  ) {
+    return content.slice(0, content.length - match[0].length).trimEnd();
+  }
+
+  return content;
+}
+
 function stripAssistantCommandBlocks(content: string): string {
-  return COMMAND_BLOCK_TAGS.reduce((cleaned, tag) => {
+  const cleaned = COMMAND_BLOCK_TAGS.reduce((nextContent, tag) => {
     const re = new RegExp("\\s*```" + tag + "\\r?\\n[\\s\\S]*?(?:```|$)", "gi");
-    return cleaned.replace(re, "");
-  }, content).trimEnd();
+    return nextContent.replace(re, "");
+  }, content);
+
+  return stripTrailingAssistantCommandStart(cleaned).trimEnd();
 }
 
 function hasAssistantCommandBlocks(content: string): boolean {
@@ -1084,12 +1101,7 @@ export default function Luna() {
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.35 }}
               >
-                <AiGlobe size={160} />
-                <p className="luna-greeting">
-                  {hasDeepSeekKey
-                    ? "What can I help you with?"
-                    : "Add a DeepSeek API key to get started."}
-                </p>
+                <AiGlobe size={240} />
                 {!hasDeepSeekKey && (
                   <button
                     className="luna-settings-link"
@@ -1107,48 +1119,67 @@ export default function Luna() {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
               >
-                {messages.map((msg, i) => (
-                  <motion.div
-                    key={msg.id}
-                    className={`luna-msg ${msg.role === "user" ? "luna-msg-user" : "luna-msg-ai"}`}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.25,
-                      delay: Math.min(i * 0.03, 0.15),
-                    }}
-                    onMouseEnter={() => setHoveredMessageId(msg.id)}
-                    onMouseLeave={() => setHoveredMessageId(null)}
-                    style={{ position: "relative" }}
-                  >
-                    <div
-                      className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}
-                    >
-                      {msg.role === "assistant" &&
-                      !msg.content &&
-                      i === messages.length - 1 &&
-                      isStreaming ? (
-                        <div className="flex gap-1 items-center h-4">
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                        </div>
-                      ) : msg.role === "assistant" ? (
-                        <div className="prose-starfield">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {stripAssistantCommandBlocks(msg.content)}
-                          </ReactMarkdown>
-                        </div>
-                      ) : (
-                        <span>{msg.content}</span>
-                      )}
-                    </div>
+                {messages.map((msg, i) => {
+                  const visibleAssistantContent =
+                    msg.role === "assistant"
+                      ? stripAssistantCommandBlocks(msg.content)
+                      : "";
+                  const actionCards = actionResults[msg.id] ?? [];
+                  const hasPendingAction = pendingActions.has(msg.id);
+                  const isStreamingAssistantPlaceholder =
+                    msg.role === "assistant" &&
+                    !msg.content &&
+                    i === messages.length - 1 &&
+                    isStreaming;
+                  const shouldRenderAssistantBubble =
+                    msg.role === "assistant" &&
+                    (isStreamingAssistantPlaceholder ||
+                      visibleAssistantContent.trim().length > 0);
+                  const showMessageActions =
+                    hoveredMessageId === msg.id &&
+                    !isStreaming &&
+                    (msg.id === lastAssistantId || msg.id === lastUserId);
 
-                    {/* Action result cards */}
-                    {msg.role === "assistant" &&
-                      (actionResults[msg.id] ?? []).length > 0 && (
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      className={`luna-msg ${msg.role === "user" ? "luna-msg-user" : "luna-msg-ai"}`}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.25,
+                        delay: Math.min(i * 0.03, 0.15),
+                      }}
+                      onMouseEnter={() => setHoveredMessageId(msg.id)}
+                      onMouseLeave={() => setHoveredMessageId(null)}
+                      style={{ position: "relative" }}
+                    >
+                      {(msg.role === "user" || shouldRenderAssistantBubble) && (
+                        <div
+                          className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}
+                        >
+                          {isStreamingAssistantPlaceholder ? (
+                            <div className="flex gap-1 items-center h-4">
+                              <span className="typing-dot" />
+                              <span className="typing-dot" />
+                              <span className="typing-dot" />
+                            </div>
+                          ) : msg.role === "assistant" ? (
+                            <div className="prose-starfield">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {visibleAssistantContent}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <span>{msg.content}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action result cards */}
+                      {msg.role === "assistant" && actionCards.length > 0 && (
                         <div className="luna-action-results">
-                          {(actionResults[msg.id] ?? []).map((result, ri) => {
+                          {actionCards.map((result, ri) => {
                             if (
                               result.type === "weather" ||
                               result.type === "weather_error"
@@ -1179,56 +1210,46 @@ export default function Luna() {
                         </div>
                       )}
 
-                    {/* Pending indicator */}
-                    {msg.role === "assistant" && pendingActions.has(msg.id) && (
-                      <div className="luna-action-pending">
-                        <span className="typing-dot" />
-                        <span className="typing-dot" />
-                        <span className="typing-dot" />
-                        <span
-                          style={{
-                            marginLeft: "0.35rem",
-                            fontSize: "0.78rem",
-                            color: "var(--color-text-secondary)",
-                          }}
-                        >
-                          Executing…
-                        </span>
-                      </div>
-                    )}
+                      {/* Pending indicator */}
+                      {msg.role === "assistant" && hasPendingAction && (
+                        <div className="luna-action-pending">
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                          <span className="luna-action-pending-label">
+                            Executing…
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Hover action buttons */}
-                    {hoveredMessageId === msg.id && !isStreaming && (
-                      <div
-                        className="flex items-center gap-1"
-                        style={{
-                          position: "absolute",
-                          bottom: -6,
-                          ...(msg.role === "user" ? { right: 4 } : { left: 4 }),
-                        }}
-                      >
-                        {msg.id === lastAssistantId && (
-                          <button
-                            className="luna-msg-action-btn"
-                            title="Retry"
-                            onClick={() => void handleRetry()}
-                          >
-                            <RotateCcw size={11} />
-                          </button>
-                        )}
-                        {msg.id === lastUserId && (
-                          <button
-                            className="luna-msg-action-btn"
-                            title="Edit"
-                            onClick={handleEdit}
-                          >
-                            <Pencil size={11} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+                      {/* Hover action buttons */}
+                      {showMessageActions && (
+                        <div
+                          className={`luna-msg-actions ${msg.role === "user" ? "luna-msg-actions-user" : "luna-msg-actions-ai"}`}
+                        >
+                          {msg.id === lastAssistantId && (
+                            <button
+                              className="luna-msg-action-btn"
+                              title="Retry"
+                              onClick={() => void handleRetry()}
+                            >
+                              <RotateCcw size={11} />
+                            </button>
+                          )}
+                          {msg.id === lastUserId && (
+                            <button
+                              className="luna-msg-action-btn"
+                              title="Edit"
+                              onClick={handleEdit}
+                            >
+                              <Pencil size={11} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
                 <div ref={bottomRef} />
               </motion.div>
             )}

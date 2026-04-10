@@ -356,6 +356,8 @@ export default function Settings() {
     {},
   );
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollingRef = useRef(false);
+  const scrollLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -504,6 +506,8 @@ export default function Settings() {
     const container = contentRef.current;
     if (!container) return;
     const onScroll = () => {
+      // Suppress spy updates while a programmatic scroll is in progress
+      if (scrollingRef.current) return;
       // If scrolled to the very top, always highlight the first section
       if (container.scrollTop < 8) {
         setActiveSection(visibleSections[0]?.id ?? "updates");
@@ -537,8 +541,16 @@ export default function Settings() {
   const scrollToSection = (id: SectionId) => {
     const el = sectionRefs.current[id];
     if (!el) return;
+    // Lock scroll-spy so intermediate scroll events don't flicker the active state
+    scrollingRef.current = true;
+    if (scrollLockTimer.current !== null) {
+      clearTimeout(scrollLockTimer.current);
+    }
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     setActiveSection(id);
+    scrollLockTimer.current = setTimeout(() => {
+      scrollingRef.current = false;
+    }, 700);
   };
 
   return (

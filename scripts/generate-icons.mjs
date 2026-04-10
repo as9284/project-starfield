@@ -52,37 +52,37 @@ function buildSvg(size) {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs>
-    <!-- Background gradient -->
-    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
-      <stop offset="0%" stop-color="#2e1065"/>
-      <stop offset="60%" stop-color="#1a0a3e"/>
-      <stop offset="100%" stop-color="#0c0520"/>
+    <!-- Background gradient: vivid purple, not near-black -->
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#5b21b6"/>
+      <stop offset="55%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#200840"/>
     </radialGradient>
 
-    <!-- Star fill gradient -->
-    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#c4b5fd"/>
-      <stop offset="40%" stop-color="#a78bfa"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+    <!-- Star fill gradient: bright white core fading to lavender -->
+    <linearGradient id="starGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#f5f3ff"/>
+      <stop offset="45%" stop-color="#ddd6fe"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
     </linearGradient>
 
-    <!-- Outer glow -->
+    <!-- Outer glow: more intense -->
     <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.45"/>
-      <stop offset="50%" stop-color="#7c3aed" stop-opacity="0.15"/>
+      <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#7c3aed" stop-opacity="0.2"/>
       <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
     </radialGradient>
 
     <!-- Inner core glow -->
     <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="white" stop-opacity="0.9"/>
-      <stop offset="30%" stop-color="#e9d5ff" stop-opacity="0.5"/>
+      <stop offset="0%" stop-color="white" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#ede9fe" stop-opacity="0.7"/>
       <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
     </radialGradient>
 
     <!-- Star shadow/glow filter -->
     <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="${size * 0.02}"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="${size * 0.025}"/>
     </filter>
   </defs>
 
@@ -112,16 +112,28 @@ function buildSvg(size) {
 
 // ── Render helpers ──────────────────────────────────────────────────────────
 
-async function renderPng(outputPath, size) {
-  const svg = Buffer.from(buildSvg(size));
-  await sharp(svg).resize(size, size).png().toFile(outputPath);
+/**
+ * Renders the SVG at 1024 px and uses Lanczos downsampling for all output
+ * sizes. This avoids the blurriness that comes from rasterising the SVG
+ * directly at the target (tiny) size.
+ */
+async function buildMaster() {
+  const svg = Buffer.from(buildSvg(1024));
+  return sharp(svg).resize(1024, 1024).png().toBuffer();
 }
 
-async function renderIco(outputPath, sizes) {
+async function renderPng(outputPath, size, master) {
+  await sharp(master)
+    .resize(size, size, { kernel: sharp.kernel.lanczos3 })
+    .png()
+    .toFile(outputPath);
+}
+
+async function renderIco(outputPath, sizes, master) {
   const buffers = await Promise.all(
     sizes.map((s) =>
-      sharp(Buffer.from(buildSvg(s)))
-        .resize(s, s)
+      sharp(master)
+        .resize(s, s, { kernel: sharp.kernel.lanczos3 })
         .png()
         .toBuffer(),
     ),
@@ -130,11 +142,9 @@ async function renderIco(outputPath, sizes) {
   await fs.writeFile(outputPath, ico);
 }
 
-async function renderIcns(outputPath) {
-  // Generate the largest PNG and use it — macOS .icns is just a renamed PNG
-  // for modern Tauri builds. Tauri's bundler converts it properly.
-  const svg = Buffer.from(buildSvg(1024));
-  await sharp(svg).resize(1024, 1024).png().toFile(outputPath);
+async function renderIcns(outputPath, master) {
+  // macOS .icns is just a 1024-px PNG for modern Tauri builds.
+  await sharp(master).resize(1024, 1024).png().toFile(outputPath);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -160,20 +170,23 @@ const pngTargets = [
 
 console.log("Generating icons…");
 
+const master = await buildMaster();
+
 await Promise.all(
   pngTargets.map(({ name, size }) =>
-    renderPng(path.join(ICON_DIR, name), size),
+    renderPng(path.join(ICON_DIR, name), size, master),
   ),
 );
 console.log(`  ✓ ${pngTargets.length} PNG icons`);
 
 await renderIco(
   path.join(ICON_DIR, "icon.ico"),
-  [16, 24, 32, 48, 64, 128, 256],
+  [16, 20, 24, 32, 40, 48, 64, 96, 128, 256],
+  master,
 );
 console.log("  ✓ icon.ico");
 
-await renderIcns(path.join(ICON_DIR, "icon.icns"));
+await renderIcns(path.join(ICON_DIR, "icon.icns"), master);
 console.log("  ✓ icon.icns");
 
 // Android icons
@@ -187,7 +200,7 @@ const androidTargets = [
 ];
 await Promise.all(
   androidTargets.map(({ dir, size }) =>
-    renderPng(path.join(androidDir, dir, "ic_launcher.png"), size),
+    renderPng(path.join(androidDir, dir, "ic_launcher.png"), size, master),
   ),
 );
 console.log(`  ✓ ${androidTargets.length} Android icons`);
@@ -215,7 +228,9 @@ const iosTargets = [
   { name: "AppIcon-512@2x.png", size: 1024 },
 ];
 await Promise.all(
-  iosTargets.map(({ name, size }) => renderPng(path.join(iosDir, name), size)),
+  iosTargets.map(({ name, size }) =>
+    renderPng(path.join(iosDir, name), size, master),
+  ),
 );
 console.log(`  ✓ ${iosTargets.length} iOS icons`);
 

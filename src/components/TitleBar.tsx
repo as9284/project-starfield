@@ -1,49 +1,29 @@
-import { Minus, Maximize2, X } from "lucide-react";
+import { Minus, Maximize2, X, Sparkles, Settings2 } from "lucide-react";
 import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
-import { CosmicLogoMini } from "./CosmicLogo";
 import { modLabel } from "../lib/platform";
 
 export default function TitleBar() {
-  const {
-    view,
-    setView,
-    closeConstellations,
-  } = useAppStore();
+  const { view, setView, closeConstellations } = useAppStore();
 
   return (
     <div className="topbar">
       {/* App identity */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <CosmicLogoMini size={15} />
-        <span
-          className="text-sm font-semibold tracking-wide"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Starfield
-        </span>
+        <span className="topbar-wordmark">Starfield</span>
       </div>
 
       {/* Nav */}
-      <nav className="topbar-nodrag flex items-center gap-1 text-xs">
+      <nav className="topbar-nodrag flex items-center gap-1">
         <button
           onClick={() => {
             closeConstellations();
             setView("luna");
           }}
-          className="px-3 py-1 rounded-md transition-colors"
-          style={{
-            color:
-              view === "luna"
-                ? "var(--color-purple-400)"
-                : "var(--color-text-muted)",
-            background:
-              view === "luna"
-                ? "rgba(124, 79, 240, 0.12)"
-                : "transparent",
-          }}
+          className={`topbar-nav-btn${view === "luna" ? " topbar-nav-btn-active" : ""}`}
           title={`Luna (${modLabel}1)`}
         >
+          <Sparkles size={12} />
           Luna
         </button>
 
@@ -52,17 +32,10 @@ export default function TitleBar() {
             closeConstellations();
             setView("settings");
           }}
-          className="px-3 py-1 rounded-md transition-colors"
-          style={{
-            color:
-              view === "settings"
-                ? "var(--color-purple-400)"
-                : "var(--color-text-muted)",
-            background:
-              view === "settings" ? "rgba(124, 79, 240, 0.12)" : "transparent",
-          }}
+          className={`topbar-nav-btn${view === "settings" ? " topbar-nav-btn-active" : ""}`}
           title={`Settings (${modLabel},)`}
         >
+          <Settings2 size={12} />
           Settings
         </button>
       </nav>
