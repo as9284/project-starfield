@@ -41,9 +41,9 @@ function formatDueDate(due: string): { label: string; overdue: boolean; today: b
 }
 
 const PRIORITY_STYLES: Record<Priority, { dot: string; label: string; text: string; border: string }> = {
-  low: { dot: "bg-blue-400/70", label: "text-blue-300/60", text: "Low", border: "border-l-blue-500/40" },
-  medium: { dot: "bg-amber-400/80", label: "text-amber-300/60", text: "Medium", border: "border-l-amber-500/40" },
-  high: { dot: "bg-rose-400", label: "text-rose-300/65", text: "High", border: "border-l-rose-500/50" },
+  low: { dot: "bg-blue-400/80", label: "text-blue-300/90", text: "Low", border: "border-l-blue-500/50" },
+  medium: { dot: "bg-amber-400/90", label: "text-amber-300/90", text: "Medium", border: "border-l-amber-500/60" },
+  high: { dot: "bg-rose-400", label: "text-rose-300/90", text: "High", border: "border-l-rose-500/70" },
 };
 
 // ── Task Card ────────────────────────────────────────────────────────────────
@@ -85,10 +85,10 @@ function TaskCard({ task, onToggle, onArchive, onUnarchive, onDelete, onEdit }: 
       <button
         onClick={() => onToggle(task.id)}
         className="shrink-0 mt-0.5 transition-all duration-200"
-        style={{ color: task.completed ? "rgba(52, 211, 153, 0.6)" : "rgba(155, 120, 248, 0.3)" }}
+        style={{ color: task.completed ? "rgba(52, 211, 153, 0.8)" : "rgba(155, 120, 248, 0.6)" }}
         title={task.completed ? "Mark active" : "Mark complete"}
       >
-        {task.completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+        {task.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
       </button>
 
       {/* Content */}
@@ -108,19 +108,19 @@ function TaskCard({ task, onToggle, onArchive, onUnarchive, onDelete, onEdit }: 
           </p>
         )}
         <div className="flex items-center gap-3 mt-1.5">
-          <span className={`flex items-center gap-1.5 text-[11px] ${p.label}`}>
+          <span className={`flex items-center gap-1.5 text-xs ${p.label}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />
             {p.text}
           </span>
           {due && (
             <span
-              className="flex items-center gap-1 text-[11px]"
+              className="flex items-center gap-1 text-xs"
               style={{
-                color: due.overdue ? "rgba(248, 113, 113, 0.8)" :
-                  due.today ? "rgba(251, 191, 36, 0.8)" : "rgba(155, 120, 248, 0.4)",
+                color: due.overdue ? "rgba(248, 113, 113, 0.9)" :
+                  due.today ? "rgba(251, 191, 36, 0.9)" : "rgba(196, 184, 240, 0.7)",
               }}
             >
-              <Calendar size={10} />
+              <Calendar size={11} />
               {due.label}
             </span>
           )}
@@ -133,38 +133,38 @@ function TaskCard({ task, onToggle, onArchive, onUnarchive, onDelete, onEdit }: 
           <button
             onClick={() => onEdit(task)}
             className="p-1.5 rounded-lg transition-all duration-150"
-            style={{ color: "var(--color-text-muted)" }}
+            style={{ color: "var(--color-text-secondary)" }}
             title="Edit"
           >
-            <Pencil size={12} />
+            <Pencil size={14} />
           </button>
         )}
         {task.archived ? (
           <button
             onClick={() => onUnarchive(task.id)}
             className="p-1.5 rounded-lg transition-all duration-150"
-            style={{ color: "var(--color-text-muted)" }}
+            style={{ color: "var(--color-text-secondary)" }}
             title="Restore"
           >
-            <RotateCcw size={12} />
+            <RotateCcw size={14} />
           </button>
         ) : (
           <button
             onClick={() => onArchive(task.id)}
             className="p-1.5 rounded-lg transition-all duration-150"
-            style={{ color: "var(--color-text-muted)" }}
+            style={{ color: "var(--color-text-secondary)" }}
             title="Archive"
           >
-            <Archive size={12} />
+            <Archive size={14} />
           </button>
         )}
         <button
           onClick={() => onDelete(task.id)}
           className="p-1.5 rounded-lg transition-all duration-150"
-          style={{ color: "var(--color-text-muted)" }}
+          style={{ color: "var(--color-text-secondary)" }}
           title="Delete"
         >
-          <Trash2 size={12} />
+          <Trash2 size={14} />
         </button>
       </div>
     </motion.div>
@@ -202,16 +202,16 @@ function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           {note.content}
         </p>
       )}
-      <p className="text-[10px] mt-2" style={{ color: "var(--color-text-dim)" }}>
+      <p className="text-[11px] mt-2" style={{ color: "var(--color-text-secondary)" }}>
         {new Date(note.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
       </p>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
         className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-150"
-        style={{ color: "var(--color-text-muted)" }}
+        style={{ color: "var(--color-text-secondary)" }}
         title="Delete"
       >
-        <Trash2 size={12} />
+        <Trash2 size={14} />
       </button>
     </motion.div>
   );
@@ -307,7 +307,7 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
           <div className="flex gap-2">
             {/* Priority */}
             <div className="flex-1">
-              <label className="block text-[11px] mb-1" style={{ color: "var(--color-text-muted)" }}>Priority</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-text-secondary)" }}>Priority</label>
               <div className="flex gap-1">
                 {(["low", "medium", "high"] as Priority[]).map((p) => (
                   <button
@@ -329,7 +329,7 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
 
             {/* Due date */}
             <div className="flex-1">
-              <label className="block text-[11px] mb-1" style={{ color: "var(--color-text-muted)" }}>Due date</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-text-secondary)" }}>Due date</label>
               <input
                 type="date"
                 value={dueDate}
@@ -630,7 +630,7 @@ export default function Orbit() {
           </span>
           <span
             className="text-xs px-2 py-0.5 rounded"
-            style={{ background: "rgba(124, 79, 240, 0.12)", color: "var(--color-text-muted)" }}
+            style={{ background: "rgba(124, 79, 240, 0.12)", color: "var(--color-purple-300)" }}
           >
             constellation
           </span>
@@ -671,9 +671,9 @@ export default function Orbit() {
               }}
               title="New (N)"
             >
-              <Plus size={12} strokeWidth={2.5} />
+              <Plus size={13} strokeWidth={2.5} />
               New
-              <kbd className="text-[9px] opacity-50 ml-0.5">N</kbd>
+              <kbd className="text-[10px] opacity-60 ml-0.5">N</kbd>
             </button>
           </div>
 
@@ -687,22 +687,22 @@ export default function Orbit() {
                     <button
                       key={f}
                       onClick={() => setTaskFilter(f)}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium capitalize transition-all duration-150"
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all duration-150"
                       style={{
                         background: taskFilter === f ? "rgba(124, 79, 240, 0.15)" : "transparent",
-                        color: taskFilter === f ? "var(--color-purple-300)" : "var(--color-text-muted)",
+                        color: taskFilter === f ? "var(--color-purple-300)" : "var(--color-text-secondary)",
                       }}
                     >
                       {f}
-                      <span className="ml-1.5 opacity-60">
+                      <span className="ml-1.5 opacity-70">
                         {f === "active" ? activeTasks.length : archivedTasks.length}
                       </span>
                     </button>
                   ))}
                   {overdueCount > 0 && taskFilter === "active" && (
                     <span
-                      className="ml-1 text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ background: "rgba(248, 113, 113, 0.15)", color: "rgba(248, 113, 113, 0.8)" }}
+                      className="ml-1 text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: "rgba(248, 113, 113, 0.15)", color: "rgba(248, 113, 113, 0.9)" }}
                     >
                       {overdueCount} overdue
                     </span>
@@ -713,8 +713,8 @@ export default function Orbit() {
                 <div ref={sortRef} className="relative">
                   <button
                     onClick={() => setShowSortMenu((v) => !v)}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors"
-                    style={{ color: "var(--color-text-muted)" }}
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
                     {SORT_LABELS[sort]}
                     <ChevronDown size={10} className={showSortMenu ? "rotate-180" : ""} style={{ transition: "transform 0.15s" }} />
@@ -734,7 +734,7 @@ export default function Orbit() {
                           onClick={() => { setSort(s); setShowSortMenu(false); }}
                           className="w-full text-left px-3 py-2 text-xs transition-colors"
                           style={{
-                            color: sort === s ? "var(--color-purple-300)" : "var(--color-text-muted)",
+                            color: sort === s ? "var(--color-purple-300)" : "var(--color-text-secondary)",
                             background: sort === s ? "rgba(124, 79, 240, 0.1)" : "transparent",
                           }}
                         >
@@ -751,7 +751,7 @@ export default function Orbit() {
                 {displayedTasks.length === 0 ? (
                   <div
                     className="flex flex-col items-center justify-center h-full gap-3 py-16"
-                    style={{ color: "var(--color-text-dim)" }}
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
                     <ListTodo size={28} style={{ opacity: 0.3 }} />
                     <p className="text-sm">
@@ -785,7 +785,7 @@ export default function Orbit() {
               {notes.length === 0 ? (
                 <div
                   className="flex flex-col items-center justify-center h-full gap-3 py-16"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   <StickyNote size={28} style={{ opacity: 0.3 }} />
                   <p className="text-sm">No notes yet — press N to create one</p>

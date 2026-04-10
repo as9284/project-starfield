@@ -147,7 +147,7 @@ function RecentCard({ project, onOpen, onRemove }: RecentCardProps) {
           </p>
           <p
             className="text-xs truncate mt-0.5 font-mono"
-            style={{ color: "var(--color-text-dim)", fontSize: "0.68rem" }}
+            style={{ color: "var(--color-text-secondary)", fontSize: "0.72rem" }}
           >
             {pathLabel}
           </p>
@@ -164,7 +164,7 @@ function RecentCard({ project, onOpen, onRemove }: RecentCardProps) {
             color: isLocal
               ? "var(--color-purple-400)"
               : "var(--color-nebula-teal)",
-            fontSize: "0.68rem",
+            fontSize: "0.72rem",
           }}
         >
           {isLocal ? "local" : "github"}
@@ -173,7 +173,7 @@ function RecentCard({ project, onOpen, onRemove }: RecentCardProps) {
         {project.fileCount > 0 && (
           <span
             className="text-xs"
-            style={{ color: "var(--color-text-dim)", fontSize: "0.7rem" }}
+            style={{ color: "var(--color-text-secondary)", fontSize: "0.75rem" }}
           >
             {project.fileCount} files
           </span>
@@ -181,9 +181,9 @@ function RecentCard({ project, onOpen, onRemove }: RecentCardProps) {
 
         <span
           className="text-xs ml-auto flex items-center gap-1"
-          style={{ color: "var(--color-text-dim)", fontSize: "0.7rem" }}
+          style={{ color: "var(--color-text-secondary)", fontSize: "0.75rem" }}
         >
-          <Clock size={9} />
+          <Clock size={10} />
           {timeAgo(project.indexedAt)}
         </span>
       </div>
@@ -603,20 +603,20 @@ function BeaconHome() {
               style={{
                 background: "rgba(124,58,237,0.15)",
                 color: "var(--color-purple-400)",
-                fontSize: "0.68rem",
+                fontSize: "0.72rem",
               }}
             >
               {recentProjects.length}
             </span>
             <button
               className="ml-auto text-xs transition-colors duration-150"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--color-text-secondary)" }}
               onMouseEnter={(e) =>
                 ((e.currentTarget as HTMLButtonElement).style.color = "#f87171")
               }
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLButtonElement).style.color =
-                  "var(--color-text-dim)")
+                  "var(--color-text-secondary)")
               }
               onClick={clearAllRecents}
               title="Clear all recent projects"
@@ -995,7 +995,7 @@ export default function Beacon() {
             className="text-xs px-2 py-0.5 rounded"
             style={{
               background: "rgba(124, 79, 240, 0.12)",
-              color: "var(--color-text-muted)",
+              color: "var(--color-purple-300)",
             }}
           >
             constellation
