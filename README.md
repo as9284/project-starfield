@@ -1,41 +1,47 @@
 # Starfield
 
-**Starfield** is an AI-powered desktop app built around a central intelligence called **Luna**. The app is structured as a universe of intelligent features called **Constellations** — each one a self-contained capability that Luna ties together.
+Starfield is a desktop AI workspace built around Luna and a set of constellation tools. The current app already ships working pages for AI chat, task management, weather, code exploration, media downloads, and URL shortening.
 
-Built with [Tauri v2](https://tauri.app), React 19, TypeScript, and Tailwind CSS v4. Luna is powered by **DeepSeek V3** with automatic prefix caching, and optionally augmented with live web search via **Tavily**.
-
----
-
-## Constellations
-
-| Constellation | Source Project | Status | Description |
-| ------------- | -------------- | ------ | ----------- |
-| **Luna** | Luna AI | ✅ Active | Central AI companion — ask anything, control every constellation, get instant answers with live web search |
-| **Orbit** | Orbit | ✅ Active | Task management and notes — plan missions, track goals, keep ideas in orbit; Luna has full control |
-| **Solaris** | Star Weather | 🔜 Coming soon | Weather intelligence — real-time forecasts, 7-day outlooks, atmospheric insights |
-| **Beacon** | Beacon | 🔜 Coming soon | Code explorer — import local folders, GitHub repos, and explore codebases with Luna |
-| **Pulsar** | Pulsar | 🔜 Coming soon | Media downloader — grab videos, music, and playlists from YouTube |
-| **Hyperlane** | Hyperlane | 🔜 Coming soon | URL shortener — collapse long links into compact hyperspace jumps |
+It is built with [Tauri v2](https://tauri.app), React 19, TypeScript, Rust, and Vite. Luna streams responses from DeepSeek, can ground answers with Tavily web search, and can trigger actions across the other constellations from chat.
 
 ---
 
-## Features
+## Current State
 
-- **Luna AI** — DeepSeek V3 (`deepseek-chat`) with streaming responses and automatic prefix caching for fast, cost-efficient conversations
-- **Web search** — Tavily integration; toggle web search on in Luna to ground answers in live results
-- **Secure key storage** — DeepSeek and Tavily API keys stored in the OS keychain (Windows Credential Manager, macOS Keychain, libsecret on Linux), never written to disk in plain text
-- **Cosmic dark-purple UI** — animated star field canvas with shooting stars, frameless transparent window
-- **Frameless window** — native-feeling custom title bar with window controls
+| Constellation | Status | What it does now                                                                                                                                              |
+| ------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Luna**      | Active | Streaming AI chat, conversation history, markdown replies, memory extraction, optional Tavily web search, and command-style control over other constellations |
+| **Orbit**     | Active | Local task and note management with priorities, due dates, archiving, and persisted state                                                                     |
+| **Solaris**   | Active | Location search, current conditions, hourly charts, 7-day forecast, and geolocation-based weather lookup                                                      |
+| **Beacon**    | Active | Import local folders or public GitHub repositories, index file trees, preload source snippets, and chat about the codebase                                    |
+| **Pulsar**    | Active | Download video, audio, and playlists with yt-dlp, choose quality, set output folder, and pause, resume, retry, or cancel downloads                            |
+| **Hyperlane** | Active | Shorten URLs with saved history and quick copy/open actions                                                                                                   |
+
+Settings also includes API key management, updater checks and installs, yt-dlp status and auto-install, memory export/import, and keyboard shortcut help.
+
+---
+
+## Highlights
+
+- **Luna AI**: streaming chat powered by DeepSeek via the `deepseek-chat` model
+- **Live web search**: Tavily-backed results when web search is enabled in Luna
+- **Constellation actions**: Luna can create Orbit items, fetch Solaris weather, shorten URLs, queue Pulsar downloads, and navigate between constellations
+- **Code exploration**: Beacon can scan local folders through the Rust backend or inspect public GitHub repositories through the GitHub API
+- **Weather UI**: Solaris uses Open-Meteo plus geocoding and reverse geocoding for forecasts and location detection
+- **Download manager**: Pulsar auto-installs yt-dlp when possible, tracks progress, and persists recent download history
+- **In-app updates**: Settings is wired to `@tauri-apps/plugin-updater` and can download and install published releases
+- **Secure key storage**: API keys are stored in the OS keychain, not in plain-text project files
+- **Desktop shell**: frameless transparent Tauri window with a custom title bar and keyboard shortcuts
 
 ---
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) 20+
-- [Rust](https://rustup.rs) (stable toolchain)
-- [Tauri CLI prerequisites](https://tauri.app/start/prerequisites/) for your platform
-- A [DeepSeek API key](https://platform.deepseek.com) (required for Luna)
-- A [Tavily API key](https://tavily.com) (optional, for web search)
+- [Rust](https://rustup.rs) stable
+- [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your platform
+- A [DeepSeek API key](https://platform.deepseek.com) for Luna and Beacon chat
+- A [Tavily API key](https://tavily.com) if you want Luna web search
 
 ---
 
@@ -48,75 +54,177 @@ npm install
 # Start the desktop app in development mode
 npm run desktop:dev
 
-# Build a production installer
+# Build the frontend only
+npm run web:build
+
+# Build a signed desktop release
 npm run desktop:build
 ```
 
 ---
 
+## Release Builds
+
+Updater artifacts are enabled for production builds, so Tauri requires the updater signing private key in your shell environment before `tauri build` or `npm run desktop:build` will succeed.
+
+On Windows PowerShell:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = (Resolve-Path "src-tauri/keys/starfield.key").Path
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+# If your key uses a password, replace the empty string with that value.
+
+npm run desktop:build
+```
+
+Tauri reads the signing key from environment variables at build time. `.env` files are not used for updater signing.
+
+For the current Windows build, the release artifacts are written under:
+
+- `src-tauri/target/release/bundle/msi/`
+- `src-tauri/target/release/bundle/nsis/`
+
+---
+
 ## Configuration
 
-All API keys are set from the **Settings** page inside the app. They are stored immediately in your OS keychain and never persisted to disk or sent anywhere other than their respective APIs.
+All runtime API keys are managed from the **Settings** page and stored in the OS keychain.
 
-| Key | Where to get it | Required |
-| --- | --------------- | -------- |
-| DeepSeek API Key | [platform.deepseek.com](https://platform.deepseek.com) | ✅ Yes — powers Luna |
-| Tavily API Key | [tavily.com](https://tavily.com) | Optional — enables web search in Luna |
+| Key              | Used for                                             | Required |
+| ---------------- | ---------------------------------------------------- | -------- |
+| DeepSeek API key | Luna chat and Beacon code chat                       | Yes      |
+| Tavily API key   | Luna web search                                      | Optional |
+| Weather API key  | Optional Open-Meteo commercial or higher-limit usage | Optional |
+
+Solaris currently works against Open-Meteo without requiring a key for normal usage.
+
+---
+
+## Publishing Updates To GitHub Releases
+
+The updater endpoint in `src-tauri/tauri.conf.json` points to:
+
+```text
+https://github.com/as9284/project-starfield/releases/latest/download/latest.json
+```
+
+That means the update flow only works when the latest published GitHub release contains:
+
+1. `latest.json`
+2. The installer file referenced inside `latest.json`
+
+For the current static JSON updater flow, uploading the `.sig` file itself is **not required by the client** because the signature is embedded in `latest.json`. You still need the generated `.sig` file locally so you can copy its contents into the manifest, and it is reasonable to upload it alongside the release for traceability.
+
+### Recommended Windows x64 release assets
+
+Minimum required:
+
+- `latest.json`
+- `Starfield_<version>_x64_en-US.msi`
+
+Recommended extras:
+
+- `Starfield_<version>_x64_en-US.msi.sig`
+- `Starfield_<version>_x64-setup.exe`
+- `Starfield_<version>_x64-setup.exe.sig`
+
+Important:
+
+- `latest.json` can reference only one `windows-x86_64` installer URL, so pick one Windows installer pair for the updater manifest.
+- If you point `latest.json` at the MSI, use the contents of the MSI `.sig` file.
+- If you point `latest.json` at the NSIS EXE, use the contents of the EXE `.sig` file.
+- Do not mix an MSI URL with an EXE signature, or the updater check will fail.
+- The bundle directories may still contain older artifacts from previous builds. Upload only the files for the version you are releasing.
+- Keep the version aligned across `package.json`, `src-tauri/tauri.conf.json`, and `latest.json`.
+
+### Example `latest.json`
+
+This example uses the MSI build:
+
+```json
+{
+  "version": "1.0.0",
+  "notes": "Bug fixes and feature updates.",
+  "pub_date": "2026-04-10T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://github.com/as9284/project-starfield/releases/download/v1.0.0/Starfield_1.0.0_x64_en-US.msi",
+      "signature": "PASTE_THE_CONTENTS_OF_Starfield_1.0.0_x64_en-US.msi.sig_HERE"
+    }
+  }
+}
+```
+
+If you prefer the NSIS installer for updates, swap both the `url` and the `signature` to the `Starfield_<version>_x64-setup.exe` pair instead.
+
+Because the app checks `releases/latest/download/latest.json`, publish the GitHub release rather than leaving it as a draft.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-| ----- | ---------- |
-| Desktop shell | Tauri v2 |
-| UI | React 19 + TypeScript |
-| Styling | Tailwind CSS v4 + custom CSS design tokens |
-| State | Zustand v5 with `persist` middleware |
-| AI | DeepSeek V3 via OpenAI-compatible REST streaming API |
-| Web search | Tavily Search API |
-| Keychain | `keyring` crate (native per-platform) |
-| Bundler | Vite 7 |
+| Layer           | Technology                                                  |
+| --------------- | ----------------------------------------------------------- |
+| Desktop shell   | Tauri v2                                                    |
+| Frontend        | React 19 + TypeScript                                       |
+| Styling         | Tailwind CSS v4 + custom CSS variables                      |
+| Animation       | Framer Motion                                               |
+| State           | Zustand with `persist` middleware                           |
+| AI backend      | DeepSeek chat completions over streaming HTTP               |
+| Web search      | Tavily Search API                                           |
+| Weather         | Open-Meteo forecast and geocoding APIs                      |
+| Code indexing   | Rust local scanner plus GitHub API fetches for public repos |
+| Media downloads | yt-dlp orchestrated from Rust commands                      |
+| Key storage     | Rust `keyring` crate                                        |
+| Bundler         | Vite 7                                                      |
 
 ---
 
 ## Project Structure
 
-```
+```text
 starfield/
-├── src/                        # React frontend
-│   ├── pages/
-│   │   ├── Home.tsx            # Starfield home — Constellations hub
-│   │   ├── Luna.tsx            # Luna AI chat page
-│   │   ├── Orbit.tsx           # Orbit — task management & notes
-│   │   ├── Solaris.tsx         # Solaris — weather intelligence
-│   │   ├── Beacon.tsx          # Beacon — AI code explorer
-│   │   ├── Pulsar.tsx          # Pulsar — media downloader
-│   │   ├── Hyperlane.tsx       # Hyperlane — URL shortener
-│   │   └── Settings.tsx        # API key management
+├── src/
 │   ├── components/
-│   │   ├── TitleBar.tsx        # Frameless window title bar + nav
-│   │   └── StarField.tsx       # Animated canvas star background
-│   ├── store/
-│   │   └── useAppStore.ts      # Zustand global state
-│   └── lib/
-│       ├── tauri.ts            # Tauri IPC bridge
-│       └── luna-prompt.ts      # Luna's system prompt & personality
-└── src-tauri/                  # Rust backend
-    └── src/
-        └── commands/
-            ├── luna.rs         # DeepSeek streaming chat
-            ├── search.rs       # Tavily web search
-            └── keychain.rs     # OS keychain key management
+│   │   ├── AiGlobe.tsx
+│   │   ├── ConstellationOverlay.tsx
+│   │   ├── CosmicLogo.tsx
+│   │   ├── StarField.tsx
+│   │   └── TitleBar.tsx
+│   ├── lib/
+│   │   ├── luna-prompt.ts
+│   │   ├── memory.ts
+│   │   ├── platform.ts
+│   │   ├── tauri.ts
+│   │   ├── weather-types.ts
+│   │   └── weather.ts
+│   ├── pages/
+│   │   ├── Beacon.tsx
+│   │   ├── Hyperlane.tsx
+│   │   ├── Luna.tsx
+│   │   ├── Orbit.tsx
+│   │   ├── Pulsar.tsx
+│   │   ├── Settings.tsx
+│   │   └── Solaris.tsx
+│   └── store/
+│       ├── useAppStore.ts
+│       ├── useBeaconStore.ts
+│       ├── useHyperlaneStore.ts
+│       ├── useOrbitStore.ts
+│       ├── usePulsarStore.ts
+│       └── useSolarisStore.ts
+└── src-tauri/
+        ├── tauri.conf.json
+        ├── keys/
+        └── src/
+                ├── lib.rs
+                └── commands/
+                        ├── beacon.rs
+                        ├── keychain.rs
+                        ├── luna.rs
+                        ├── pulsar.rs
+                        └── search.rs
 ```
-
----
-
-## Luna
-
-Luna is the central AI of Starfield. She has her own personality — sharp, warm, lightly sarcastic, and quietly confident — and she will never reveal what model powers her under the hood.
-
-Her system prompt lives in `src/lib/luna-prompt.ts` and is injected at the start of every conversation. DeepSeek automatically caches the prefix (system prompt + older messages) when the conversation reaches ≥ 1 024 tokens, keeping subsequent turns fast and cheap.
 
 ---
 
