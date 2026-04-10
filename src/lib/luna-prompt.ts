@@ -1,39 +1,4 @@
-/** Strip control characters and backtick sequences to prevent prompt injection. */
-function sanitizeForPrompt(text: string, maxLen = 120): string {
-  return text
-    .replace(/[\x00-\x1f\x7f]/g, " ")
-    .replace(/`{3,}/g, "```")
-    .slice(0, maxLen);
-}
-
-export interface OrbitContext {
-  activeTasks: Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    priority: string;
-    due_date: string | null;
-  }>;
-  notes: Array<{
-    id: string;
-    title: string;
-    content: string | null;
-  }>;
-}
-
-export interface ConstellationContext {
-  orbit?: OrbitContext;
-  solaris?: {
-    currentLocation: string;
-  };
-  hyperlane?: {
-    recentCount: number;
-  };
-  pulsar?: {
-    activeDownloads: number;
-    outputDir: string;
-  };
-}
+import { constellationHandlers } from "./constellations";
 
 /**
  * Luna's system prompt for Project Starfield.
@@ -41,12 +6,12 @@ export interface ConstellationContext {
  * Luna is the central AI of the Starfield app — she has her own identity,
  * personality, and sense of humor. She never reveals the underlying model
  * powering her, and she treats questions about it with playful deflection.
+ *
+ * Constellation-specific command instructions and live context are pulled
+ * dynamically from the constellation handler registry, so adding a new
+ * constellation automatically teaches Luna how to use it.
  */
-export function buildLunaSystemPrompt(
-  memories?: string[],
-  ctx?: ConstellationContext,
-): string {
-  const orbit = ctx?.orbit;
+export function buildLunaSystemPrompt(memories?: string[]): string {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -54,6 +19,16 @@ export function buildLunaSystemPrompt(
     month: "long",
     day: "numeric",
   });
+
+  // ── Build dynamic constellation sections ───────────────────────────────
+  const commandSections = constellationHandlers
+    .map((h) => h.promptInstructions)
+    .join("\n\n---\n\n");
+
+  const contextSections = constellationHandlers
+    .map((h) => h.buildContext())
+    .filter(Boolean)
+    .join("\n\n");
 
   return `You are Luna — the central AI intelligence of Starfield, an AI-powered universe of intelligent features called Constellations.
 
@@ -139,98 +114,11 @@ Keep the internal action layer invisible. Never mention fenced code blocks, raw 
 
 ---
 
-### Orbit Control — Tasks & Notes
-
-\`\`\`orbit-commands
-CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
-COMPLETE_TASK {"id":"..."}
-UNCOMPLETE_TASK {"id":"..."}
-ARCHIVE_TASK {"id":"..."}
-DELETE_TASK {"id":"..."}
-CREATE_NOTE {"title":"...","content":"..."}
-DELETE_NOTE {"id":"..."}
-\`\`\`
-
-Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date if none given.
+${commandSections}
 
 ---
 
-### Solaris Control — Weather
-
-\`\`\`solaris-commands
-GET_WEATHER {"location":"city name or city, country"}
-\`\`\`
-
-Use this when the user asks for weather, forecasts, temperature, or anything atmospheric. Location must be a real place name. Only one command per block.
-
----
-
-### Hyperlane Control — URL Shortening
-
-\`\`\`hyperlane-commands
-SHORTEN_URL {"url":"https://..."}
-\`\`\`
-
-Use this when the user asks to shorten, compress, or create a short link for a URL. Only one command per block.
-
----
-
-### Pulsar Control — Media Downloads
-
-\`\`\`pulsar-commands
-DOWNLOAD_MEDIA {"url":"https://...","format":"best|audio|720|1080","audio_format":"mp3|flac|wav|ogg|m4a|opus"}
-\`\`\`
-
-Use this when the user asks to download a video, audio track, or playlist from YouTube or supported sites. The "audio_format" field is only required when format is "audio". Default format is "best". Only one command per block.
-
----
-
-### Navigation — Switch Constellation
-
-\`\`\`navigate-commands
-NAVIGATE {"to":"orbit|solaris|beacon|hyperlane|pulsar"}
-\`\`\`
-
-Use this when the user asks to go to, open, or switch to a specific constellation. Only one command per block.
-
----
-
-${
-  orbit && (orbit.activeTasks.length > 0 || orbit.notes.length > 0)
-    ? `## Current Orbit State
-
-${
-  orbit.activeTasks.length > 0
-    ? `**Active Tasks (${orbit.activeTasks.length}):**
-${orbit.activeTasks
-  .map(
-    (t) =>
-      `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`,
-  )
-  .join("\n")}`
-    : "**No active tasks.**"
-}
-
-${
-  orbit.notes.length > 0
-    ? `**Notes (${orbit.notes.length}):**
-${orbit.notes.map((n) => `- [${n.id}] "${sanitizeForPrompt(n.title)}"${n.content ? `: ${sanitizeForPrompt(n.content)}` : ""}`).join("\n")}`
-    : "**No notes.**"
-}
-
-Use task/note IDs when emitting commands that target existing items.
-
-`
-    : ""
-}${
-    ctx?.solaris
-      ? `## Solaris — Current Location: ${ctx.solaris.currentLocation}\n\n`
-      : ""
-  }${
-    ctx?.pulsar && ctx.pulsar.activeDownloads > 0
-      ? `## Pulsar — Active Downloads: ${ctx.pulsar.activeDownloads} in queue\n\n`
-      : ""
-  }${
+${contextSections ? contextSections + "\n\n" : ""}${
     memories && memories.length > 0
       ? `## What You Remember About the User
 

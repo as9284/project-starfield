@@ -1,7 +1,6 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { buildLunaSystemPrompt } from "./luna-prompt";
-import type { ConstellationContext } from "./luna-prompt";
 
 /** Returns the live Tauri window handle. */
 export const win = () => getCurrentWindow();
@@ -43,7 +42,10 @@ export type StreamEvent =
 
 /**
  * Stream a Luna response from the Rust backend.
- * The system prompt is injected here so it is always current and consistent.
+ *
+ * The system prompt is built here using the constellation handler registry,
+ * so it always includes up-to-date command instructions and live state from
+ * every registered constellation — no manual wiring needed.
  */
 export const streamLuna = (
   userMessage: string,
@@ -51,9 +53,8 @@ export const streamLuna = (
   searchContext: string,
   onEvent: (e: StreamEvent) => void,
   memories?: string[],
-  ctx?: ConstellationContext,
 ) => {
-  const systemPrompt = buildLunaSystemPrompt(memories, ctx);
+  const systemPrompt = buildLunaSystemPrompt(memories);
   const channel = new Channel<StreamEvent>();
   channel.onmessage = onEvent;
 
