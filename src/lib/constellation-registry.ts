@@ -71,10 +71,12 @@ export interface ConstellationHandler {
 
 /** Strip control characters and backtick sequences to prevent prompt injection. */
 export function sanitizeForPrompt(text: string, maxLen = 120): string {
-  return text
-    .replace(/[\x00-\x1f\x7f]/g, " ")
-    .replace(/`{3,}/g, "```")
-    .slice(0, maxLen);
+  const withoutControlChars = Array.from(text, (char) => {
+    const code = char.charCodeAt(0);
+    return code <= 0x1f || code === 0x7f ? " " : char;
+  }).join("");
+
+  return withoutControlChars.replace(/`{3,}/g, "```").slice(0, maxLen);
 }
 
 // ── Parse helpers ────────────────────────────────────────────────────────────
@@ -97,9 +99,7 @@ export function parseCommands(
   const body = getCommandBlockBody(response, tag);
   if (!body) return [];
 
-  const lines = multi
-    ? body.trim().split("\n")
-    : [body.trim().split("\n")[0]];
+  const lines = multi ? body.trim().split("\n") : [body.trim().split("\n")[0]];
 
   return lines.flatMap((line) => {
     const trimmed = line.trim();
@@ -128,10 +128,7 @@ export function stripCommandBlocks(
 ): string {
   let cleaned = content;
   for (const { tag } of handlers) {
-    const re = new RegExp(
-      "\\s*```" + tag + "\\r?\\n[\\s\\S]*?(?:```|$)",
-      "gi",
-    );
+    const re = new RegExp("\\s*```" + tag + "\\r?\\n[\\s\\S]*?(?:```|$)", "gi");
     cleaned = cleaned.replace(re, "");
   }
 

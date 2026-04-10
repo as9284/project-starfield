@@ -391,7 +391,7 @@ export default function Pulsar() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Populate default output dir if not already set
   useEffect(() => {

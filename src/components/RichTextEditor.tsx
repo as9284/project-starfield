@@ -209,7 +209,6 @@ export function RichTextEditor({
     if (editorRef.current) {
       editorRef.current.innerHTML = markdownToHtml(value);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync when value changes externally (not from our own input)

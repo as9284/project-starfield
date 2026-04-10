@@ -51,7 +51,7 @@ export function OrbitDatePicker({
       setViewYear(parsed.getFullYear());
       setViewMonth(parsed.getMonth());
     }
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value]);
 
   // Close on outside click
   useEffect(() => {

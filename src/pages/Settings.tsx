@@ -23,6 +23,7 @@ import {
   Zap,
   Settings as SettingsIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
@@ -55,7 +56,7 @@ type SectionId =
 const SECTIONS: {
   id: SectionId;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   keywords: string[];
 }[] = [
   {
@@ -242,7 +243,7 @@ function SectionHeader({
   label,
   color,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   label: string;
   color: "purple" | "teal" | "blue" | "pink";
 }) {

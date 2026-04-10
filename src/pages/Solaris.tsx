@@ -166,16 +166,15 @@ function HourlyChart({
 
   const now = new Date();
   let startIdx = 0;
-  let endIdx = 24;
 
   if (dayIndex !== undefined) {
     startIdx = dayIndex * 24;
-    endIdx = startIdx + 24;
   } else {
     startIdx = hourly.time.findIndex((t) => new Date(t) >= now);
     if (startIdx < 0) startIdx = 0;
-    endIdx = Math.min(startIdx + 24, hourly.time.length);
   }
+
+  const endIdx = Math.min(startIdx + 24, hourly.time.length);
 
   const chartData = hourly.time.slice(startIdx, endIdx).map((t, i) => {
     const idx = startIdx + i;
@@ -495,7 +494,7 @@ export default function Solaris() {
     if (!weatherData) {
       fetchWeather();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const current = weatherData?.current;
   const daily = weatherData?.daily;
