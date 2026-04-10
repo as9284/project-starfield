@@ -22,7 +22,10 @@ import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import { useSolarisStore } from "../store/useSolarisStore";
 import { WEATHER_CODES } from "../lib/weather-types";
-import type { WeatherForecastResponse, GeocodingResult } from "../lib/weather-types";
+import type {
+  WeatherForecastResponse,
+  GeocodingResult,
+} from "../lib/weather-types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -385,8 +388,7 @@ function LocationSearchInput() {
     setSelectedLocation(loc);
   };
 
-  const showDropdown =
-    showResults && isEditing && searchResults.length > 0;
+  const showDropdown = showResults && isEditing && searchResults.length > 0;
 
   return (
     <div className="flex gap-2 items-center">
@@ -497,9 +499,7 @@ export default function Solaris() {
 
   const current = weatherData?.current;
   const daily = weatherData?.daily;
-  const currentWeather = current
-    ? WEATHER_CODES[current.weather_code]
-    : null;
+  const currentWeather = current ? WEATHER_CODES[current.weather_code] : null;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -511,11 +511,7 @@ export default function Solaris() {
           className="flex items-center gap-3 px-5 py-3"
           style={{ borderBottom: "1px solid var(--color-border-dim)" }}
         >
-          <button
-            className="win-btn"
-            onClick={goBack}
-            title="Back (Esc)"
-          >
+          <button className="win-btn" onClick={goBack} title="Back (Esc)">
             <ArrowLeft size={14} />
           </button>
           <CloudSun size={16} style={{ color: "var(--color-purple-400)" }} />
@@ -541,10 +537,7 @@ export default function Solaris() {
             disabled={isLoading}
             title="Refresh weather"
           >
-            <RefreshCw
-              size={13}
-              className={isLoading ? "animate-spin" : ""}
-            />
+            <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
 
@@ -633,8 +626,7 @@ export default function Solaris() {
                           className="text-[11px] mt-1"
                           style={{ color: "var(--color-text-dim)" }}
                         >
-                          Feels like{" "}
-                          {Math.round(current.apparent_temperature)}°
+                          Feels like {Math.round(current.apparent_temperature)}°
                         </div>
                       </div>
                     </div>
@@ -720,10 +712,10 @@ export default function Solaris() {
                           onClick={() =>
                             setExpandedDay(isExpanded ? null : index)
                           }
-                          className={`w-full glass px-4 py-3 flex items-center gap-4 text-left cursor-pointer select-none transition-all duration-200 rounded-xl ${
+                          className={`w-full glass px-4 py-3 flex items-center gap-4 text-left cursor-pointer select-none transition-all duration-200 ${
                             isExpanded
-                              ? "!border-purple-500/40 !bg-purple-500/[0.08]"
-                              : ""
+                              ? "rounded-t-xl !border-purple-500/40 !border-b-transparent !bg-purple-500/[0.08]"
+                              : "rounded-xl"
                           }`}
                         >
                           <span
@@ -805,8 +797,7 @@ export default function Solaris() {
                                 className="rounded-b-xl px-4 py-5 flex flex-col gap-5"
                                 style={{
                                   background: "rgba(16, 15, 46, 0.55)",
-                                  border:
-                                    "1px solid rgba(37, 34, 96, 0.6)",
+                                  border: "1px solid rgba(168, 85, 247, 0.4)",
                                   borderTop: "none",
                                 }}
                               >
@@ -814,11 +805,8 @@ export default function Solaris() {
                                   <DetailTile
                                     label="UV Index"
                                     value={
-                                      daily.uv_index_max?.[index] !==
-                                      undefined
-                                        ? daily.uv_index_max[
-                                            index
-                                          ].toFixed(1)
+                                      daily.uv_index_max?.[index] !== undefined
+                                        ? daily.uv_index_max[index].toFixed(1)
                                         : "--"
                                     }
                                   />
