@@ -12,6 +12,7 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
+    "release:latest-json": "node scripts/generate-latest-json.mjs",
     "icon:generate": "tauri icon public/starfield.svg --output src-tauri/icons"
   },
   "dependencies": {

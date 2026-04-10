@@ -84,6 +84,32 @@ For the current Windows build, the release artifacts are written under:
 - `src-tauri/target/release/bundle/msi/`
 - `src-tauri/target/release/bundle/nsis/`
 
+### Automated GitHub Releases
+
+This repo now includes a GitHub Actions workflow at `.github/workflows/release.yml` that will:
+
+- build the Windows release on `windows-latest`
+- sign updater artifacts using your GitHub repository secrets
+- generate `latest.json`
+- create or update the GitHub release for the version tag
+- upload the MSI, NSIS, `.sig`, and `latest.json` assets
+
+Before you use it, add these repository secrets in GitHub:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: the full contents of `src-tauri/keys/starfield.key`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: optional; set it only if the key has a password
+
+How to publish a release:
+
+1. Update `package.json` and `src-tauri/tauri.conf.json` to the new version.
+2. Commit and push those changes.
+3. Create a tag that matches the version exactly, for example `v1.0.1`.
+4. Push the tag: `git push origin v1.0.1`.
+5. Wait for the `Release` workflow to finish.
+6. The workflow will publish the GitHub release and upload `latest.json` plus the Windows installers.
+
+You can also rerun the workflow manually from the Actions tab with an existing tag. Manual runs let you choose whether `latest.json` points to the MSI or NSIS asset. The default is MSI.
+
 ---
 
 ## Configuration
@@ -157,7 +183,7 @@ This example uses the MSI build:
 
 If you prefer the NSIS installer for updates, swap both the `url` and the `signature` to the `Starfield_<version>_x64-setup.exe` pair instead.
 
-Because the app checks `releases/latest/download/latest.json`, publish the GitHub release rather than leaving it as a draft.
+Because the app checks `releases/latest/download/latest.json`, the release must be published, not left as a draft. The included release workflow handles that automatically.
 
 ---
 

@@ -1,0 +1,179 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to publish, for example v1.0.0
+        required: true
+        type: string
+      updater_artifact:
+        description: Which Windows installer latest.json should reference
+        required: false
+        default: msi
+        type: choice
+        options:
+          - msi
+          - nsis
+
+jobs:
+  release-windows:
+    name: Build And Publish Windows Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauriConfig = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $tauriVersion = $tauriConfig.version
+
+          if ($packageVersion -ne $tauriVersion) {
+            throw "package.json version ($packageVersion) and src-tauri/tauri.conf.json version ($tauriVersion) must match."
+          }
+
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = "${{ github.ref_name }}"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "Could not resolve release tag."
+          }
+
+          $expectedTag = "v$packageVersion"
+          if ($tag -ne $expectedTag) {
+            throw "Release tag $tag does not match app version $expectedTag."
+          }
+
+          $updaterArtifact = "${{ github.event.inputs.updater_artifact }}"
+          if ([string]::IsNullOrWhiteSpace($updaterArtifact)) {
+            $updaterArtifact = "msi"
+          }
+
+          $assetPrefix = [string]$tauriConfig.productName
+          $assetPrefix = $assetPrefix -replace "\s+", "_"
+
+          "version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
+          "updater_artifact=$updaterArtifact" >> $env:GITHUB_OUTPUT
+          "release_name=Starfield $tag" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build signed Tauri release
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run desktop:build
+
+      - name: Generate release notes
+        shell: pwsh
+        run: |
+          $response = gh api `
+            --method POST `
+            -H "Accept: application/vnd.github+json" `
+            "/repos/${env:GITHUB_REPOSITORY}/releases/generate-notes" `
+            -f tag_name="${{ steps.meta.outputs.tag }}" | ConvertFrom-Json
+
+          $body = [string]$response.body
+          if ([string]::IsNullOrWhiteSpace($body)) {
+            $body = "Release ${{ steps.meta.outputs.tag }}"
+          }
+
+          Set-Content -Path release-notes.md -Value $body
+
+      - name: Generate latest.json
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_NOTES_FILE: release-notes.md
+          LATEST_JSON_PATH: release-assets/latest.json
+          UPDATER_WINDOWS_ARTIFACT: ${{ steps.meta.outputs.updater_artifact }}
+        run: node scripts/generate-latest-json.mjs
+
+      - name: Resolve release asset paths
+        id: assets
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $prefix = "${{ steps.meta.outputs.asset_prefix }}"
+
+          $msi = Get-ChildItem "src-tauri/target/release/bundle/msi" -Filter "${prefix}_${version}_*_en-US.msi" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $msiSig = Get-ChildItem "src-tauri/target/release/bundle/msi" -Filter "${prefix}_${version}_*_en-US.msi.sig" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $nsis = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "${prefix}_${version}_*-setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $nsisSig = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "${prefix}_${version}_*-setup.exe.sig" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+          foreach ($asset in @($msi, $msiSig, $nsis, $nsisSig)) {
+            if ($null -eq $asset) {
+              throw "Missing one or more release assets for version $version."
+            }
+          }
+
+          "msi=$($msi.FullName)" >> $env:GITHUB_OUTPUT
+          "msi_sig=$($msiSig.FullName)" >> $env:GITHUB_OUTPUT
+          "nsis=$($nsis.FullName)" >> $env:GITHUB_OUTPUT
+          "nsis_sig=$($nsisSig.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Create or update GitHub release
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $releaseName = "${{ steps.meta.outputs.release_name }}"
+          $repo = $env:GITHUB_REPOSITORY
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit $tag --repo $repo --title $releaseName --notes-file release-notes.md
+          } else {
+            gh release create $tag --repo $repo --title $releaseName --notes-file release-notes.md
+          }
+
+          $release = gh release view $tag --repo $repo --json id | ConvertFrom-Json
+          gh api `
+            --method PATCH `
+            -H "Accept: application/vnd.github+json" `
+            "/repos/$repo/releases/$($release.id)" `
+            -f draft=false `
+            -f prerelease=false *> $null
+
+          gh release upload $tag `
+            "${{ steps.assets.outputs.msi }}" `
+            "${{ steps.assets.outputs.msi_sig }}" `
+            "${{ steps.assets.outputs.nsis }}" `
+            "${{ steps.assets.outputs.nsis_sig }}" `
+            "release-assets/latest.json" `
+            --repo $repo `
+            --clobber
