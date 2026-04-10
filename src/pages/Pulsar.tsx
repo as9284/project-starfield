@@ -24,7 +24,11 @@ import {
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import { usePulsarStore } from "../store/usePulsarStore";
-import type { FormatOption, AudioFormat, DownloadItem } from "../store/usePulsarStore";
+import type {
+  FormatOption,
+  AudioFormat,
+  DownloadItem,
+} from "../store/usePulsarStore";
 import {
   pulsarCheckYtdlp,
   pulsarDownload,
@@ -56,7 +60,12 @@ const FORMAT_OPTIONS: FormatChoice[] = [
     description: "HD video, smaller file",
     icon: Film,
   },
-  { id: "audio", label: "Audio only", description: "Extract audio", icon: Music },
+  {
+    id: "audio",
+    label: "Audio only",
+    description: "Extract audio",
+    icon: Music,
+  },
 ];
 
 interface AudioFormatChoice {
@@ -126,7 +135,9 @@ function statusLabel(item: DownloadItem): string {
     case "merging":
       return "Merging…";
     case "paused":
-      return item.progress > 0 ? `Paused at ${item.progress.toFixed(1)}%` : "Paused";
+      return item.progress > 0
+        ? `Paused at ${item.progress.toFixed(1)}%`
+        : "Paused";
     case "done":
       return "Complete";
     case "error":
@@ -156,12 +167,11 @@ function DownloadCard({
     item.status === "queued" ||
     item.status === "merging";
 
-  const displayName =
-    item.filename
-      ? item.filename.split("/").pop() ?? item.filename
-      : item.url.length > 60
-        ? item.url.slice(0, 60) + "…"
-        : item.url;
+  const displayName = item.filename
+    ? (item.filename.split("/").pop() ?? item.filename)
+    : item.url.length > 60
+      ? item.url.slice(0, 60) + "…"
+      : item.url;
 
   return (
     <div
@@ -192,18 +202,20 @@ function DownloadCard({
             >
               {statusLabel(item)}
             </span>
-            {item.status === "downloading" && item.speed && item.speed !== "?" && (
-              <>
-                <span style={{ color: "var(--color-text-dim)" }}>·</span>
-                <span
-                  className="text-xs flex items-center gap-1"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  <Zap size={9} />
-                  {formatBytes(item.speed)}
-                </span>
-              </>
-            )}
+            {item.status === "downloading" &&
+              item.speed &&
+              item.speed !== "?" && (
+                <>
+                  <span style={{ color: "var(--color-text-dim)" }}>·</span>
+                  <span
+                    className="text-xs flex items-center gap-1"
+                    style={{ color: "var(--color-text-dim)" }}
+                  >
+                    <Zap size={9} />
+                    {formatBytes(item.speed)}
+                  </span>
+                </>
+              )}
             {item.status === "downloading" && item.eta && (
               <>
                 <span style={{ color: "var(--color-text-dim)" }}>·</span>
@@ -311,6 +323,7 @@ export default function Pulsar() {
 
   const [hasYtdlp, setHasYtdlp] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [installFailed, setInstallFailed] = useState(false);
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<FormatOption>("best");
   const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
@@ -326,9 +339,7 @@ export default function Pulsar() {
   const pausedDownloads = downloads.filter((d) => d.status === "paused");
   const historyDownloads = downloads.filter(
     (d) =>
-      d.status === "done" ||
-      d.status === "error" ||
-      d.status === "cancelled",
+      d.status === "done" || d.status === "error" || d.status === "cancelled",
   );
 
   // Refs so callbacks always see latest state
@@ -338,11 +349,28 @@ export default function Pulsar() {
   // Track IDs that were paused so we don't overwrite their status with "cancelled"
   const pausedIdsRef = useRef(new Set<string>());
 
+  // Check for yt-dlp once on mount; auto-install if missing
   useEffect(() => {
     pulsarCheckYtdlp()
-      .then(setHasYtdlp)
+      .then((found) => {
+        setHasYtdlp(found);
+        if (!found) {
+          setInstalling(true);
+          setInstallFailed(false);
+          pulsarInstallYtdlp()
+            .then((ok) => {
+              setHasYtdlp(ok);
+              if (!ok) setInstallFailed(true);
+            })
+            .catch(() => setInstallFailed(true))
+            .finally(() => setInstalling(false));
+        }
+      })
       .catch(() => setHasYtdlp(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Populate default output dir if not already set
+  useEffect(() => {
     if (!outputDir) {
       pulsarGetDownloadsDir()
         .then(setOutputDir)
@@ -352,15 +380,16 @@ export default function Pulsar() {
 
   const handleInstallYtdlp = async () => {
     setInstalling(true);
+    setInstallFailed(false);
     try {
       const ok = await pulsarInstallYtdlp();
       if (ok) {
         setHasYtdlp(true);
       } else {
-        setHasYtdlp(false);
+        setInstallFailed(true);
       }
     } catch {
-      // ignore
+      setInstallFailed(true);
     } finally {
       setInstalling(false);
     }
@@ -391,7 +420,10 @@ export default function Pulsar() {
       const isDuplicate = downloads.some(
         (d) =>
           d.url === downloadUrl &&
-          (d.status === "downloading" || d.status === "queued" || d.status === "merging" || d.status === "paused"),
+          (d.status === "downloading" ||
+            d.status === "queued" ||
+            d.status === "merging" ||
+            d.status === "paused"),
       );
       if (isDuplicate) return;
     }
@@ -448,7 +480,10 @@ export default function Pulsar() {
               });
               break;
             case "merging":
-              updateDownloadRef.current(id, { status: "merging", progress: 100 });
+              updateDownloadRef.current(id, {
+                status: "merging",
+                progress: 100,
+              });
               break;
             case "done":
               updateDownloadRef.current(id, {
@@ -469,7 +504,9 @@ export default function Pulsar() {
               }
               updateDownloadRef.current(id, {
                 status:
-                  event.message === "Download cancelled" ? "cancelled" : "error",
+                  event.message === "Download cancelled"
+                    ? "cancelled"
+                    : "error",
                 error: event.message,
                 speed: "",
                 eta: "",
@@ -551,7 +588,12 @@ export default function Pulsar() {
   };
 
   const handleRetry = (item: DownloadItem) => {
-    void startDownload(item.url, item.format, item.playlist, item.audioFormat ?? "mp3");
+    void startDownload(
+      item.url,
+      item.format,
+      item.playlist,
+      item.audioFormat ?? "mp3",
+    );
   };
 
   const noOutputDir = !outputDir.trim();
@@ -569,10 +611,7 @@ export default function Pulsar() {
           <button className="win-btn" onClick={goBack} title="Back (Esc)">
             <ArrowLeft size={14} />
           </button>
-          <Download
-            size={16}
-            style={{ color: "var(--color-purple-400)" }}
-          />
+          <Download size={16} style={{ color: "var(--color-purple-400)" }} />
           <span
             className="text-sm font-semibold"
             style={{ color: "var(--color-text-primary)" }}
@@ -623,70 +662,108 @@ export default function Pulsar() {
               </p>
             </div>
 
-            {/* yt-dlp not found */}
-            {hasYtdlp === false && (
+            {/* yt-dlp not found / auto-installing */}
+            {(hasYtdlp === false || installing) && (
               <div
                 className="glass rounded-xl px-5 py-4 w-full flex flex-col gap-3"
-                style={{ borderColor: "rgba(234, 179, 8, 0.25)" }}
+                style={{
+                  borderColor: installing
+                    ? "rgba(124, 79, 240, 0.3)"
+                    : installFailed
+                      ? "rgba(239, 68, 68, 0.25)"
+                      : "rgba(234, 179, 8, 0.25)",
+                }}
               >
                 <div className="flex items-center gap-2">
-                  <AlertCircle
-                    size={15}
-                    style={{ color: "#eab308", flexShrink: 0 }}
-                  />
+                  {installing ? (
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                      style={{
+                        color: "var(--color-purple-400)",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <AlertCircle
+                      size={15}
+                      style={{
+                        color: installFailed ? "#fca5a5" : "#eab308",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
                   <span
                     className="text-sm font-medium"
                     style={{ color: "var(--color-text-primary)" }}
                   >
-                    yt-dlp not found
+                    {installing
+                      ? "Downloading yt-dlp…"
+                      : installFailed
+                        ? "Auto-install failed"
+                        : "yt-dlp not found"}
                   </span>
                 </div>
                 <p
                   className="text-xs"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  Pulsar requires{" "}
-                  <a
-                    href="https://github.com/yt-dlp/yt-dlp#installation"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      color: "var(--color-nebula-teal)",
-                      textDecoration: "underline",
-                    }}
-                  >
-                    yt-dlp
-                  </a>{" "}
-                  to be installed. You can install it via pip, brew, or the
-                  link above.
-                </p>
-                <button
-                  className="btn-send"
-                  style={{
-                    position: "static",
-                    height: 34,
-                    borderRadius: "var(--radius-md)",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    gap: "0.4rem",
-                    width: "fit-content",
-                    padding: "0 16px",
-                  }}
-                  onClick={() => void handleInstallYtdlp()}
-                  disabled={installing}
-                >
                   {installing ? (
+                    "Grabbing the yt-dlp binary for you — won't take long."
+                  ) : installFailed ? (
                     <>
-                      <Loader2 size={13} className="animate-spin" />
-                      Installing…
+                      Automatic installation didn't work. Install{" "}
+                      <a
+                        href="https://github.com/yt-dlp/yt-dlp#installation"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "var(--color-nebula-teal)",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        yt-dlp
+                      </a>{" "}
+                      manually via pip, brew, or the link above — then restart
+                      the app.
                     </>
                   ) : (
                     <>
-                      <Package size={13} />
-                      Auto-install via pip
+                      Pulsar requires{" "}
+                      <a
+                        href="https://github.com/yt-dlp/yt-dlp#installation"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "var(--color-nebula-teal)",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        yt-dlp
+                      </a>
+                      . Attempting to install it automatically…
                     </>
                   )}
-                </button>
+                </p>
+                {!installing && installFailed && (
+                  <button
+                    className="btn-send"
+                    style={{
+                      position: "static",
+                      height: 34,
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      gap: "0.4rem",
+                      width: "fit-content",
+                      padding: "0 16px",
+                    }}
+                    onClick={() => void handleInstallYtdlp()}
+                  >
+                    <Package size={13} />
+                    Retry
+                  </button>
+                )}
               </div>
             )}
 
@@ -723,10 +800,7 @@ export default function Pulsar() {
               </div>
 
               {noOutputDir && (
-                <p
-                  className="text-xs"
-                  style={{ color: "#fca5a5" }}
-                >
+                <p className="text-xs" style={{ color: "#fca5a5" }}>
                   Set an output directory before downloading.
                 </p>
               )}
@@ -862,9 +936,7 @@ export default function Pulsar() {
               }}
               onClick={() => void handleDownload()}
               disabled={
-                !url.trim() ||
-                hasYtdlp === false ||
-                noOutputDir
+                !url.trim() || hasYtdlp !== true || installing || noOutputDir
               }
             >
               <Download size={15} />
@@ -923,7 +995,10 @@ export default function Pulsar() {
                 <div className="flex items-center justify-between">
                   <button
                     className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--color-text-muted)", cursor: "pointer" }}
+                    style={{
+                      color: "var(--color-text-muted)",
+                      cursor: "pointer",
+                    }}
                     onClick={() => setShowHistory((v) => !v)}
                   >
                     {showHistory ? (
@@ -972,18 +1047,17 @@ export default function Pulsar() {
               </div>
             )}
 
-            {hasYtdlp === true &&
-              downloads.length === 0 && (
-                <div
-                  className="flex flex-col items-center gap-2 py-6"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  <CheckCircle2 size={24} style={{ opacity: 0.3 }} />
-                  <p className="text-xs text-center" style={{ opacity: 0.5 }}>
-                    No downloads yet. Paste a URL above to get started.
-                  </p>
-                </div>
-              )}
+            {hasYtdlp === true && downloads.length === 0 && (
+              <div
+                className="flex flex-col items-center gap-2 py-6"
+                style={{ color: "var(--color-text-dim)" }}
+              >
+                <CheckCircle2 size={24} style={{ opacity: 0.3 }} />
+                <p className="text-xs text-center" style={{ opacity: 0.5 }}>
+                  No downloads yet. Paste a URL above to get started.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

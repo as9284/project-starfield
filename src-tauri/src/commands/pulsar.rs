@@ -53,20 +53,58 @@ pub enum PulsarEvent {
 
 // ── Commands ──────────────────────────────────────────────────────────────
 
-/// Check whether yt-dlp is available on the system PATH.
+/// Return the path to the locally bundled yt-dlp binary (downloaded by
+/// `pulsar_install_ytdlp` when the system-wide one is absent).
+fn get_local_ytdlp_path() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        let local_app_data = std::env::var_os("LOCALAPPDATA")?;
+        return Some(
+            std::path::PathBuf::from(local_app_data)
+                .join("starfield")
+                .join("bin")
+                .join("yt-dlp.exe"),
+        );
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Some(home_dir()?.join(".local").join("bin").join("yt-dlp"));
+    }
+}
+
+/// Return the yt-dlp executable path — local install takes priority so that
+/// the auto-downloaded binary is used even when the system hasn't been updated.
+fn get_ytdlp_command() -> String {
+    if let Some(p) = get_local_ytdlp_path() {
+        if p.exists() {
+            return p.to_string_lossy().into_owned();
+        }
+    }
+    "yt-dlp".to_string()
+}
+
+/// Check whether yt-dlp is available — checks both the system PATH and the
+/// local app install directory.
 #[command]
 pub async fn pulsar_check_ytdlp() -> Result<bool, String> {
+    // 1. Check system PATH
     let cmd = if cfg!(target_os = "windows") {
         "where"
     } else {
         "which"
     };
-    let output = Command::new(cmd)
-        .arg("yt-dlp")
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(output.status.success())
+    if let Ok(out) = Command::new(cmd).arg("yt-dlp").output().await {
+        if out.status.success() {
+            return Ok(true);
+        }
+    }
+    // 2. Check local app install location
+    if let Some(p) = get_local_ytdlp_path() {
+        if p.exists() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Get the default downloads directory for the current user.
@@ -85,21 +123,68 @@ pub fn pulsar_get_downloads_dir() -> Result<String, String> {
     Err("Cannot determine downloads directory".to_string())
 }
 
-/// Attempt to auto-install yt-dlp via pip3 or pip.
+/// Auto-install yt-dlp.
+///
+/// * Windows  — downloads the standalone `yt-dlp.exe` from the latest GitHub
+///              release directly into `%LOCALAPPDATA%\starfield\bin\`.
+/// * Others   — falls back to `pip3` / `pip install --user --upgrade yt-dlp`.
 #[command]
 pub async fn pulsar_install_ytdlp() -> Result<bool, String> {
-    for pip in &["pip3", "pip"] {
-        if let Ok(out) = Command::new(pip)
-            .args(["install", "--user", "--upgrade", "yt-dlp"])
-            .output()
+    #[cfg(target_os = "windows")]
+    {
+        use futures_util::StreamExt;
+
+        let local_path = get_local_ytdlp_path()
+            .ok_or_else(|| "Cannot locate yt-dlp install path".to_string())?;
+
+        if let Some(parent) = local_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory: {e}"))?;
+        }
+
+        let client = reqwest::Client::builder()
+            .user_agent("Starfield-app/0.1")
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        let resp = client
+            .get("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe")
+            .send()
             .await
-        {
-            if out.status.success() {
-                return Ok(true);
+            .map_err(|e| format!("Failed to reach GitHub: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("GitHub returned HTTP {}", resp.status()));
+        }
+
+        let mut file = std::fs::File::create(&local_path)
+            .map_err(|e| format!("Cannot create file: {e}"))?;
+
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| format!("Stream error: {e}"))?;
+            std::io::Write::write_all(&mut file, &chunk)
+                .map_err(|e| format!("Write error: {e}"))?;
+        }
+
+        return Ok(true);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        for pip in &["pip3", "pip"] {
+            if let Ok(out) = Command::new(pip)
+                .args(["install", "--user", "--upgrade", "yt-dlp"])
+                .output()
+                .await
+            {
+                if out.status.success() {
+                    return Ok(true);
+                }
             }
         }
+        Ok(false)
     }
-    Ok(false)
 }
 
 /// Delete a downloaded file (and any leftover .part file) from disk.
@@ -189,8 +274,9 @@ pub async fn pulsar_download(
 
     args.push(url);
 
-    // Spawn yt-dlp
-    let mut child = Command::new("yt-dlp")
+    // Spawn yt-dlp (prefer locally installed binary)
+    let ytdlp_cmd = get_ytdlp_command();
+    let mut child = Command::new(&ytdlp_cmd)
         .args(&args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
