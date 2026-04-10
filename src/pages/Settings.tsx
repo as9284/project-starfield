@@ -698,7 +698,7 @@ export default function Settings() {
                   DeepSeek-V3.2
                 </span>{" "}
                 in non-thinking mode via the official <code>deepseek-chat</code>{" "}
-                alias, with thinking explicitly disabled. Get a key at{" "}
+                alias, with thinking explicitly disabled in the request payload. Get a key at{" "}
                 <a
                   href="https://platform.deepseek.com"
                   target="_blank"
@@ -778,7 +778,7 @@ export default function Settings() {
                 Solaris uses{" "}
                 <span style={{ color: "var(--color-purple-300)" }}>Open-Meteo</span>{" "}
                 for weather data, which is free and works without a key. An optional
-                key is available for commercial use at{" "}
+                key is available for commercial use or higher rate limits at{" "}
                 <a
                   href="https://open-meteo.com"
                   target="_blank"
