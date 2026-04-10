@@ -1,178 +1,189 @@
-import { useEffect } from "react";
-import { motion } from "framer-motion";
 import {
-  ArrowRight,
-  CloudSun,
-  Download,
-  FolderSearch,
-  Link as LinkIcon,
-  ListTodo,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { motion } from "framer-motion";
+import { X } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import type { AppView } from "../store/useAppStore";
-import { modLabel } from "../lib/platform";
+import {
+  CONSTELLATIONS,
+  type ConstellationId,
+} from "../lib/constellation-catalog";
+
+// Lazy-load the 3D scene so the WebGL bundle is never on the critical path
+const ConstellationAtlas3D = lazy(() => import("./ConstellationAtlas3D"));
 
 type ConstellationView = Exclude<AppView, "luna" | "settings">;
 
-interface ConstellationItem {
-  id: ConstellationView;
-  name: string;
-  description: string;
-  icon: LucideIcon;
-  accentColor: string;
-  shortcutNum: string;
+// ── Detect whether we should skip WebGL ──────────────────────────────────────
+
+function canUseWebGL(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
 }
 
-const CONSTELLATIONS: ConstellationItem[] = [
-  {
-    id: "orbit",
-    name: "Orbit",
-    description: "Tasks & notes that stay in formation.",
-    icon: ListTodo,
-    accentColor: "rgba(124, 79, 240, 0.55)",
-    shortcutNum: "2",
-  },
-  {
-    id: "solaris",
-    name: "Solaris",
-    description: "Weather intelligence, solar-powered.",
-    icon: CloudSun,
-    accentColor: "rgba(217, 70, 239, 0.55)",
-    shortcutNum: "3",
-  },
-  {
-    id: "beacon",
-    name: "Beacon",
-    description: "Codebase exploration, lit from orbit.",
-    icon: FolderSearch,
-    accentColor: "rgba(99, 102, 241, 0.55)",
-    shortcutNum: "4",
-  },
-  {
-    id: "hyperlane",
-    name: "Hyperlane",
-    description: "Links compressed into tiny jumps.",
-    icon: LinkIcon,
-    accentColor: "rgba(20, 184, 166, 0.55)",
-    shortcutNum: "5",
-  },
-  {
-    id: "pulsar",
-    name: "Pulsar",
-    description: "Media downloads with glow on demand.",
-    icon: Download,
-    accentColor: "rgba(155, 120, 248, 0.55)",
-    shortcutNum: "6",
-  },
-];
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
-const container = {
+// ── Variants ─────────────────────────────────────────────────────────────────
+// Using a single variant tree so Framer Motion orchestrates all children as
+// one coordinated timeline instead of independent, potentially de-synced
+// animations. This also lets us animate backdropFilter as a string value so
+// the blur grows in smoothly rather than snapping at the end of an opacity fade.
+
+const shellVariants = {
   hidden: { opacity: 0 },
-  show: {
+  visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+    transition: {
+      duration: 0.18,
+      when: "beforeChildren" as const,
+      staggerChildren: 0,
+    },
   },
-  exit: { opacity: 0, transition: { duration: 0.15 } },
+  exit: {
+    opacity: 0,
+    transition: {
+      when: "afterChildren" as const,
+      duration: 0.22,
+    },
+  },
 };
 
-const cardVariant = {
-  hidden: { opacity: 0, y: 16, scale: 0.97 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: "easeOut" as const } },
+const backdropVariants = {
+  // Opacity-only: blur stays static in CSS so the GPU never recalculates
+  // it per-frame. will-change: opacity in CSS pre-promotes the layer so
+  // the blur texture is ready before the fade starts, eliminating the snap.
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { duration: 0.4, ease: "easeOut" as const },
+  },
+  exit: { opacity: 0, transition: { duration: 0.25, ease: "easeIn" as const } },
 };
+
+const surfaceVariants = {
+  hidden: { opacity: 0, scale: 0.965, y: 18 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.98,
+    y: 10,
+    transition: { duration: 0.28, ease: [0.4, 0, 1, 1] as const },
+  },
+};
+
+const closeVariants = {
+  hidden: { opacity: 0, scale: 0.84 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { delay: 0.2, duration: 0.22 },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.84,
+    transition: { duration: 0.15 },
+  },
+};
+
+// ── Overlay ──────────────────────────────────────────────────────────────────
 
 export default function ConstellationOverlay() {
-  const { closeConstellations, setView } = useAppStore();
+  const { view, closeConstellations, setView } = useAppStore();
 
+  // Determine current active constellation (if any)
+  const activeConstellation = useMemo<ConstellationId | null>(() => {
+    const match = CONSTELLATIONS.find((c) => c.id === view);
+    return match ? match.id : null;
+  }, [view]);
+
+  // Feature detection (run once)
+  const [use3D, setUse3D] = useState(true);
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeConstellations();
+    if (!canUseWebGL() || prefersReducedMotion()) setUse3D(false);
+  }, []);
+
+  // Escape to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeConstellations();
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [closeConstellations]);
 
-  const open = (view: ConstellationView) => setView(view);
+  // Navigation handler
+  const navigate = useCallback(
+    (id: ConstellationId) => {
+      setView(id as ConstellationView);
+    },
+    [setView],
+  );
+
+  // Clean up cursor when overlay unmounts
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
 
   return (
-    <div className="cst-shell above-stars">
+    <motion.div
+      className="cst-shell above-stars"
+      variants={shellVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      {/* Backdrop — blur and background animate as one to avoid the snap */}
       <motion.div
         className="cst-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        variants={backdropVariants}
         onClick={closeConstellations}
       />
 
-      <motion.section
-        className="cst-panel"
-        variants={container}
-        initial="hidden"
-        animate="show"
-        exit="exit"
-      >
-        {/* Header */}
-        <div className="cst-header">
-          <div>
-            <h2 className="cst-title">Constellations</h2>
-            <p className="cst-subtitle">
-              Everything branches off from Luna.
-            </p>
-          </div>
-          <button
-            className="win-btn"
-            type="button"
-            onClick={closeConstellations}
-            title="Close"
-          >
-            <X size={14} />
-          </button>
-        </div>
+      {/* Scene surface — scales in independently */}
+      <motion.div className="cst-surface" variants={surfaceVariants}>
+        <div className="cst-surface-veil" />
 
-        {/* Grid */}
-        <motion.div className="cst-grid" variants={container}>
-          {CONSTELLATIONS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <motion.button
-                key={item.id}
-                type="button"
-                className="cst-card group"
-                variants={cardVariant}
-                whileHover={{ y: -3, scale: 1.015 }}
-                whileTap={{ scale: 0.985 }}
-                onClick={() => open(item.id)}
-              >
-                <span
-                  className="cst-card-glow"
-                  style={{ background: item.accentColor }}
-                />
-                <span className="cst-card-icon">
-                  <Icon size={20} />
-                </span>
-                <span className="cst-card-body">
-                  <span className="cst-card-name">{item.name}</span>
-                  <span className="cst-card-desc">{item.description}</span>
-                </span>
-                <kbd
-                  className="text-xs font-mono px-1.5 py-0.5 rounded shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline-block"
-                  style={{
-                    background: "rgba(124, 79, 240, 0.08)",
-                    border: "1px solid rgba(124, 79, 240, 0.15)",
-                    color: "var(--color-text-dim)",
-                    fontSize: "0.65rem",
-                  }}
-                  title={`${modLabel}${item.shortcutNum}`}
-                >
-                  {modLabel}{item.shortcutNum}
-                </kbd>
-                <ArrowRight size={14} className="cst-card-arrow" />
-              </motion.button>
-            );
-          })}
-        </motion.div>
-      </motion.section>
-    </div>
+        {/* Close button */}
+        <motion.button
+          className="cst-close-btn"
+          variants={closeVariants}
+          onClick={closeConstellations}
+          aria-label="Close constellations"
+        >
+          <X size={18} />
+        </motion.button>
+
+        {/* 3D stage — fills the entire overlay */}
+        {use3D && (
+          <div className="cst-stage">
+            <Suspense fallback={null}>
+              <ConstellationAtlas3D
+                activeView={activeConstellation}
+                onSelect={navigate}
+              />
+            </Suspense>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }

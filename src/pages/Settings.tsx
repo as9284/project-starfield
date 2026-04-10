@@ -28,6 +28,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
+import { CONSTELLATIONS } from "../lib/constellation-catalog";
 import { modKey } from "../lib/platform";
 import {
   saveDeepSeekKey,
@@ -1126,14 +1127,13 @@ export default function Settings() {
                   description="Go back / close overlay"
                 />
                 <ShortcutRow keys={[modKey, "1"]} description="Go to Luna" />
-                <ShortcutRow keys={[modKey, "2"]} description="Go to Orbit" />
-                <ShortcutRow keys={[modKey, "3"]} description="Go to Solaris" />
-                <ShortcutRow keys={[modKey, "4"]} description="Go to Beacon" />
-                <ShortcutRow
-                  keys={[modKey, "5"]}
-                  description="Go to Hyperlane"
-                />
-                <ShortcutRow keys={[modKey, "6"]} description="Go to Pulsar" />
+                {CONSTELLATIONS.map((c) => (
+                  <ShortcutRow
+                    key={c.id}
+                    keys={[modKey, c.shortcutNum]}
+                    description={`Go to ${c.name}`}
+                  />
+                ))}
                 <ShortcutRow
                   keys={["Enter"]}
                   description="Send message (in chat)"

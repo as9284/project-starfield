@@ -685,151 +685,86 @@ body {
   animation: status-pulse 2.5s infinite;
 }
 
-/* ── Constellation overlay (minimal grid) ──────────────────────────────── */
+/* ── Constellation overlay (3D atlas) ──────────────────────────────────── */
 .cst-shell {
   position: absolute;
   inset: 42px 0 0;
   z-index: 40;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
 }
 
 .cst-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(5, 5, 14, 0.72);
-  backdrop-filter: blur(16px);
+  background: rgba(5, 5, 14, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  /* will-change keeps the blur layer pre-promoted so opacity
+     animation has no snap and costs only a compositor blend */
+  will-change: opacity;
 }
 
-.cst-panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: min(560px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
-  padding: 1.5rem;
-  border-radius: 20px;
-  overflow-y: auto;
-  background: rgba(10, 10, 28, 0.88);
-  border: 1px solid rgba(124, 79, 240, 0.16);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(124, 79, 240, 0.08);
-}
-
-.cst-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.cst-title {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  letter-spacing: -0.01em;
-}
-
-.cst-subtitle {
-  margin: 0.4rem 0 0;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.cst-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cst-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid rgba(124, 79, 240, 0.14);
-  border-radius: 14px;
-  background: rgba(16, 15, 46, 0.5);
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  overflow: hidden;
-  transition: border-color 0.2s;
-}
-
-.cst-card:hover {
-  border-color: rgba(124, 79, 240, 0.3);
-}
-
-.cst-card-glow {
+.cst-surface {
   position: absolute;
-  top: -20px;
-  left: -20px;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  filter: blur(28px);
-  opacity: 0;
+  inset: 0;
+  z-index: 1;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  contain: paint;
+}
+
+.cst-surface-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   pointer-events: none;
-  transition: opacity 0.3s;
+  background:
+    radial-gradient(
+      circle at 50% 48%,
+      rgba(124, 79, 240, 0.08),
+      transparent 34%
+    ),
+    linear-gradient(180deg, rgba(10, 10, 26, 0.12), rgba(6, 6, 14, 0.22));
 }
 
-.cst-card:hover .cst-card-glow {
-  opacity: 0.35;
+/* ── 3D stage ─────────────────────────────────────────────────── */
+.cst-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
 }
 
-.cst-card-icon {
+/* ── Close button ─────────────────────────────────────────────── */
+.cst-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: rgba(124, 79, 240, 0.1);
+  width: 36px;
+  height: 36px;
   border: 1px solid rgba(124, 79, 240, 0.2);
-  color: var(--color-purple-300);
-  flex-shrink: 0;
-}
-
-.cst-card-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.cst-card-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.cst-card-desc {
-  font-size: 0.8125rem;
+  border-radius: 10px;
+  background: rgba(10, 10, 28, 0.7);
+  backdrop-filter: blur(12px);
   color: var(--color-text-muted);
-  line-height: 1.4;
-}
-
-.cst-card-arrow {
-  color: var(--color-text-dim);
-  flex-shrink: 0;
-  opacity: 0;
-  transform: translateX(-4px);
+  cursor: pointer;
   transition:
-    opacity 0.2s,
-    transform 0.2s;
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
 }
 
-.cst-card:hover .cst-card-arrow {
-  opacity: 0.7;
-  transform: translateX(0);
+.cst-close-btn:hover {
+  border-color: rgba(124, 79, 240, 0.4);
+  background: rgba(16, 15, 46, 0.85);
+  color: var(--color-text-primary);
 }
 
 /* ── Luna page ─────────────────────────────────────────────────────────── */

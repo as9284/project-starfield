@@ -11,8 +11,10 @@ import Pulsar from "./pages/Pulsar";
 import Hyperlane from "./pages/Hyperlane";
 import Settings from "./pages/Settings";
 import { useAppStore } from "./store/useAppStore";
-import type { AppView } from "./store/useAppStore";
 import { getDeepSeekKey, getTavilyKey, getWeatherKey, win } from "./lib/tauri";
+import { buildShortcutMap } from "./lib/constellation-catalog";
+
+const SHORTCUT_MAP = buildShortcutMap();
 
 const slideIn = {
   initial: { opacity: 0, x: 10 },
@@ -151,17 +153,9 @@ export default function App() {
         return;
       }
 
-      // Ctrl/Cmd + number: jump to constellation
+      // Ctrl/Cmd + number: jump to constellation (catalog-driven)
       if (isMod && !e.shiftKey && !e.altKey) {
-        const constellationMap: Record<string, AppView> = {
-          "1": "luna",
-          "2": "orbit",
-          "3": "solaris",
-          "4": "beacon",
-          "5": "hyperlane",
-          "6": "pulsar",
-        };
-        const target = constellationMap[e.key];
+        const target = SHORTCUT_MAP[e.key];
         if (target) {
           e.preventDefault();
           setView(target);
