@@ -35,11 +35,21 @@ interface MeetingState {
   activeSession: MeetingSession | null;
   sessions: MeetingSession[];
 
+  /** Non-persisted: set by Luna to navigate Orbit to the meeting tab. */
+  pendingOrbitTab: string | null;
+  /** Non-persisted: meeting title pre-filled by Luna's OPEN_MEETING command. */
+  pendingMeetingTitle: string | null;
+
   startSession: (title: string) => MeetingSession | null;
   addEntry: (content: string) => boolean;
   endSession: (artifacts: MeetingSessionArtifacts) => MeetingSession | null;
   deleteSession: (id: string) => boolean;
   discardActiveSession: () => boolean;
+
+  /** Request Orbit to switch to a specific tab (consumed once by Orbit.tsx). */
+  requestOrbitTab: (tab: string, meetingTitle?: string) => void;
+  /** Consume and clear the pending tab request (call from Orbit.tsx useEffect). */
+  consumePendingTab: () => { tab: string | null; meetingTitle: string | null };
 }
 
 export const useOrbitMeetingStore = create<MeetingState>()(
@@ -47,6 +57,8 @@ export const useOrbitMeetingStore = create<MeetingState>()(
     (set, get) => ({
       activeSession: null,
       sessions: [],
+      pendingOrbitTab: null,
+      pendingMeetingTitle: null,
 
       startSession: (title) => {
         const trimmed = title.trim();
@@ -116,10 +128,25 @@ export const useOrbitMeetingStore = create<MeetingState>()(
         set({ activeSession: null });
         return true;
       },
+
+      requestOrbitTab: (tab, meetingTitle) => {
+        set({ pendingOrbitTab: tab, pendingMeetingTitle: meetingTitle ?? null });
+      },
+
+      consumePendingTab: () => {
+        const { pendingOrbitTab, pendingMeetingTitle } = get();
+        set({ pendingOrbitTab: null, pendingMeetingTitle: null });
+        return { tab: pendingOrbitTab, meetingTitle: pendingMeetingTitle };
+      },
     }),
     {
       name: "starfield-orbit-meetings",
       version: 1,
+      // Don't persist ephemeral navigation signals
+      partialize: (state) => ({
+        activeSession: state.activeSession,
+        sessions: state.sessions,
+      }),
     },
   ),
 );

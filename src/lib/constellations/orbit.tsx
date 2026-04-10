@@ -1,6 +1,10 @@
-import { StickyNote } from "lucide-react";
+import { useState } from "react";
+import { StickyNote, PenLine, Check, Copy, ExternalLink, Sparkles } from "lucide-react";
 import { useOrbitStore, VALID_PROJECT_COLORS } from "../../store/useOrbitStore";
 import { useOrbitMeetingStore } from "../../store/useOrbitMeetingStore";
+import { useAppStore } from "../../store/useAppStore";
+import { processWriting, WRITING_MODES } from "../orbit-ai";
+import type { WritingMode } from "../orbit-ai";
 import type {
   ConstellationHandler,
   ParsedCommand,
@@ -8,7 +12,7 @@ import type {
 } from "../constellation-registry";
 import { sanitizeForPrompt } from "../constellation-registry";
 
-// ── Result card ──────────────────────────────────────────────────────────────
+// ── Result cards ─────────────────────────────────────────────────────────────
 
 function OrbitDoneCard({ result }: { result: ActionResult }) {
   const count = (result as ActionResult & { count: number }).count;
@@ -27,6 +31,77 @@ function OrbitDoneCard({ result }: { result: ActionResult }) {
   );
 }
 
+function WritingResultCard({ result }: { result: ActionResult }) {
+  const [copied, setCopied] = useState(false);
+  const mode = result.mode as WritingMode;
+  const text = result.text as string | null;
+  const error = result.error as string | null;
+  const modeLabel = WRITING_MODES.find((m) => m.mode === mode)?.label ?? mode;
+
+  if (error || !text) {
+    return (
+      <div className="luna-action-card luna-action-card-error">
+        <PenLine size={13} style={{ flexShrink: 0 }} />
+        <span>Writing assistant: {error ?? "No result"}</span>
+      </div>
+    );
+  }
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="luna-action-card luna-action-card-writing">
+      <div className="luna-writing-header">
+        <PenLine size={13} style={{ color: "var(--color-purple-400)", flexShrink: 0 }} />
+        <span className="luna-writing-label">{modeLabel}</span>
+        <button onClick={handleCopy} className="luna-writing-copy-btn" title="Copy result">
+          {copied ? <Check size={11} style={{ color: "var(--color-nebula-teal)" }} /> : <Copy size={11} />}
+        </button>
+      </div>
+      <pre className="luna-writing-result">{text}</pre>
+    </div>
+  );
+}
+
+function MeetingOpenedCard({
+  result,
+  onNavigate,
+}: {
+  result: ActionResult;
+  onNavigate?: (view: string) => void;
+}) {
+  const title = result.meetingTitle as string;
+  return (
+    <div className="luna-action-card luna-action-card-meeting">
+      <div className="luna-meeting-header">
+        <Sparkles size={13} style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }} />
+        <span className="luna-meeting-label">Meeting mode ready</span>
+      </div>
+      {title && (
+        <p className="luna-meeting-title">"{title}"</p>
+      )}
+      <button
+        className="luna-meeting-open-btn"
+        onClick={() => onNavigate?.("orbit")}
+      >
+        <ExternalLink size={11} />
+        Open Orbit → Meeting tab
+      </button>
+    </div>
+  );
+}
+
+function OrbitActionCard({ result, onNavigate }: { result: ActionResult; onNavigate?: (view: string) => void }) {
+  if (result.type === "writing_result") return <WritingResultCard result={result} />;
+  if (result.type === "meeting_opened") return <MeetingOpenedCard result={result} onNavigate={onNavigate} />;
+  return <OrbitDoneCard result={result} />;
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export const orbitHandler: ConstellationHandler = {
@@ -34,7 +109,7 @@ export const orbitHandler: ConstellationHandler = {
   name: "Orbit",
   multiCommand: true,
 
-  promptInstructions: `### Orbit Control — Tasks, Notes & Projects
+  promptInstructions: `### Orbit Control — Tasks, Notes, Projects, Writing & Meetings
 
 \`\`\`orbit-commands
 CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
@@ -49,9 +124,15 @@ CREATE_NOTE {"title":"...","content":"..."}
 DELETE_NOTE {"id":"..."}
 CREATE_PROJECT {"name":"...","description":"...","color":"violet|purple|blue|cyan|emerald|amber|rose|pink","deadline":"YYYY-MM-DD or null"}
 DELETE_PROJECT {"id":"..."}
+PROCESS_WRITING {"mode":"improve|grammar|rephrase|formal|casual|expand|shorten|bullets|continue|email","text":"..."}
+OPEN_MEETING {"title":"..."}
 \`\`\`
 
-Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given.`,
+Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given.
+
+PROCESS_WRITING: Use when the user asks you to improve, fix, rephrase, expand, shorten, convert to bullets, continue, make formal/casual, or format as email. Always use this command to show the result as a copyable card rather than writing the text in your prose response. Text must be the exact content to transform, not a summary.
+
+OPEN_MEETING: Use when the user says they want to start, begin, or open a meeting. This pre-fills the meeting title in the Orbit Meeting tab and navigates there automatically.`,
 
   buildContext(): string {
     const { tasks, notes, projects } = useOrbitStore.getState();
@@ -122,6 +203,7 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
 
   async execute(commands: ParsedCommand[]): Promise<ActionResult[]> {
     const store = useOrbitStore.getState();
+    const results: ActionResult[] = [];
     let count = 0;
 
     for (const { command, args } of commands) {
@@ -219,6 +301,36 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
             store.deleteProject(String(args.id ?? ""));
             count++;
             break;
+
+          case "PROCESS_WRITING": {
+            const mode = String(args.mode ?? "improve") as WritingMode;
+            const text = String(args.text ?? "").trim();
+            if (text) {
+              const writingResult = await processWriting(text, mode);
+              results.push({
+                type: "writing_result",
+                handler: "orbit-commands",
+                mode,
+                text: writingResult.text,
+                error: writingResult.error,
+              });
+            }
+            break;
+          }
+
+          case "OPEN_MEETING": {
+            const title = String(args.title ?? "").trim();
+            // Signal Orbit to switch to meeting tab and pre-fill the title
+            useOrbitMeetingStore.getState().requestOrbitTab("meeting", title || undefined);
+            // Navigate to Orbit
+            useAppStore.getState().setView("orbit");
+            results.push({
+              type: "meeting_opened",
+              handler: "orbit-commands",
+              meetingTitle: title,
+            });
+            break;
+          }
         }
       } catch {
         /* skip malformed */
@@ -226,10 +338,10 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
     }
 
     if (count > 0) {
-      return [{ type: "orbit_done", handler: "orbit-commands", count }];
+      results.unshift({ type: "orbit_done", handler: "orbit-commands", count });
     }
-    return [];
+    return results;
   },
 
-  ResultCard: OrbitDoneCard,
+  ResultCard: OrbitActionCard,
 };

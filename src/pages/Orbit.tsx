@@ -1320,6 +1320,7 @@ function MeetingModeView({
     endSession,
     deleteSession,
     discardActiveSession,
+    consumePendingTab,
   } = useOrbitMeetingStore();
 
   const [meetingTitle, setMeetingTitle] = useState("");
@@ -1327,6 +1328,13 @@ function MeetingModeView({
   const [ending, setEnding] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [selectedSession, setSelectedSession] = useState<MeetingSession | null>(null);
+
+  // Consume any pending title pre-fill requested by Luna
+  useEffect(() => {
+    const { meetingTitle: pending } = consumePendingTab();
+    if (pending) setMeetingTitle(pending);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const notesEndRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
@@ -1843,6 +1851,8 @@ export default function Orbit() {
     unlinkNoteFromProject,
   } = useOrbitStore();
 
+  const { consumePendingTab } = useOrbitMeetingStore();
+
   const [tab, setTab] = useState<Tab>("tasks");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("active");
   const [taskModal, setTaskModal] = useState<OrbitTask | null | "new">(null);
@@ -1852,6 +1862,16 @@ export default function Orbit() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sort, setSort] = useState<"recent" | "priority" | "due">("recent");
   const sortRef = useRef<HTMLDivElement>(null);
+
+  // Consume pending tab switch requested by Luna (e.g. OPEN_MEETING)
+  useEffect(() => {
+    const { tab: pendingTab } = consumePendingTab();
+    if (pendingTab && (["tasks", "notes", "projects", "writing", "meeting"] as string[]).includes(pendingTab)) {
+      setTab(pendingTab as Tab);
+    }
+  // Only run on mount — consumePendingTab is stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep detailProject in sync with store when projects change.
   // We read the detailProject ID via a ref to avoid a dependency on detailProject
