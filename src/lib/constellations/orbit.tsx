@@ -1,5 +1,10 @@
-import { StickyNote } from "lucide-react";
-import { useOrbitStore } from "../../store/useOrbitStore";
+import { useState } from "react";
+import { StickyNote, PenLine, Check, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { useOrbitStore, VALID_PROJECT_COLORS } from "../../store/useOrbitStore";
+import { useOrbitMeetingStore } from "../../store/useOrbitMeetingStore";
+import { useAppStore } from "../../store/useAppStore";
+import { processWriting, WRITING_MODES } from "../orbit-ai";
+import type { WritingMode } from "../orbit-ai";
 import type {
   ConstellationHandler,
   ParsedCommand,
@@ -7,7 +12,13 @@ import type {
 } from "../constellation-registry";
 import { sanitizeForPrompt } from "../constellation-registry";
 
-// ── Result card ──────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function isValidProjectColor(color: string): color is typeof VALID_PROJECT_COLORS[number] {
+  return (VALID_PROJECT_COLORS as readonly string[]).includes(color);
+}
+
+// ── Result cards ─────────────────────────────────────────────────────────────
 
 function OrbitDoneCard({ result }: { result: ActionResult }) {
   const count = (result as ActionResult & { count: number }).count;
@@ -26,6 +37,77 @@ function OrbitDoneCard({ result }: { result: ActionResult }) {
   );
 }
 
+function WritingResultCard({ result }: { result: ActionResult }) {
+  const [copied, setCopied] = useState(false);
+  const mode = result.mode as WritingMode;
+  const text = result.text as string | null;
+  const error = result.error as string | null;
+  const modeLabel = WRITING_MODES.find((m) => m.mode === mode)?.label ?? mode;
+
+  if (error || !text) {
+    return (
+      <div className="luna-action-card luna-action-card-error">
+        <PenLine size={13} style={{ flexShrink: 0 }} />
+        <span>Writing assistant: {error ?? "No result"}</span>
+      </div>
+    );
+  }
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="luna-action-card luna-action-card-writing">
+      <div className="luna-writing-header">
+        <PenLine size={13} style={{ color: "var(--color-purple-400)", flexShrink: 0 }} />
+        <span className="luna-writing-label">{modeLabel}</span>
+        <button onClick={handleCopy} className="luna-writing-copy-btn" title="Copy result">
+          {copied ? <Check size={11} style={{ color: "var(--color-nebula-teal)" }} /> : <Copy size={11} />}
+        </button>
+      </div>
+      <pre className="luna-writing-result">{text}</pre>
+    </div>
+  );
+}
+
+function MeetingOpenedCard({
+  result,
+  onNavigate,
+}: {
+  result: ActionResult;
+  onNavigate?: (view: string) => void;
+}) {
+  const title = result.meetingTitle as string;
+  return (
+    <div className="luna-action-card luna-action-card-meeting">
+      <div className="luna-meeting-header">
+        <Sparkles size={13} style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }} />
+        <span className="luna-meeting-label">Meeting mode ready</span>
+      </div>
+      {title && (
+        <p className="luna-meeting-title">"{title}"</p>
+      )}
+      <button
+        className="luna-meeting-open-btn"
+        onClick={() => onNavigate?.("orbit")}
+      >
+        <ExternalLink size={11} />
+        Open Orbit → Meeting tab
+      </button>
+    </div>
+  );
+}
+
+function OrbitActionCard({ result, onNavigate }: { result: ActionResult; onNavigate?: (view: string) => void }) {
+  if (result.type === "writing_result") return <WritingResultCard result={result} />;
+  if (result.type === "meeting_opened") return <MeetingOpenedCard result={result} onNavigate={onNavigate} />;
+  return <OrbitDoneCard result={result} />;
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export const orbitHandler: ConstellationHandler = {
@@ -33,7 +115,7 @@ export const orbitHandler: ConstellationHandler = {
   name: "Orbit",
   multiCommand: true,
 
-  promptInstructions: `### Orbit Control — Tasks & Notes
+  promptInstructions: `### Orbit Control — Tasks, Notes, Projects, Writing & Meetings
 
 \`\`\`orbit-commands
 CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
@@ -41,27 +123,44 @@ COMPLETE_TASK {"id":"..."}
 UNCOMPLETE_TASK {"id":"..."}
 ARCHIVE_TASK {"id":"..."}
 DELETE_TASK {"id":"..."}
+ADD_SUBTASK {"task_id":"...","title":"..."}
+TOGGLE_SUBTASK {"task_id":"...","subtask_id":"..."}
+DELETE_SUBTASK {"task_id":"...","subtask_id":"..."}
 CREATE_NOTE {"title":"...","content":"..."}
 DELETE_NOTE {"id":"..."}
+CREATE_PROJECT {"name":"...","description":"...","color":"violet|purple|blue|cyan|emerald|amber|rose|pink","deadline":"YYYY-MM-DD or null"}
+DELETE_PROJECT {"id":"..."}
+PROCESS_WRITING {"mode":"improve|grammar|rephrase|formal|casual|expand|shorten|bullets|continue|email","text":"..."}
+OPEN_MEETING {"title":"..."}
 \`\`\`
 
-Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date if none given.`,
+Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given.
+
+PROCESS_WRITING: Use when the user asks you to improve, fix, rephrase, expand, shorten, convert to bullets, continue, make formal/casual, or format as email. Always use this command to show the result as a copyable card rather than writing the text in your prose response. Text must be the exact content to transform, not a summary.
+
+OPEN_MEETING: Use when the user says they want to start, begin, or open a meeting. This pre-fills the meeting title in the Orbit Meeting tab and navigates there automatically.`,
 
   buildContext(): string {
-    const { tasks, notes } = useOrbitStore.getState();
+    const { tasks, notes, projects } = useOrbitStore.getState();
+    const { activeSession, sessions } = useOrbitMeetingStore.getState();
     const activeTasks = tasks.filter((t) => !t.archived);
 
-    if (activeTasks.length === 0 && notes.length === 0) return "";
+    if (activeTasks.length === 0 && notes.length === 0 && projects.length === 0 && !activeSession && sessions.length === 0) return "";
 
     let ctx = "## Current Orbit State\n\n";
 
     if (activeTasks.length > 0) {
       ctx += `**Active Tasks (${activeTasks.length}):**\n`;
       ctx += activeTasks
-        .map(
-          (t) =>
-            `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`,
-        )
+        .map((t) => {
+          let line = `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`;
+          if (t.sub_tasks && t.sub_tasks.length > 0) {
+            const done = t.sub_tasks.filter((s) => s.completed).length;
+            line += ` | sub-tasks: ${done}/${t.sub_tasks.length} done`;
+            line += "\n" + t.sub_tasks.map((s) => `  - [${s.id}] [${s.completed ? "x" : " "}] "${sanitizeForPrompt(s.title)}"`).join("\n");
+          }
+          return line;
+        })
         .join("\n");
     } else {
       ctx += "**No active tasks.**";
@@ -81,14 +180,36 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
       ctx += "**No notes.**";
     }
 
+    if (projects.length > 0) {
+      ctx += "\n\n";
+      ctx += `**Projects (${projects.length}):**\n`;
+      ctx += projects
+        .map(
+          (p) =>
+            `- [${p.id}] "${sanitizeForPrompt(p.name)}"${p.description ? ` — ${sanitizeForPrompt(p.description)}` : ""}${p.deadline ? `, deadline: ${p.deadline}` : ""} | tasks: ${p.taskIds.length}, notes: ${p.noteIds.length}`,
+        )
+        .join("\n");
+    }
+
+    if (activeSession) {
+      ctx += "\n\n";
+      ctx += `**Active Meeting:** "${sanitizeForPrompt(activeSession.title)}" with ${activeSession.entries.length} notes captured so far.`;
+    }
+
+    if (sessions.length > 0) {
+      ctx += "\n\n";
+      ctx += `**Past Meetings:** ${sessions.length} completed session${sessions.length !== 1 ? "s" : ""}.`;
+    }
+
     ctx +=
-      "\n\nUse task/note IDs when emitting commands that target existing items.";
+      "\n\nOrbit also has a Writing Assistant tab (AI-powered text transformation) and a Meeting Mode tab (capture notes → auto-generate summary + task). Use task/note/project IDs when emitting commands that target existing items.";
 
     return ctx;
   },
 
   async execute(commands: ParsedCommand[]): Promise<ActionResult[]> {
     const store = useOrbitStore.getState();
+    const results: ActionResult[] = [];
     let count = 0;
 
     for (const { command, args } of commands) {
@@ -135,6 +256,18 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
             store.deleteTask(String(args.id ?? ""));
             count++;
             break;
+          case "ADD_SUBTASK":
+            store.addSubTask(String(args.task_id ?? ""), String(args.title ?? ""));
+            count++;
+            break;
+          case "TOGGLE_SUBTASK":
+            store.toggleSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            count++;
+            break;
+          case "DELETE_SUBTASK":
+            store.deleteSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            count++;
+            break;
           case "CREATE_NOTE":
             store.createNote({
               title: String(args.title ?? ""),
@@ -146,6 +279,60 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
             store.deleteNote(String(args.id ?? ""));
             count++;
             break;
+          case "CREATE_PROJECT": {
+            const rawDeadline = args.deadline;
+            const deadline =
+              rawDeadline != null &&
+              rawDeadline !== "null" &&
+              typeof rawDeadline === "string" &&
+              rawDeadline.trim() !== ""
+                ? rawDeadline
+                : null;
+            store.createProject({
+              name: String(args.name ?? ""),
+              description: args.description != null && args.description !== "null"
+                ? String(args.description)
+                : undefined,
+              color: isValidProjectColor(String(args.color)) ? String(args.color) : "violet",
+              deadline,
+            });
+            count++;
+            break;
+          }
+          case "DELETE_PROJECT":
+            store.deleteProject(String(args.id ?? ""));
+            count++;
+            break;
+
+          case "PROCESS_WRITING": {
+            const mode = String(args.mode ?? "improve") as WritingMode;
+            const text = String(args.text ?? "").trim();
+            if (text) {
+              const writingResult = await processWriting(text, mode);
+              results.push({
+                type: "writing_result",
+                handler: "orbit-commands",
+                mode,
+                text: writingResult.text,
+                error: writingResult.error,
+              });
+            }
+            break;
+          }
+
+          case "OPEN_MEETING": {
+            const title = String(args.title ?? "").trim();
+            // Signal Orbit to switch to meeting tab and pre-fill the title
+            useOrbitMeetingStore.getState().requestOrbitTab("meeting", title || undefined);
+            // Navigate to Orbit
+            useAppStore.getState().setView("orbit");
+            results.push({
+              type: "meeting_opened",
+              handler: "orbit-commands",
+              meetingTitle: title,
+            });
+            break;
+          }
         }
       } catch {
         /* skip malformed */
@@ -153,10 +340,10 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
     }
 
     if (count > 0) {
-      return [{ type: "orbit_done", handler: "orbit-commands", count }];
+      results.unshift({ type: "orbit_done", handler: "orbit-commands", count });
     }
-    return [];
+    return results;
   },
 
-  ResultCard: OrbitDoneCard,
+  ResultCard: OrbitActionCard,
 };

@@ -176,3 +176,8 @@ export const pulsarCancelDownload = (downloadId: string) =>
 
 export const pulsarDeleteFile = (filePath: string) =>
   invoke<void>("pulsar_delete_file", { filePath });
+
+// ── AI text (non-streaming, used by Writing Assistant & Meeting Mode) ─────
+
+export const aiText = (prompt: string, maxTokens: number) =>
+  invoke<string>("ai_text", { prompt, maxTokens });
