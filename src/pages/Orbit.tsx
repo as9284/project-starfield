@@ -1138,13 +1138,19 @@ export default function Orbit() {
   const [sort, setSort] = useState<"recent" | "priority" | "due">("recent");
   const sortRef = useRef<HTMLDivElement>(null);
 
-  // Keep detailProject in sync with store
+  // Keep detailProject in sync with store when projects change.
+  // We read the detailProject ID via a ref to avoid a dependency on detailProject
+  // itself, which would create an infinite update loop.
+  const detailProjectIdRef = useRef<string | null>(null);
+  detailProjectIdRef.current = detailProject?.id ?? null;
+
   useEffect(() => {
-    if (!detailProject) return;
-    const updated = projects.find((p) => p.id === detailProject.id);
+    const currentId = detailProjectIdRef.current;
+    if (!currentId) return;
+    const updated = projects.find((p) => p.id === currentId);
     if (updated) setDetailProject(updated);
     else setDetailProject(null);
-  }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projects]);
 
   // Keyboard shortcut: N to create
   const openCreate = useCallback(() => {
@@ -1223,11 +1229,9 @@ export default function Orbit() {
   const handleSaveTask = (data: { title: string; description: string; priority: Priority; due_date: string | null; subTasks: OrbitSubTask[] }) => {
     if (taskModal === "new") {
       const taskId = createTask(data);
-      // Save sub-tasks by adding them one at a time
       for (const st of data.subTasks) {
         addSubTask(taskId, st.title);
       }
-      // Sync completed state for newly added sub-tasks (shouldn't be completed on creation, but just in case)
     } else if (taskModal) {
       const existingTask = tasks.find((t) => t.id === taskModal.id);
       updateTask(taskModal.id, data);

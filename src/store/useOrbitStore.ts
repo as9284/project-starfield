@@ -32,6 +32,9 @@ export interface OrbitNote {
   updated_at: string;
 }
 
+export const VALID_PROJECT_COLORS = ["violet", "purple", "blue", "cyan", "emerald", "amber", "rose", "pink"] as const;
+export type ProjectColor = typeof VALID_PROJECT_COLORS[number];
+
 export interface OrbitProject {
   id: string;
   name: string;
@@ -397,19 +400,19 @@ export const useOrbitStore = create<OrbitState>()(
       name: "starfield-orbit-state",
       version: 2,
       migrate(persistedState, version) {
-        const state = persistedState as Partial<OrbitState> & { tasks?: OrbitTask[]; notes?: OrbitNote[] };
         if (version < 2) {
-          // Add sub_tasks array to all existing tasks and add projects array
+          const old = persistedState as { tasks?: Array<OrbitTask & { sub_tasks?: OrbitSubTask[] }>; notes?: OrbitNote[] };
+          // Add sub_tasks array to all existing tasks and initialize projects array
           return {
-            ...state,
-            tasks: (state.tasks ?? []).map((t) => ({
+            ...old,
+            tasks: (old.tasks ?? []).map((t) => ({
               ...t,
-              sub_tasks: (t as OrbitTask & { sub_tasks?: OrbitSubTask[] }).sub_tasks ?? [],
+              sub_tasks: t.sub_tasks ?? [],
             })),
             projects: [],
           };
         }
-        return state as OrbitState;
+        return persistedState as OrbitState;
       },
     },
   ),

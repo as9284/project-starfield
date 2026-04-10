@@ -1,5 +1,5 @@
 import { StickyNote } from "lucide-react";
-import { useOrbitStore } from "../../store/useOrbitStore";
+import { useOrbitStore, VALID_PROJECT_COLORS } from "../../store/useOrbitStore";
 import type {
   ConstellationHandler,
   ParsedCommand,
@@ -194,7 +194,7 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
                 ? String(args.description)
                 : undefined,
               color: (
-                ["violet", "purple", "blue", "cyan", "emerald", "amber", "rose", "pink"].includes(String(args.color))
+                (VALID_PROJECT_COLORS as readonly string[]).includes(String(args.color))
                   ? String(args.color)
                   : "violet"
               ),
