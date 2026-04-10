@@ -386,12 +386,12 @@ export default function Pulsar() {
   ) => {
     if (!outputDir.trim()) return;
 
-    // Prevent duplicate downloads — skip if the same URL is already active
+    // Prevent duplicate downloads — skip if the same URL is already active or paused
     if (!existingId) {
       const isDuplicate = downloads.some(
         (d) =>
           d.url === downloadUrl &&
-          (d.status === "downloading" || d.status === "queued" || d.status === "merging"),
+          (d.status === "downloading" || d.status === "queued" || d.status === "merging" || d.status === "paused"),
       );
       if (isDuplicate) return;
     }
