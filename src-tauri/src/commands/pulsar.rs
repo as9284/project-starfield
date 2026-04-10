@@ -6,6 +6,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::{oneshot, Mutex};
 
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 // ── State ─────────────────────────────────────────────────────────────────
 
 pub struct PulsarState {
@@ -51,6 +54,15 @@ pub enum PulsarEvent {
     Error { message: String },
 }
 
+fn run_without_console_window(command: &mut Command) -> &mut Command {
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command
+}
+
 // ── Commands ──────────────────────────────────────────────────────────────
 
 /// Return the path to the locally bundled yt-dlp binary (downloaded by
@@ -93,7 +105,12 @@ pub async fn pulsar_check_ytdlp() -> Result<bool, String> {
     } else {
         "which"
     };
-    if let Ok(out) = Command::new(cmd).arg("yt-dlp").output().await {
+    let mut check_command = Command::new(cmd);
+    if let Ok(out) = run_without_console_window(&mut check_command)
+        .arg("yt-dlp")
+        .output()
+        .await
+    {
         if out.status.success() {
             return Ok(true);
         }
@@ -173,7 +190,8 @@ pub async fn pulsar_install_ytdlp() -> Result<bool, String> {
     #[cfg(not(target_os = "windows"))]
     {
         for pip in &["pip3", "pip"] {
-            if let Ok(out) = Command::new(pip)
+            let mut install_command = Command::new(pip);
+            if let Ok(out) = run_without_console_window(&mut install_command)
                 .args(["install", "--user", "--upgrade", "yt-dlp"])
                 .output()
                 .await
@@ -276,7 +294,8 @@ pub async fn pulsar_download(
 
     // Spawn yt-dlp (prefer locally installed binary)
     let ytdlp_cmd = get_ytdlp_command();
-    let mut child = Command::new(&ytdlp_cmd)
+    let mut ytdlp_process = Command::new(&ytdlp_cmd);
+    let mut child = run_without_console_window(&mut ytdlp_process)
         .args(&args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

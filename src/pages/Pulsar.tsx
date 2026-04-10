@@ -206,7 +206,9 @@ function DownloadCard({
               item.speed &&
               item.speed !== "?" && (
                 <>
-                  <span style={{ color: "var(--color-text-secondary)" }}>·</span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>
+                    ·
+                  </span>
                   <span
                     className="text-xs flex items-center gap-1"
                     style={{ color: "var(--color-text-secondary)" }}
@@ -349,24 +351,25 @@ export default function Pulsar() {
   // Track IDs that were paused so we don't overwrite their status with "cancelled"
   const pausedIdsRef = useRef(new Set<string>());
 
-  // Check for yt-dlp once on mount; auto-install if missing
+  // Check for yt-dlp once on mount, but do not auto-install on page load.
   useEffect(() => {
+    let cancelled = false;
+
     pulsarCheckYtdlp()
       .then((found) => {
+        if (cancelled) return;
         setHasYtdlp(found);
-        if (!found) {
-          setInstalling(true);
-          setInstallFailed(false);
-          pulsarInstallYtdlp()
-            .then((ok) => {
-              setHasYtdlp(ok);
-              if (!ok) setInstallFailed(true);
-            })
-            .catch(() => setInstallFailed(true))
-            .finally(() => setInstalling(false));
-        }
+        setInstallFailed(false);
       })
-      .catch(() => setHasYtdlp(false));
+      .catch(() => {
+        if (cancelled) return;
+        setHasYtdlp(false);
+        setInstallFailed(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Populate default output dir if not already set
@@ -700,7 +703,7 @@ export default function Pulsar() {
                     {installing
                       ? "Downloading yt-dlp…"
                       : installFailed
-                        ? "Auto-install failed"
+                        ? "Installation failed"
                         : "yt-dlp not found"}
                   </span>
                 </div>
@@ -741,11 +744,11 @@ export default function Pulsar() {
                       >
                         yt-dlp
                       </a>
-                      . Attempting to install it automatically…
+                      . Install it below or from Settings to enable downloads.
                     </>
                   )}
                 </p>
-                {!installing && installFailed && (
+                {!installing && (installFailed || hasYtdlp === false) && (
                   <button
                     className="btn-send"
                     style={{
@@ -761,7 +764,7 @@ export default function Pulsar() {
                     onClick={() => void handleInstallYtdlp()}
                   >
                     <Package size={13} />
-                    Retry
+                    {installFailed ? "Retry install" : "Install yt-dlp"}
                   </button>
                 )}
               </div>
