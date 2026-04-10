@@ -106,6 +106,8 @@ export interface MeetingAgendaResult {
   error: string | null;
 }
 
+const MAX_MEETING_SUBTASKS = 6;
+
 function stripMarkdownCodeFence(text: string): string {
   let s = text.trim();
   if (s.startsWith("```")) {
@@ -133,7 +135,7 @@ function fallbackMeetingArtifacts(title: string, notes: string[]): MeetingArtifa
   };
 }
 
-function parseMeetingArtifacts(text: string, fallback: MeetingArtifacts): MeetingArtifacts | null {
+function parseMeetingArtifacts(text: string): MeetingArtifacts | null {
   try {
     const parsed = JSON.parse(stripMarkdownCodeFence(text));
     const note = parsed.note;
@@ -150,12 +152,11 @@ function parseMeetingArtifacts(text: string, fallback: MeetingArtifacts): Meetin
         description: String(task.description ?? "").trim(),
         priority: ["low", "medium", "high"].includes(task.priority) ? task.priority : "medium",
         subTasks: Array.isArray(task.subTasks)
-          ? task.subTasks.filter((s: unknown) => typeof s === "string" && s.trim()).map((s: string) => s.trim()).slice(0, 6)
+          ? task.subTasks.filter((s: unknown) => typeof s === "string" && s.trim()).map((s: string) => s.trim()).slice(0, MAX_MEETING_SUBTASKS)
           : [],
       },
     };
   } catch {
-    void fallback; // used by caller when null is returned
     return null;
   }
 }
@@ -196,7 +197,7 @@ export async function generateMeetingArtifacts(
 
   try {
     const result = await aiText(prompt, 700);
-    const artifacts = parseMeetingArtifacts(result, fallback);
+    const artifacts = parseMeetingArtifacts(result);
     if (!artifacts) {
       return {
         artifacts: fallback,

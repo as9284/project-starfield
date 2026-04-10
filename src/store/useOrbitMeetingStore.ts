@@ -100,13 +100,14 @@ export const useOrbitMeetingStore = create<MeetingState>()(
 
       deleteSession: (id) => {
         const { activeSession, sessions } = get();
-        const existed = sessions.some((s) => s.id === id);
         const isActive = activeSession?.id === id;
+        const existsInSessions = sessions.some((s) => s.id === id);
+        if (!isActive && !existsInSessions) return false;
         set({
           activeSession: isActive ? null : activeSession,
           sessions: sessions.filter((s) => s.id !== id),
         });
-        return existed || isActive;
+        return true;
       },
 
       discardActiveSession: () => {
