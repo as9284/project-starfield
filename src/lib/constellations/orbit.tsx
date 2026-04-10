@@ -1,5 +1,6 @@
 import { StickyNote } from "lucide-react";
 import { useOrbitStore, VALID_PROJECT_COLORS } from "../../store/useOrbitStore";
+import { useOrbitMeetingStore } from "../../store/useOrbitMeetingStore";
 import type {
   ConstellationHandler,
   ParsedCommand,
@@ -54,9 +55,10 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
 
   buildContext(): string {
     const { tasks, notes, projects } = useOrbitStore.getState();
+    const { activeSession, sessions } = useOrbitMeetingStore.getState();
     const activeTasks = tasks.filter((t) => !t.archived);
 
-    if (activeTasks.length === 0 && notes.length === 0 && projects.length === 0) return "";
+    if (activeTasks.length === 0 && notes.length === 0 && projects.length === 0 && !activeSession && sessions.length === 0) return "";
 
     let ctx = "## Current Orbit State\n\n";
 
@@ -102,8 +104,18 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
         .join("\n");
     }
 
+    if (activeSession) {
+      ctx += "\n\n";
+      ctx += `**Active Meeting:** "${sanitizeForPrompt(activeSession.title)}" with ${activeSession.entries.length} notes captured so far.`;
+    }
+
+    if (sessions.length > 0) {
+      ctx += "\n\n";
+      ctx += `**Past Meetings:** ${sessions.length} completed session${sessions.length !== 1 ? "s" : ""}.`;
+    }
+
     ctx +=
-      "\n\nUse task/note/project IDs when emitting commands that target existing items.";
+      "\n\nOrbit also has a Writing Assistant tab (AI-powered text transformation) and a Meeting Mode tab (capture notes → auto-generate summary + task). Use task/note/project IDs when emitting commands that target existing items.";
 
     return ctx;
   },

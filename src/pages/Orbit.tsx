@@ -16,14 +16,27 @@ import {
   FolderOpen,
   CheckSquare,
   Square,
+  PenLine,
+  Copy,
+  Check,
+  ArrowRight,
+  Eraser,
+  Loader2,
+  Sparkles,
+  Play,
+  History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import { useOrbitStore } from "../store/useOrbitStore";
+import { useOrbitMeetingStore } from "../store/useOrbitMeetingStore";
 import type { OrbitTask, OrbitNote, OrbitSubTask, OrbitProject, Priority } from "../store/useOrbitStore";
+import type { MeetingSession } from "../store/useOrbitMeetingStore";
+import { WRITING_MODES, processWriting, generateMeetingArtifacts, generateMeetingAgenda } from "../lib/orbit-ai";
+import type { WritingMode } from "../lib/orbit-ai";
 
-type Tab = "tasks" | "notes" | "projects";
+type Tab = "tasks" | "notes" | "projects" | "writing" | "meeting";
 type TaskFilter = "active" | "archived";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1097,6 +1110,708 @@ function ProjectDetailModal({
   );
 }
 
+// ── Writing Assistant View ────────────────────────────────────────────────────
+
+function WritingAssistantView() {
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [activeMode, setActiveMode] = useState<WritingMode>("improve");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleProcess = useCallback(async () => {
+    if (!input.trim() || loading) return;
+    setLoading(true);
+    setOutput("");
+    try {
+      const result = await processWriting(input, activeMode);
+      if (result.text) setOutput(result.text);
+      else setOutput(`Error: ${result.error ?? "Could not process text"}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [input, activeMode, loading]);
+
+  const handleCopy = useCallback(async () => {
+    if (!output) return;
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
+  }, [output]);
+
+  const handleUseOutput = useCallback(() => {
+    if (!output) return;
+    setInput(output);
+    setOutput("");
+  }, [output]);
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Mode selector */}
+      <div
+        className="px-5 pt-3 pb-2 shrink-0"
+        style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
+      >
+        <p
+          className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+          style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}
+        >
+          Mode
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {WRITING_MODES.map(({ mode, label, description }) => (
+            <button
+              key={mode}
+              title={description}
+              onClick={() => setActiveMode(mode)}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-150"
+              style={{
+                background: activeMode === mode ? "rgba(124, 79, 240, 0.18)" : "rgba(255,255,255,0.03)",
+                border: activeMode === mode ? "1px solid rgba(124, 79, 240, 0.3)" : "1px solid rgba(255,255,255,0.07)",
+                color: activeMode === mode ? "var(--color-purple-300)" : "var(--color-text-secondary)",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex-1 flex min-h-0">
+        {/* Input column */}
+        <div
+          className="flex-1 flex flex-col min-h-0 p-4 gap-3"
+          style={{ borderRight: "1px solid rgba(37, 34, 96, 0.3)" }}
+        >
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Paste or type your text here…"
+            className="flex-1 min-h-0 w-full resize-none rounded-xl px-4 py-3 text-sm leading-relaxed focus:outline-none transition-all duration-200"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "var(--color-text-primary)",
+            }}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleProcess}
+              disabled={loading || !input.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "linear-gradient(to right, rgba(124, 79, 240, 0.8), rgba(59, 130, 246, 0.8))",
+                color: "#fff",
+              }}
+            >
+              {loading ? (
+                <><Loader2 size={15} className="animate-spin" /> Processing…</>
+              ) : (
+                <>{WRITING_MODES.find((m) => m.mode === activeMode)?.label} <ArrowRight size={14} /></>
+              )}
+            </button>
+            {input.trim() && (
+              <button
+                onClick={() => { setInput(""); setOutput(""); }}
+                className="flex items-center gap-1.5 text-[11px] px-3 py-2.5 rounded-xl transition-colors"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                <Eraser size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Output column */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div
+            className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0"
+            style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
+          >
+            <p
+              className="text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}
+            >
+              Result
+            </p>
+            {output && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleUseOutput}
+                  title="Move result back to input"
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  <ArrowRight size={11} className="rotate-180" />
+                  Use as input
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  {copied ? <Check size={11} style={{ color: "var(--color-nebula-teal)" }} /> : <Copy size={11} />}
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 p-4">
+            {output ? (
+              <textarea
+                readOnly
+                value={output}
+                className="h-full w-full resize-none rounded-xl px-4 py-3 text-sm leading-relaxed focus:outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+            ) : (
+              <div
+                className="h-full flex flex-col items-center justify-center gap-3 text-center"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={22} className="animate-spin" style={{ color: "var(--color-purple-400)", opacity: 0.6 }} />
+                    <p className="text-xs" style={{ opacity: 0.5 }}>Processing…</p>
+                  </>
+                ) : (
+                  <>
+                    <PenLine size={28} style={{ opacity: 0.2 }} />
+                    <p className="text-xs" style={{ opacity: 0.5 }}>
+                      Your result will appear here
+                    </p>
+                    <p className="text-[11px]" style={{ opacity: 0.3 }}>
+                      Enter text, choose a mode, and tap the button
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Meeting Mode View ────────────────────────────────────────────────────────
+
+function MeetingModeView({
+  createTask,
+  addSubTask,
+  createNote,
+}: {
+  createTask: (data: { title: string; description?: string | null; priority?: Priority; due_date?: string | null }) => string;
+  addSubTask: (taskId: string, title: string) => string;
+  createNote: (data: { title: string; content?: string | null }) => string;
+}) {
+  const {
+    activeSession,
+    sessions,
+    startSession,
+    addEntry,
+    endSession,
+    deleteSession,
+    discardActiveSession,
+  } = useOrbitMeetingStore();
+
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [ending, setEnding] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<MeetingSession | null>(null);
+
+  const notesEndRef = useRef<HTMLDivElement>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to newest note
+  useEffect(() => {
+    notesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeSession?.entries.length]);
+
+  // Focus textarea when session becomes active
+  useEffect(() => {
+    if (activeSession) noteInputRef.current?.focus();
+  }, [activeSession]);
+
+  const handleStartMeeting = useCallback(async () => {
+    if (activeSession || !meetingTitle.trim()) return;
+    const created = startSession(meetingTitle);
+    if (!created) return;
+    setMeetingTitle("");
+    setSelectedSession(null);
+
+    // Generate agenda as first entry (best-effort)
+    try {
+      const agendaResult = await generateMeetingAgenda(meetingTitle);
+      if (agendaResult.agenda) {
+        addEntry(`📋 Suggested Agenda\n\n${agendaResult.agenda}`);
+      }
+    } catch { /* ignore */ }
+  }, [activeSession, meetingTitle, startSession, addEntry]);
+
+  const handleAddEntry = useCallback(() => {
+    if (!activeSession || !noteInput.trim()) return;
+    addEntry(noteInput);
+    setNoteInput("");
+    requestAnimationFrame(() => noteInputRef.current?.focus());
+  }, [activeSession, noteInput, addEntry]);
+
+  const handleEntryKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleAddEntry();
+      }
+    },
+    [handleAddEntry],
+  );
+
+  const handleEndMeeting = useCallback(async () => {
+    if (!activeSession || activeSession.entries.length === 0) return;
+    setEnding(true);
+
+    try {
+      const result = await generateMeetingArtifacts(
+        activeSession.title,
+        activeSession.entries.map((e) => e.content),
+      );
+
+      if (!result.artifacts) {
+        setEnding(false);
+        return;
+      }
+
+      // Create a note and task in Orbit from the meeting artifacts
+      createNote({
+        title: result.artifacts.note.title,
+        content: result.artifacts.note.content,
+      });
+
+      const taskId = createTask({
+        title: result.artifacts.task.title,
+        description: result.artifacts.task.description || undefined,
+        priority: result.artifacts.task.priority,
+      });
+
+      for (const subTitle of result.artifacts.task.subTasks) {
+        addSubTask(taskId, subTitle);
+      }
+
+      endSession({
+        createdAt: new Date().toISOString(),
+        warning: result.error,
+        note: result.artifacts.note,
+        task: {
+          ...result.artifacts.task,
+        },
+      });
+
+      setSelectedSession(null);
+    } finally {
+      setEnding(false);
+    }
+  }, [activeSession, createNote, createTask, addSubTask, endSession]);
+
+  const handleDiscard = useCallback(() => {
+    discardActiveSession();
+    setNoteInput("");
+  }, [discardActiveSession]);
+
+  // Meeting History Modal
+  if (showHistory) {
+    const viewSession = selectedSession ?? (sessions.length > 0 ? sessions[0] : null);
+    return (
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div
+          className="flex items-center justify-between px-5 py-3 shrink-0"
+          style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
+        >
+          <div className="flex items-center gap-2">
+            <History size={14} style={{ color: "var(--color-purple-400)" }} />
+            <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              Meeting History
+            </span>
+            <span className="text-xs" style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}>
+              {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowHistory(false)}
+            className="win-btn"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {sessions.length === 0 ? (
+          <div
+            className="flex-1 flex flex-col items-center justify-center gap-3"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            <History size={28} style={{ opacity: 0.2 }} />
+            <p className="text-sm" style={{ opacity: 0.5 }}>No completed sessions yet</p>
+          </div>
+        ) : (
+          <div className="flex-1 flex min-h-0">
+            {/* Session list sidebar */}
+            <div
+              className="w-52 shrink-0 overflow-y-auto p-2"
+              style={{ borderRight: "1px solid rgba(37, 34, 96, 0.3)" }}
+            >
+              {sessions.map((s) => {
+                const isSelected = viewSession?.id === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSession(s)}
+                    className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-200 mb-1"
+                    style={{
+                      background: isSelected ? "rgba(124, 79, 240, 0.12)" : "transparent",
+                      border: isSelected ? "1px solid rgba(124, 79, 240, 0.2)" : "1px solid transparent",
+                      color: isSelected ? "var(--color-purple-300)" : "var(--color-text-secondary)",
+                    }}
+                  >
+                    <span className="truncate font-medium text-xs">{s.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Session detail */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {viewSession ? (
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                        {viewSession.title}
+                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}>
+                        {viewSession.endedAt
+                          ? new Date(viewSession.endedAt).toLocaleString()
+                          : new Date(viewSession.startedAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        deleteSession(viewSession.id);
+                        setSelectedSession(null);
+                      }}
+                      className="p-1.5 rounded-lg transition-colors"
+                      style={{ color: "var(--color-text-secondary)" }}
+                      title="Delete session"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+
+                  {/* Artifact badges */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      <StickyNote size={10} />
+                      {viewSession.entries.length} note{viewSession.entries.length !== 1 ? "s" : ""}
+                    </span>
+                    {viewSession.artifacts?.note.title && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] max-w-52"
+                        style={{
+                          background: "rgba(124, 79, 240, 0.08)",
+                          border: "1px solid rgba(124, 79, 240, 0.18)",
+                          color: "var(--color-purple-300)",
+                        }}
+                      >
+                        <StickyNote size={10} className="shrink-0" />
+                        <span className="truncate">{viewSession.artifacts.note.title}</span>
+                      </span>
+                    )}
+                    {viewSession.artifacts?.task.title && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] max-w-52"
+                        style={{
+                          background: "rgba(59, 130, 246, 0.08)",
+                          border: "1px solid rgba(59, 130, 246, 0.18)",
+                          color: "var(--color-sky-300)",
+                        }}
+                      >
+                        <ListTodo size={10} className="shrink-0" />
+                        <span className="truncate">{viewSession.artifacts.task.title}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Entry preview */}
+                  {viewSession.entries.length > 0 && (
+                    <div className="space-y-2.5">
+                      {viewSession.entries.map((entry, i) => (
+                        <div key={entry.id} className="flex gap-2.5">
+                          <div
+                            className="mt-0.5 shrink-0 h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-medium"
+                            style={{
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.07)",
+                              color: "var(--color-text-secondary)",
+                              opacity: 0.5,
+                            }}
+                          >
+                            {i + 1}
+                          </div>
+                          <p
+                            className="text-xs leading-relaxed whitespace-pre-wrap flex-1"
+                            style={{ color: "var(--color-text-secondary)", opacity: 0.7 }}
+                          >
+                            {entry.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="flex items-center justify-center h-full text-sm"
+                  style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}
+                >
+                  Select a meeting to review
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Active session view
+  if (activeSession) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Active session sub-header */}
+        <div
+          className="flex items-center gap-3 px-5 py-2.5 shrink-0"
+          style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.3)" }}
+        >
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
+              style={{ background: "var(--color-nebula-teal)" }}
+            />
+            <span
+              className="relative inline-flex h-2 w-2 rounded-full"
+              style={{ background: "var(--color-nebula-teal)" }}
+            />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {activeSession.title}
+            </p>
+          </div>
+          <span className="text-[11px]" style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}>
+            {activeSession.entries.length} note{activeSession.entries.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            onClick={handleDiscard}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            <X size={12} />
+            Discard
+          </button>
+        </div>
+
+        {/* Notes list */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {activeSession.entries.length === 0 ? (
+            <div
+              className="h-full flex flex-col items-center justify-center gap-3"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              <StickyNote size={28} style={{ opacity: 0.2 }} />
+              <p className="text-sm" style={{ opacity: 0.5 }}>No notes yet</p>
+              <p className="text-xs" style={{ opacity: 0.3 }}>
+                Type a note below and press Enter — one per key point
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto space-y-3">
+              {activeSession.entries.map((entry, i) => (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3"
+                >
+                  <div
+                    className="mt-1 shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      color: "var(--color-text-secondary)",
+                      opacity: 0.5,
+                    }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div
+                    className="flex-1 min-w-0 rounded-2xl rounded-tl-md px-4 py-2.5"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <p
+                      className="text-sm leading-relaxed whitespace-pre-wrap"
+                      style={{ color: "var(--color-text-primary)", opacity: 0.85 }}
+                    >
+                      {entry.content}
+                    </p>
+                    <p className="mt-1.5 text-[10px]" style={{ color: "var(--color-text-secondary)", opacity: 0.3 }}>
+                      {new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+              <div ref={notesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Input bar */}
+        <div
+          className="shrink-0 px-5 py-3"
+          style={{ borderTop: "1px solid rgba(37, 34, 96, 0.3)" }}
+        >
+          <div className="max-w-2xl mx-auto flex items-end gap-2">
+            <textarea
+              ref={noteInputRef}
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              onKeyDown={handleEntryKeyDown}
+              rows={1}
+              placeholder="Type a note and press Enter…"
+              className="flex-1 resize-none rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors duration-200"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "var(--color-text-primary)",
+                minHeight: 48,
+                maxHeight: 144,
+              }}
+              onInput={(e) => {
+                const el = e.currentTarget;
+                el.style.height = "auto";
+                el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+              }}
+            />
+            <button
+              onClick={handleAddEntry}
+              disabled={!noteInput.trim()}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              onClick={() => void handleEndMeeting()}
+              disabled={ending || activeSession.entries.length === 0}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "linear-gradient(to right, rgba(124, 79, 240, 0.8), rgba(59, 130, 246, 0.8))",
+                color: "#fff",
+              }}
+            >
+              {ending ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Square size={12} fill="currentColor" />
+              )}
+              <span>{ending ? "Generating…" : "End & save"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Idle — start a meeting
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+          style={{
+            background: "rgba(124, 79, 240, 0.1)",
+            border: "1px solid rgba(124, 79, 240, 0.15)",
+          }}
+        >
+          <Play size={28} style={{ color: "var(--color-purple-400)", opacity: 0.6, transform: "translateX(2px)" }} />
+        </div>
+        <h2 className="text-lg font-bold mb-2" style={{ color: "var(--color-text-primary)", opacity: 0.8 }}>
+          Start a meeting
+        </h2>
+        <p className="text-sm max-w-sm leading-relaxed mb-7" style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}>
+          Jot one note per point as the conversation unfolds. Luna will write a summary note and create a follow-up task when you end.
+        </p>
+        <div className="w-full max-w-xs space-y-3">
+          <input
+            type="text"
+            value={meetingTitle}
+            onChange={(e) => setMeetingTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleStartMeeting(); }}
+            placeholder="Meeting title"
+            className="w-full rounded-xl px-4 py-2.5 text-sm text-center focus:outline-none transition-colors duration-200"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "var(--color-text-primary)",
+            }}
+          />
+          <button
+            onClick={() => void handleStartMeeting()}
+            disabled={!meetingTitle.trim()}
+            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed"
+            style={{
+              background: "linear-gradient(to right, rgba(124, 79, 240, 0.8), rgba(59, 130, 246, 0.8))",
+              color: "#fff",
+            }}
+          >
+            <Play size={15} style={{ transform: "translateX(2px)" }} />
+            Start meeting
+          </button>
+          {sessions.length > 0 && (
+            <button
+              onClick={() => { setShowHistory(true); setSelectedSession(null); }}
+              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-medium py-2 transition-colors"
+              style={{ color: "var(--color-text-secondary)", opacity: 0.5 }}
+            >
+              <History size={12} />
+              View history ({sessions.length})
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Orbit Page ──────────────────────────────────────────────────────────
 
 export default function Orbit() {
@@ -1152,12 +1867,14 @@ export default function Orbit() {
     else setDetailProject(null);
   }, [projects]);
 
-  // Keyboard shortcut: N to create
+  // Keyboard shortcut: N to create (only for tasks/notes/projects tabs)
   const openCreate = useCallback(() => {
     if (tab === "tasks") setTaskModal("new");
     else if (tab === "notes") setNoteModal("new");
-    else setProjectModal("new");
+    else if (tab === "projects") setProjectModal("new");
   }, [tab]);
+
+  const showNewButton = tab === "tasks" || tab === "notes" || tab === "projects";
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1291,6 +2008,8 @@ export default function Orbit() {
     tasks: <ListTodo size={12} />,
     notes: <StickyNote size={12} />,
     projects: <FolderOpen size={12} />,
+    writing: <PenLine size={12} />,
+    meeting: <Sparkles size={12} />,
   };
 
   return (
@@ -1330,7 +2049,7 @@ export default function Orbit() {
             style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.5)" }}
           >
             <div className="flex items-center gap-1">
-              {(["tasks", "notes", "projects"] as Tab[]).map((t) => (
+              {(["tasks", "notes", "projects", "writing", "meeting"] as Tab[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -1347,20 +2066,22 @@ export default function Orbit() {
               ))}
             </div>
 
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
-              style={{
-                background: "rgba(124, 79, 240, 0.2)",
-                border: "1px solid rgba(124, 79, 240, 0.35)",
-                color: "var(--color-purple-300)",
-              }}
-              title="New (N)"
-            >
-              <Plus size={13} strokeWidth={2.5} />
-              New
-              <kbd className="text-[10px] opacity-60 ml-0.5">N</kbd>
-            </button>
+            {showNewButton && (
+              <button
+                onClick={openCreate}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+                style={{
+                  background: "rgba(124, 79, 240, 0.2)",
+                  border: "1px solid rgba(124, 79, 240, 0.35)",
+                  color: "var(--color-purple-300)",
+                }}
+                title="New (N)"
+              >
+                <Plus size={13} strokeWidth={2.5} />
+                New
+                <kbd className="text-[10px] opacity-60 ml-0.5">N</kbd>
+              </button>
+            )}
           </div>
 
           {/* Tasks view */}
@@ -1523,6 +2244,18 @@ export default function Orbit() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Writing Assistant view */}
+          {tab === "writing" && <WritingAssistantView />}
+
+          {/* Meeting Mode view */}
+          {tab === "meeting" && (
+            <MeetingModeView
+              createTask={createTask}
+              addSubTask={addSubTask}
+              createNote={createNote}
+            />
           )}
         </div>
       </div>

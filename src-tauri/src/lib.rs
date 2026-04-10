@@ -1,6 +1,7 @@
 mod commands;
 
 use commands::{
+    ai_text::ai_text,
     beacon::scan_local_directory,
     keychain::{
         delete_deepseek_key, delete_tavily_key, delete_weather_key, get_deepseek_key,
@@ -37,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            ai_text,
             save_deepseek_key,
             get_deepseek_key,
             delete_deepseek_key,
