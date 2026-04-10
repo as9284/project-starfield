@@ -106,6 +106,7 @@ export interface MeetingAgendaResult {
   error: string | null;
 }
 
+/** Maximum sub-tasks per meeting follow-up task to avoid overwhelming the task view. */
 const MAX_MEETING_SUBTASKS = 6;
 
 function stripMarkdownCodeFence(text: string): string {
@@ -152,7 +153,12 @@ function parseMeetingArtifacts(text: string): MeetingArtifacts | null {
         description: String(task.description ?? "").trim(),
         priority: ["low", "medium", "high"].includes(task.priority) ? task.priority : "medium",
         subTasks: Array.isArray(task.subTasks)
-          ? task.subTasks.filter((s: unknown) => typeof s === "string" && s.trim()).map((s: string) => s.trim()).slice(0, MAX_MEETING_SUBTASKS)
+          ? (task.subTasks as unknown[]).reduce((acc: string[], s: unknown) => {
+              if (typeof s === "string" && s.trim() && acc.length < MAX_MEETING_SUBTASKS) {
+                acc.push(s.trim());
+              }
+              return acc;
+            }, [])
           : [],
       },
     };

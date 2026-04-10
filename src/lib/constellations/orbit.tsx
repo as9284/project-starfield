@@ -12,6 +12,12 @@ import type {
 } from "../constellation-registry";
 import { sanitizeForPrompt } from "../constellation-registry";
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function isValidProjectColor(color: string): color is typeof VALID_PROJECT_COLORS[number] {
+  return (VALID_PROJECT_COLORS as readonly string[]).includes(color);
+}
+
 // ── Result cards ─────────────────────────────────────────────────────────────
 
 function OrbitDoneCard({ result }: { result: ActionResult }) {
@@ -287,11 +293,7 @@ OPEN_MEETING: Use when the user says they want to start, begin, or open a meetin
               description: args.description != null && args.description !== "null"
                 ? String(args.description)
                 : undefined,
-              color: (
-                (VALID_PROJECT_COLORS as readonly string[]).includes(String(args.color))
-                  ? String(args.color)
-                  : "violet"
-              ),
+              color: isValidProjectColor(String(args.color)) ? String(args.color) : "violet",
               deadline,
             });
             count++;
