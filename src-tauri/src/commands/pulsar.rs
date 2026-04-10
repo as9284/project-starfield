@@ -102,15 +102,33 @@ pub async fn pulsar_install_ytdlp() -> Result<bool, String> {
     Ok(false)
 }
 
+/// Delete a downloaded file (and any leftover .part file) from disk.
+#[command]
+pub async fn pulsar_delete_file(file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|e| format!("Failed to delete file: {e}"))?;
+    }
+    // Also remove .part file if it exists
+    let part_path_str = format!("{}.part", file_path);
+    let part_path = std::path::Path::new(&part_path_str);
+    if part_path.exists() {
+        let _ = std::fs::remove_file(part_path);
+    }
+    Ok(())
+}
+
 /// Download media using yt-dlp with real-time progress events.
 ///
 /// `format_arg` — "best" | "audio" | "720" | "1080"
+/// `audio_format` — "mp3" | "flac" | "wav" | "ogg" | "m4a" | "opus" (used when format_arg is "audio")
 /// `playlist`   — when true, download the full playlist instead of one video
 #[command]
 pub async fn pulsar_download(
     download_id: String,
     url: String,
     format_arg: String,
+    audio_format: String,
     output_dir: String,
     playlist: bool,
     channel: Channel<PulsarEvent>,
@@ -149,7 +167,11 @@ pub async fn pulsar_download(
         "audio" => {
             args.push("-x".to_string());
             args.push("--audio-format".to_string());
-            args.push("mp3".to_string());
+            let af = match audio_format.as_str() {
+                "flac" | "wav" | "ogg" | "m4a" | "opus" => audio_format.clone(),
+                _ => "mp3".to_string(),
+            };
+            args.push(af);
         }
         "720" => {
             args.push("-f".to_string());
