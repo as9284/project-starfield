@@ -1,5 +1,24 @@
-import { useState, useRef } from "react";
-import { Eye, EyeOff, Save, Trash2, Download, Upload, X, Brain, Keyboard, Command } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import {
+  Eye,
+  EyeOff,
+  Save,
+  Trash2,
+  Download,
+  Upload,
+  X,
+  Brain,
+  Keyboard,
+  Command,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Package,
+  RefreshCw,
+  Rocket,
+} from "lucide-react";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
 import { modKey } from "../lib/platform";
@@ -10,6 +29,8 @@ import {
   deleteTavilyKey,
   saveWeatherKey,
   deleteWeatherKey,
+  pulsarCheckYtdlp,
+  pulsarInstallYtdlp,
 } from "../lib/tauri";
 
 interface KeyFieldProps {
@@ -133,11 +154,106 @@ function KeyField({
 }
 
 export default function Settings() {
-  const { hasDeepSeekKey, setHasDeepSeekKey, hasTavilyKey, setHasTavilyKey, hasWeatherKey, setHasWeatherKey, memories, removeMemory, clearMemories, importMemories } =
-    useAppStore();
+  const {
+    hasDeepSeekKey,
+    setHasDeepSeekKey,
+    hasTavilyKey,
+    setHasTavilyKey,
+    hasWeatherKey,
+    setHasWeatherKey,
+    memories,
+    removeMemory,
+    clearMemories,
+    importMemories,
+  } = useAppStore();
 
   const [confirmClear, setConfirmClear] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── yt-dlp status ─────────────────────────────────────────────────────────
+  const [ytdlpStatus, setYtdlpStatus] = useState<
+    "checking" | "found" | "missing" | "installing" | "failed"
+  >("checking");
+
+  useEffect(() => {
+    pulsarCheckYtdlp()
+      .then((found) => setYtdlpStatus(found ? "found" : "missing"))
+      .catch(() => setYtdlpStatus("missing"));
+  }, []);
+
+  const handleInstallYtdlp = async () => {
+    setYtdlpStatus("installing");
+    try {
+      const ok = await pulsarInstallYtdlp();
+      setYtdlpStatus(ok ? "found" : "failed");
+    } catch {
+      setYtdlpStatus("failed");
+    }
+  };
+
+  // ── App updates ───────────────────────────────────────────────────────────
+  const [updateStatus, setUpdateStatus] = useState<
+    | "idle"
+    | "checking"
+    | "available"
+    | "downloading"
+    | "ready"
+    | "up-to-date"
+    | "error"
+  >("idle");
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const updateRef = useRef<Awaited<ReturnType<typeof check>> | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus("checking");
+    setUpdateError(null);
+    try {
+      const update = await check();
+      if (update) {
+        updateRef.current = update;
+        setUpdateVersion(update.version);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("up-to-date");
+      }
+    } catch (e) {
+      setUpdateError(String(e));
+      setUpdateStatus("error");
+    }
+  };
+
+  const handleDownloadAndInstall = async () => {
+    const update = updateRef.current;
+    if (!update) return;
+    setUpdateStatus("downloading");
+    setUpdateProgress(0);
+    try {
+      let totalBytes = 0;
+      let downloadedBytes = 0;
+      await update.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          totalBytes = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloadedBytes += event.data.chunkLength;
+          if (totalBytes > 0) {
+            setUpdateProgress(Math.round((downloadedBytes / totalBytes) * 100));
+          }
+        } else if (event.event === "Finished") {
+          setUpdateProgress(100);
+        }
+      });
+      setUpdateStatus("ready");
+    } catch (e) {
+      setUpdateError(String(e));
+      setUpdateStatus("error");
+    }
+  };
+
+  const handleRelaunch = async () => {
+    await relaunch();
+  };
 
   const handleExportMemories = () => {
     const json = JSON.stringify(memories, null, 2);
@@ -197,6 +313,131 @@ export default function Settings() {
             to disk.
           </p>
         </div>
+
+        {/* App Updates */}
+        <section className="glass rounded-xl p-5 flex flex-col gap-4">
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            App Updates
+          </h3>
+
+          <div className="settings-update-row">
+            <div className="settings-update-status">
+              {updateStatus === "checking" || updateStatus === "downloading" ? (
+                <Loader2
+                  size={15}
+                  className="animate-spin"
+                  style={{ color: "var(--color-purple-400)", flexShrink: 0 }}
+                />
+              ) : updateStatus === "up-to-date" ? (
+                <CheckCircle2
+                  size={15}
+                  style={{ color: "#86efac", flexShrink: 0 }}
+                />
+              ) : updateStatus === "available" ? (
+                <Rocket
+                  size={15}
+                  style={{ color: "var(--color-nebula-teal)", flexShrink: 0 }}
+                />
+              ) : updateStatus === "ready" ? (
+                <CheckCircle2
+                  size={15}
+                  style={{ color: "#86efac", flexShrink: 0 }}
+                />
+              ) : updateStatus === "error" ? (
+                <AlertCircle
+                  size={15}
+                  style={{ color: "#fca5a5", flexShrink: 0 }}
+                />
+              ) : (
+                <RefreshCw
+                  size={15}
+                  style={{ color: "var(--color-text-muted)", flexShrink: 0 }}
+                />
+              )}
+              <span
+                className="settings-update-status-text"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {updateStatus === "checking"
+                  ? "Checking for updates…"
+                  : updateStatus === "downloading"
+                    ? `Downloading v${updateVersion}… ${updateProgress}%`
+                    : updateStatus === "available"
+                      ? `v${updateVersion} available`
+                      : updateStatus === "up-to-date"
+                        ? "You're on the latest version"
+                        : updateStatus === "ready"
+                          ? `v${updateVersion} ready — restart to apply`
+                          : updateStatus === "error"
+                            ? "Update check failed"
+                            : "v1.0.0"}
+              </span>
+            </div>
+
+            <div className="settings-update-actions">
+              {(updateStatus === "idle" ||
+                updateStatus === "up-to-date" ||
+                updateStatus === "error") && (
+                <button
+                  className="settings-update-button"
+                  onClick={() => void handleCheckUpdate()}
+                >
+                  <RefreshCw size={14} />
+                  Check for updates
+                </button>
+              )}
+
+              {updateStatus === "available" && (
+                <button
+                  className="settings-update-button"
+                  onClick={() => void handleDownloadAndInstall()}
+                >
+                  <Download size={14} />
+                  Download &amp; install
+                </button>
+              )}
+
+              {updateStatus === "ready" && (
+                <button
+                  className="settings-update-button"
+                  onClick={() => void handleRelaunch()}
+                >
+                  <Rocket size={14} />
+                  Restart now
+                </button>
+              )}
+            </div>
+          </div>
+
+          {updateStatus === "downloading" && (
+            <div
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ background: "rgba(124, 79, 240, 0.15)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${updateProgress}%`,
+                  background: "var(--color-purple-400)",
+                }}
+              />
+            </div>
+          )}
+
+          {updateError && (
+            <p className="text-xs" style={{ color: "#fca5a5" }}>
+              {updateError}
+            </p>
+          )}
+
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Starfield checks for new versions from GitHub releases. Updates are
+            downloaded and applied seamlessly — just restart when ready.
+          </p>
+        </section>
 
         {/* AI */}
         <section className="glass rounded-xl p-5 flex flex-col gap-5">
@@ -310,9 +551,7 @@ export default function Settings() {
 
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Solaris uses{" "}
-            <span style={{ color: "var(--color-purple-300)" }}>
-              Open-Meteo
-            </span>{" "}
+            <span style={{ color: "var(--color-purple-300)" }}>Open-Meteo</span>{" "}
             for weather data, which is free and works without a key. An optional
             API key is available for commercial use or higher rate limits at{" "}
             <a
@@ -330,6 +569,90 @@ export default function Settings() {
           </p>
         </section>
 
+        {/* Pulsar — yt-dlp */}
+        <section className="glass rounded-xl p-5 flex flex-col gap-4">
+          <h3
+            className="text-sm font-semibold uppercase tracking-widest"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Pulsar — yt-dlp
+          </h3>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              {ytdlpStatus === "checking" || ytdlpStatus === "installing" ? (
+                <Loader2
+                  size={15}
+                  className="animate-spin"
+                  style={{ color: "var(--color-purple-400)", flexShrink: 0 }}
+                />
+              ) : ytdlpStatus === "found" ? (
+                <CheckCircle2
+                  size={15}
+                  style={{ color: "#86efac", flexShrink: 0 }}
+                />
+              ) : (
+                <AlertCircle
+                  size={15}
+                  style={{ color: "#fca5a5", flexShrink: 0 }}
+                />
+              )}
+              <span
+                className="text-sm"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {ytdlpStatus === "checking"
+                  ? "Checking…"
+                  : ytdlpStatus === "installing"
+                    ? "Downloading yt-dlp…"
+                    : ytdlpStatus === "found"
+                      ? "yt-dlp is installed"
+                      : ytdlpStatus === "failed"
+                        ? "Installation failed"
+                        : "yt-dlp not found"}
+              </span>
+            </div>
+
+            {(ytdlpStatus === "missing" || ytdlpStatus === "failed") && (
+              <button
+                className="btn-send"
+                style={{
+                  position: "static",
+                  height: 32,
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  gap: "0.35rem",
+                  padding: "0 14px",
+                  flexShrink: 0,
+                }}
+                onClick={() => void handleInstallYtdlp()}
+              >
+                <Package size={12} />
+                {ytdlpStatus === "failed" ? "Retry" : "Auto-install"}
+              </button>
+            )}
+          </div>
+
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Pulsar requires{" "}
+            <a
+              href="https://github.com/yt-dlp/yt-dlp#installation"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "var(--color-nebula-teal)",
+                textDecoration: "underline",
+              }}
+            >
+              yt-dlp
+            </a>{" "}
+            to download videos and audio. On Windows the binary is downloaded
+            directly from GitHub; on other platforms pip is used. You can also
+            install it manually via your package manager.
+          </p>
+        </section>
+
         {/* Memory */}
         <section className="glass rounded-xl p-5 flex flex-col gap-5">
           <h3
@@ -341,8 +664,12 @@ export default function Settings() {
 
           <div className="flex items-center gap-3">
             <Brain size={16} style={{ color: "var(--color-purple-400)" }} />
-            <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {memories.length} {memories.length === 1 ? "memory" : "memories"} stored
+            <span
+              className="text-sm"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              {memories.length} {memories.length === 1 ? "memory" : "memories"}{" "}
+              stored
             </span>
           </div>
 
@@ -384,20 +711,30 @@ export default function Settings() {
 
           {memories.length > 0 && (
             <div className="luna-memory-list">
-              {memories.slice(-10).reverse().map((mem) => (
-                <div key={mem.id} className="luna-memory-item">
-                  <span className="luna-memory-item-text">{mem.content}</span>
-                  <button
-                    className="luna-memory-item-delete"
-                    onClick={() => removeMemory(mem.id)}
-                    title="Remove memory"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
+              {memories
+                .slice(-10)
+                .reverse()
+                .map((mem) => (
+                  <div key={mem.id} className="luna-memory-item">
+                    <span className="luna-memory-item-text">{mem.content}</span>
+                    <button
+                      className="luna-memory-item-delete"
+                      onClick={() => removeMemory(mem.id)}
+                      title="Remove memory"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
               {memories.length > 10 && (
-                <p className="text-xs" style={{ color: "var(--color-text-dim)", textAlign: "center", marginTop: "0.25rem" }}>
+                <p
+                  className="text-xs"
+                  style={{
+                    color: "var(--color-text-dim)",
+                    textAlign: "center",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   …and {memories.length - 10} more
                 </p>
               )}
@@ -422,7 +759,10 @@ export default function Settings() {
           </h3>
 
           <div className="flex flex-col gap-1">
-            <ShortcutRow keys={[modKey, "K"]} description="Open constellations" />
+            <ShortcutRow
+              keys={[modKey, "K"]}
+              description="Open constellations"
+            />
             <ShortcutRow keys={[modKey, ","]} description="Open settings" />
             <ShortcutRow keys={["Esc"]} description="Go back / close overlay" />
             <ShortcutRow keys={[modKey, "1"]} description="Go to Luna" />
@@ -431,14 +771,20 @@ export default function Settings() {
             <ShortcutRow keys={[modKey, "4"]} description="Go to Beacon" />
             <ShortcutRow keys={[modKey, "5"]} description="Go to Hyperlane" />
             <ShortcutRow keys={[modKey, "6"]} description="Go to Pulsar" />
-            <ShortcutRow keys={["Enter"]} description="Send message (in chat)" />
-            <ShortcutRow keys={["Shift", "Enter"]} description="New line (in chat)" />
+            <ShortcutRow
+              keys={["Enter"]}
+              description="Send message (in chat)"
+            />
+            <ShortcutRow
+              keys={["Shift", "Enter"]}
+              description="New line (in chat)"
+            />
           </div>
 
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Shortcuts are disabled while typing in input fields or during AI
-            streaming. On macOS, use <Command size={10} className="inline" /> Cmd; on
-            Windows/Linux, use Ctrl.
+            streaming. On macOS, use <Command size={10} className="inline" />{" "}
+            Cmd; on Windows/Linux, use Ctrl.
           </p>
         </section>
       </div>

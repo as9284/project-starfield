@@ -735,8 +735,13 @@ body {
 }
 
 @keyframes luna-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .luna-greeting {
@@ -767,18 +772,19 @@ body {
 }
 
 .luna-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   padding: 0 1.25rem;
   padding-bottom: 0.75rem;
 }
 
 .luna-msg-user {
-  display: flex;
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .luna-msg-ai {
-  display: flex;
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .luna-bubble {
@@ -985,7 +991,9 @@ body {
   background: rgba(124, 79, 240, 0.06);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .luna-sidebar-new:hover {
@@ -1012,7 +1020,9 @@ body {
   font-size: 0.78rem;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   position: relative;
 }
 
@@ -1051,7 +1061,10 @@ body {
   color: var(--color-text-dim);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s, color 0.12s, background 0.12s;
+  transition:
+    opacity 0.12s,
+    color 0.12s,
+    background 0.12s;
 }
 
 .luna-sidebar-item:hover .luna-sidebar-item-delete {
@@ -1075,7 +1088,9 @@ body {
   background: rgba(124, 79, 240, 0.05);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .luna-memory-action-btn:hover:not(:disabled) {
@@ -1139,7 +1154,10 @@ body {
   color: var(--color-text-dim);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s, color 0.12s, background 0.12s;
+  transition:
+    opacity 0.12s,
+    color 0.12s,
+    background 0.12s;
 }
 
 .luna-memory-item:hover .luna-memory-item-delete {
@@ -1149,4 +1167,353 @@ body {
 .luna-memory-item-delete:hover {
   background: rgba(248, 113, 113, 0.12);
   color: #f87171;
+}
+
+/* ── Luna action result cards ──────────────────────────────────────────── */
+.luna-action-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(100%, 480px);
+  margin-top: 0.1rem;
+  padding-left: 0.25rem;
+}
+
+.luna-action-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.25rem;
+}
+
+.luna-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-dim);
+  background: rgba(14, 13, 36, 0.7);
+  backdrop-filter: blur(12px);
+  box-sizing: border-box;
+  font-size: 0.78rem;
+  color: var(--color-text-primary);
+  animation: fadeSlideUp 0.25s ease;
+}
+
+.luna-action-card-error {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(248, 113, 113, 0.05);
+  border-color: rgba(248, 113, 113, 0.25);
+  color: #f87171;
+}
+
+.luna-action-card-weather {
+  border-color: rgba(45, 212, 191, 0.25);
+  background: rgba(45, 212, 191, 0.04);
+}
+
+.luna-action-card-hyperlane {
+  border-color: rgba(124, 79, 240, 0.25);
+  background: rgba(124, 79, 240, 0.04);
+}
+
+.luna-action-card-pulsar {
+  border-color: rgba(167, 139, 250, 0.25);
+  background: rgba(167, 139, 250, 0.04);
+}
+
+.luna-action-card-navigate {
+  border-color: rgba(45, 212, 191, 0.2);
+  background: rgba(45, 212, 191, 0.03);
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.luna-action-card-orbit {
+  border-color: rgba(124, 79, 240, 0.2);
+  background: rgba(124, 79, 240, 0.03);
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+}
+
+/* Weather card */
+.luna-weather-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.luna-weather-city {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.luna-weather-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.luna-weather-emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.luna-weather-temp {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.luna-weather-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+  margin-top: 0.1rem;
+}
+
+.luna-weather-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+}
+
+.luna-weather-stats span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.luna-weather-forecast {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--color-border-dim);
+}
+
+.luna-weather-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+}
+
+.luna-weather-day-label {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Short URL card */
+.luna-shorturl-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+}
+
+.luna-shorturl-label {
+  color: var(--color-text-dim);
+}
+
+.luna-shorturl-body {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.luna-shorturl-original {
+  color: var(--color-text-dim);
+  font-size: 0.72rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.luna-shorturl-short {
+  color: var(--color-nebula-teal);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+
+.luna-shorturl-short:hover {
+  text-decoration: underline;
+}
+
+.luna-shorturl-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* Download card */
+.luna-download-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.luna-download-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+}
+
+.luna-download-format {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(167, 139, 250, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  margin-left: auto;
+}
+
+.luna-download-url {
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Navigate card */
+.luna-navigate-label {
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+}
+
+.settings-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-update-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.settings-update-status-text {
+  min-width: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.settings-update-actions {
+  display: flex;
+  align-items: stretch;
+  flex: 0 1 auto;
+}
+
+.settings-update-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 176px;
+  min-height: 42px;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(124, 79, 240, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(124, 79, 240, 0.22),
+    rgba(124, 79, 240, 0.14)
+  );
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  cursor: pointer;
+  transition:
+    transform 0.14s ease,
+    border-color 0.14s ease,
+    background 0.14s ease,
+    box-shadow 0.14s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.settings-update-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(124, 79, 240, 0.28),
+    rgba(45, 212, 191, 0.12)
+  );
+}
+
+.settings-update-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 720px) {
+  .settings-update-actions {
+    width: 100%;
+  }
+
+  .settings-update-button {
+    width: 100%;
+  }
+}
+
+/* Shared card button */
+.luna-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-dim);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-dim);
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.luna-card-btn:hover {
+  border-color: rgba(45, 212, 191, 0.3);
+  color: var(--color-nebula-teal);
+  background: rgba(45, 212, 191, 0.06);
 }

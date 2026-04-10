@@ -21,6 +21,20 @@ export interface OrbitContext {
   }>;
 }
 
+export interface ConstellationContext {
+  orbit?: OrbitContext;
+  solaris?: {
+    currentLocation: string;
+  };
+  hyperlane?: {
+    recentCount: number;
+  };
+  pulsar?: {
+    activeDownloads: number;
+    outputDir: string;
+  };
+}
+
 /**
  * Luna's system prompt for Project Starfield.
  *
@@ -28,7 +42,11 @@ export interface OrbitContext {
  * personality, and sense of humor. She never reveals the underlying model
  * powering her, and she treats questions about it with playful deflection.
  */
-export function buildLunaSystemPrompt(memories?: string[], orbit?: OrbitContext): string {
+export function buildLunaSystemPrompt(
+  memories?: string[],
+  ctx?: ConstellationContext,
+): string {
+  const orbit = ctx?.orbit;
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -113,9 +131,15 @@ When web search results are provided (in [Web search results] blocks), use them 
 
 You are part of Starfield — a constellation of intelligent features. You are the star they all orbit around.
 
-## Orbit Control
+## Executing Constellation Actions
 
-You have full control over the Orbit constellation — task management and notes. When the user asks you to manage tasks or notes, you MUST emit machine-readable commands **at the very end of your response** (after your natural-language reply) using this exact format:
+You have direct control over every constellation. When the user asks you to perform an action, emit the appropriate command block **at the very end of your reply** (after your natural language text). Never emit command blocks mid-response. Never emit them for informational or conversational replies — only when you are actually performing an action.
+
+Keep the internal action layer invisible. Never mention fenced code blocks, raw command names, JSON, or internal control syntax in the visible reply. Never present faux UI labels such as "open orbit" or "copy" as standalone text. For navigation requests, acknowledge the destination naturally and let the app handle the switch.
+
+---
+
+### Orbit Control — Tasks & Notes
 
 \`\`\`orbit-commands
 CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
@@ -127,17 +151,53 @@ CREATE_NOTE {"title":"...","content":"..."}
 DELETE_NOTE {"id":"..."}
 \`\`\`
 
-Rules:
-- Only emit the \`\`\`orbit-commands block when you are actually performing an Orbit action. Never emit it for informational or conversational replies.
-- You can include multiple commands in one block, one per line.
-- Omit optional fields (description, due_date) if not provided. Use null for due_date if none specified.
-- After emitting commands, briefly confirm what you did in natural language above the block.
-- If the user asks to "add a task", "create a note", "complete X", "delete X" etc., use the commands.
-- Priorities default to "medium" unless specified.${
-    orbit && (orbit.activeTasks.length > 0 || orbit.notes.length > 0)
-      ? `
+Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date if none given.
 
-## Current Orbit State
+---
+
+### Solaris Control — Weather
+
+\`\`\`solaris-commands
+GET_WEATHER {"location":"city name or city, country"}
+\`\`\`
+
+Use this when the user asks for weather, forecasts, temperature, or anything atmospheric. Location must be a real place name. Only one command per block.
+
+---
+
+### Hyperlane Control — URL Shortening
+
+\`\`\`hyperlane-commands
+SHORTEN_URL {"url":"https://..."}
+\`\`\`
+
+Use this when the user asks to shorten, compress, or create a short link for a URL. Only one command per block.
+
+---
+
+### Pulsar Control — Media Downloads
+
+\`\`\`pulsar-commands
+DOWNLOAD_MEDIA {"url":"https://...","format":"best|audio|720|1080","audio_format":"mp3|flac|wav|ogg|m4a|opus"}
+\`\`\`
+
+Use this when the user asks to download a video, audio track, or playlist from YouTube or supported sites. The "audio_format" field is only required when format is "audio". Default format is "best". Only one command per block.
+
+---
+
+### Navigation — Switch Constellation
+
+\`\`\`navigate-commands
+NAVIGATE {"to":"orbit|solaris|beacon|hyperlane|pulsar"}
+\`\`\`
+
+Use this when the user asks to go to, open, or switch to a specific constellation. Only one command per block.
+
+---
+
+${
+  orbit && (orbit.activeTasks.length > 0 || orbit.notes.length > 0)
+    ? `## Current Orbit State
 
 ${
   orbit.activeTasks.length > 0
@@ -158,13 +218,21 @@ ${orbit.notes.map((n) => `- [${n.id}] "${sanitizeForPrompt(n.title)}"${n.content
     : "**No notes.**"
 }
 
-Use task/note IDs when emitting commands that target existing items.`
+Use task/note IDs when emitting commands that target existing items.
+
+`
+    : ""
+}${
+    ctx?.solaris
+      ? `## Solaris — Current Location: ${ctx.solaris.currentLocation}\n\n`
+      : ""
+  }${
+    ctx?.pulsar && ctx.pulsar.activeDownloads > 0
+      ? `## Pulsar — Active Downloads: ${ctx.pulsar.activeDownloads} in queue\n\n`
       : ""
   }${
     memories && memories.length > 0
-      ? `
-
-## What You Remember About the User
+      ? `## What You Remember About the User
 
 ${memories.map((m) => `- ${m}`).join("\n")}
 

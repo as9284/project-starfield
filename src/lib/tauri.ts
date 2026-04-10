@@ -1,7 +1,7 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { buildLunaSystemPrompt } from "./luna-prompt";
-import type { OrbitContext } from "./luna-prompt";
+import type { ConstellationContext } from "./luna-prompt";
 
 /** Returns the live Tauri window handle. */
 export const win = () => getCurrentWindow();
@@ -51,9 +51,9 @@ export const streamLuna = (
   searchContext: string,
   onEvent: (e: StreamEvent) => void,
   memories?: string[],
-  orbit?: OrbitContext,
+  ctx?: ConstellationContext,
 ) => {
-  const systemPrompt = buildLunaSystemPrompt(memories, orbit);
+  const systemPrompt = buildLunaSystemPrompt(memories, ctx);
   const channel = new Channel<StreamEvent>();
   channel.onmessage = onEvent;
 
