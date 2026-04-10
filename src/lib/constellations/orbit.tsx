@@ -33,7 +33,7 @@ export const orbitHandler: ConstellationHandler = {
   name: "Orbit",
   multiCommand: true,
 
-  promptInstructions: `### Orbit Control — Tasks & Notes
+  promptInstructions: `### Orbit Control — Tasks, Notes & Projects
 
 \`\`\`orbit-commands
 CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
@@ -41,27 +41,37 @@ COMPLETE_TASK {"id":"..."}
 UNCOMPLETE_TASK {"id":"..."}
 ARCHIVE_TASK {"id":"..."}
 DELETE_TASK {"id":"..."}
+ADD_SUBTASK {"task_id":"...","title":"..."}
+TOGGLE_SUBTASK {"task_id":"...","subtask_id":"..."}
+DELETE_SUBTASK {"task_id":"...","subtask_id":"..."}
 CREATE_NOTE {"title":"...","content":"..."}
 DELETE_NOTE {"id":"..."}
+CREATE_PROJECT {"name":"...","description":"...","color":"violet|purple|blue|cyan|emerald|amber|rose|pink","deadline":"YYYY-MM-DD or null"}
+DELETE_PROJECT {"id":"..."}
 \`\`\`
 
-Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date if none given.`,
+Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given.`,
 
   buildContext(): string {
-    const { tasks, notes } = useOrbitStore.getState();
+    const { tasks, notes, projects } = useOrbitStore.getState();
     const activeTasks = tasks.filter((t) => !t.archived);
 
-    if (activeTasks.length === 0 && notes.length === 0) return "";
+    if (activeTasks.length === 0 && notes.length === 0 && projects.length === 0) return "";
 
     let ctx = "## Current Orbit State\n\n";
 
     if (activeTasks.length > 0) {
       ctx += `**Active Tasks (${activeTasks.length}):**\n`;
       ctx += activeTasks
-        .map(
-          (t) =>
-            `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`,
-        )
+        .map((t) => {
+          let line = `- [${t.id}] "${sanitizeForPrompt(t.title)}" — priority: ${t.priority}${t.due_date ? `, due: ${t.due_date}` : ""}${t.description ? `, notes: ${sanitizeForPrompt(t.description)}` : ""}`;
+          if (t.sub_tasks && t.sub_tasks.length > 0) {
+            const done = t.sub_tasks.filter((s) => s.completed).length;
+            line += ` | sub-tasks: ${done}/${t.sub_tasks.length} done`;
+            line += "\n" + t.sub_tasks.map((s) => `  - [${s.id}] [${s.completed ? "x" : " "}] "${sanitizeForPrompt(s.title)}"`).join("\n");
+          }
+          return line;
+        })
         .join("\n");
     } else {
       ctx += "**No active tasks.**";
@@ -81,8 +91,19 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
       ctx += "**No notes.**";
     }
 
+    if (projects.length > 0) {
+      ctx += "\n\n";
+      ctx += `**Projects (${projects.length}):**\n`;
+      ctx += projects
+        .map(
+          (p) =>
+            `- [${p.id}] "${sanitizeForPrompt(p.name)}"${p.description ? ` — ${sanitizeForPrompt(p.description)}` : ""}${p.deadline ? `, deadline: ${p.deadline}` : ""} | tasks: ${p.taskIds.length}, notes: ${p.noteIds.length}`,
+        )
+        .join("\n");
+    }
+
     ctx +=
-      "\n\nUse task/note IDs when emitting commands that target existing items.";
+      "\n\nUse task/note/project IDs when emitting commands that target existing items.";
 
     return ctx;
   },
@@ -135,6 +156,18 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
             store.deleteTask(String(args.id ?? ""));
             count++;
             break;
+          case "ADD_SUBTASK":
+            store.addSubTask(String(args.task_id ?? ""), String(args.title ?? ""));
+            count++;
+            break;
+          case "TOGGLE_SUBTASK":
+            store.toggleSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            count++;
+            break;
+          case "DELETE_SUBTASK":
+            store.deleteSubTask(String(args.task_id ?? ""), String(args.subtask_id ?? ""));
+            count++;
+            break;
           case "CREATE_NOTE":
             store.createNote({
               title: String(args.title ?? ""),
@@ -144,6 +177,34 @@ Rules: Multiple commands per block are allowed, one per line. Priorities default
             break;
           case "DELETE_NOTE":
             store.deleteNote(String(args.id ?? ""));
+            count++;
+            break;
+          case "CREATE_PROJECT": {
+            const rawDeadline = args.deadline;
+            const deadline =
+              rawDeadline != null &&
+              rawDeadline !== "null" &&
+              typeof rawDeadline === "string" &&
+              rawDeadline.trim() !== ""
+                ? rawDeadline
+                : null;
+            store.createProject({
+              name: String(args.name ?? ""),
+              description: args.description != null && args.description !== "null"
+                ? String(args.description)
+                : undefined,
+              color: (
+                ["violet", "purple", "blue", "cyan", "emerald", "amber", "rose", "pink"].includes(String(args.color))
+                  ? String(args.color)
+                  : "violet"
+              ),
+              deadline,
+            });
+            count++;
+            break;
+          }
+          case "DELETE_PROJECT":
+            store.deleteProject(String(args.id ?? ""));
             count++;
             break;
         }

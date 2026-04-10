@@ -13,14 +13,17 @@ import {
   Calendar,
   ChevronDown,
   RotateCcw,
+  FolderOpen,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StarField from "../components/StarField";
 import { useAppStore } from "../store/useAppStore";
 import { useOrbitStore } from "../store/useOrbitStore";
-import type { OrbitTask, OrbitNote, Priority } from "../store/useOrbitStore";
+import type { OrbitTask, OrbitNote, OrbitSubTask, OrbitProject, Priority } from "../store/useOrbitStore";
 
-type Tab = "tasks" | "notes";
+type Tab = "tasks" | "notes" | "projects";
 type TaskFilter = "active" | "archived";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,6 +63,8 @@ interface TaskCardProps {
 function TaskCard({ task, onToggle, onArchive, onUnarchive, onDelete, onEdit }: TaskCardProps) {
   const p = PRIORITY_STYLES[task.priority];
   const due = task.due_date ? formatDueDate(task.due_date) : null;
+  const subTasks = task.sub_tasks ?? [];
+  const completedSubTasks = subTasks.filter((s) => s.completed).length;
 
   return (
     <motion.div
@@ -106,6 +111,27 @@ function TaskCard({ task, onToggle, onArchive, onUnarchive, onDelete, onEdit }: 
           <p className="mt-0.5 text-xs line-clamp-1" style={{ color: "var(--color-text-muted)" }}>
             {task.description}
           </p>
+        )}
+        {subTasks.length > 0 && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <div
+              className="flex-1 h-1 rounded-full overflow-hidden"
+              style={{ background: "rgba(37, 34, 96, 0.8)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0}%`,
+                  background: completedSubTasks === subTasks.length
+                    ? "rgba(52, 211, 153, 0.7)"
+                    : "rgba(124, 79, 240, 0.6)",
+                }}
+              />
+            </div>
+            <span className="text-[11px] tabular-nums shrink-0" style={{ color: "var(--color-text-secondary)" }}>
+              {completedSubTasks}/{subTasks.length}
+            </span>
+          </div>
         )}
         <div className="flex items-center gap-3 mt-1.5">
           <span className={`flex items-center gap-1.5 text-xs ${p.label}`}>
@@ -221,7 +247,7 @@ function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
 
 interface TaskModalProps {
   task?: OrbitTask | null;
-  onSave: (data: { title: string; description: string; priority: Priority; due_date: string | null }) => void;
+  onSave: (data: { title: string; description: string; priority: Priority; due_date: string | null; subTasks: OrbitSubTask[] }) => void;
   onClose: () => void;
 }
 
@@ -230,20 +256,56 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
   const [description, setDescription] = useState(task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "medium");
   const [dueDate, setDueDate] = useState(task?.due_date?.slice(0, 10) ?? "");
+  const [subTasks, setSubTasks] = useState<OrbitSubTask[]>(task?.sub_tasks ?? []);
+  const [newSubTask, setNewSubTask] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+  const newSubTaskRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
 
+  const handleAddSubTask = () => {
+    const trimmed = newSubTask.trim();
+    if (!trimmed) return;
+    setSubTasks((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), title: trimmed, completed: false, position: prev.length },
+    ]);
+    setNewSubTask("");
+    newSubTaskRef.current?.focus();
+  };
+
+  const handleSubTaskKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddSubTask();
+    }
+  };
+
+  const toggleSubTask = (id: string) => {
+    setSubTasks((prev) =>
+      prev.map((st) => (st.id === id ? { ...st, completed: !st.completed } : st)),
+    );
+  };
+
+  const deleteSubTaskLocal = (id: string) => {
+    setSubTasks((prev) => prev.filter((st) => st.id !== id).map((st, i) => ({ ...st, position: i })));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    // Add any pending sub-task input
+    const finalSubTasks = newSubTask.trim()
+      ? [...subTasks, { id: crypto.randomUUID(), title: newSubTask.trim(), completed: false, position: subTasks.length }]
+      : subTasks;
     onSave({
       title: title.trim(),
       description: description.trim(),
       priority,
       due_date: dueDate || null,
+      subTasks: finalSubTasks,
     });
   };
 
@@ -261,7 +323,7 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-md p-5"
+        className="glass rounded-2xl w-full max-w-md p-5 max-h-[85vh] overflow-y-auto"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -342,6 +404,75 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
                   colorScheme: "dark",
                 }}
               />
+            </div>
+          </div>
+
+          {/* Sub-tasks */}
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--color-text-secondary)" }}>
+              Sub-tasks
+            </label>
+            {subTasks.length > 0 && (
+              <div className="flex flex-col gap-1 mb-1.5">
+                {subTasks.map((st) => (
+                  <div key={st.id} className="flex items-center gap-2 group">
+                    <button
+                      type="button"
+                      onClick={() => toggleSubTask(st.id)}
+                      className="shrink-0 transition-colors"
+                      style={{ color: st.completed ? "rgba(52, 211, 153, 0.8)" : "rgba(155, 120, 248, 0.5)" }}
+                    >
+                      {st.completed ? <CheckSquare size={14} /> : <Square size={14} />}
+                    </button>
+                    <span
+                      className="flex-1 text-xs"
+                      style={{
+                        color: st.completed ? "var(--color-text-secondary)" : "var(--color-text-primary)",
+                        textDecoration: st.completed ? "line-through" : "none",
+                        opacity: st.completed ? 0.6 : 1,
+                      }}
+                    >
+                      {st.title}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => deleteSubTaskLocal(st.id)}
+                      className="opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                ref={newSubTaskRef}
+                value={newSubTask}
+                onChange={(e) => setNewSubTask(e.target.value)}
+                onKeyDown={handleSubTaskKeyDown}
+                placeholder="Add sub-task…"
+                className="flex-1 px-2.5 py-1.5 rounded-lg text-xs outline-none"
+                style={{
+                  background: "rgba(13, 12, 34, 0.8)",
+                  border: "1px solid var(--color-border-dim)",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddSubTask}
+                disabled={!newSubTask.trim()}
+                className="p-1.5 rounded-lg transition-all disabled:opacity-30"
+                style={{
+                  background: "rgba(124, 79, 240, 0.2)",
+                  border: "1px solid rgba(124, 79, 240, 0.3)",
+                  color: "var(--color-purple-300)",
+                }}
+              >
+                <Plus size={12} strokeWidth={2.5} />
+              </button>
             </div>
           </div>
 
@@ -489,6 +620,483 @@ function NoteModal({ note, onSave, onClose }: NoteModalProps) {
   );
 }
 
+// ── Project helpers ──────────────────────────────────────────────────────────
+
+const PROJECT_COLORS = [
+  { name: "violet", bg: "rgba(139, 92, 246, 0.7)", border: "rgba(139, 92, 246, 0.35)" },
+  { name: "purple", bg: "rgba(168, 85, 247, 0.7)", border: "rgba(168, 85, 247, 0.35)" },
+  { name: "blue", bg: "rgba(59, 130, 246, 0.7)", border: "rgba(59, 130, 246, 0.35)" },
+  { name: "cyan", bg: "rgba(6, 182, 212, 0.7)", border: "rgba(6, 182, 212, 0.35)" },
+  { name: "emerald", bg: "rgba(16, 185, 129, 0.7)", border: "rgba(16, 185, 129, 0.35)" },
+  { name: "amber", bg: "rgba(245, 158, 11, 0.7)", border: "rgba(245, 158, 11, 0.35)" },
+  { name: "rose", bg: "rgba(244, 63, 94, 0.7)", border: "rgba(244, 63, 94, 0.35)" },
+  { name: "pink", bg: "rgba(236, 72, 153, 0.7)", border: "rgba(236, 72, 153, 0.35)" },
+];
+
+function getProjectColorStyle(color: string) {
+  return PROJECT_COLORS.find((c) => c.name === color) ?? PROJECT_COLORS[0];
+}
+
+// ── Project Card ─────────────────────────────────────────────────────────────
+
+interface ProjectCardProps {
+  project: OrbitProject;
+  taskCount: number;
+  completedTaskCount: number;
+  noteCount: number;
+  onEdit: (p: OrbitProject) => void;
+  onDelete: (id: string) => void;
+  onClick: (p: OrbitProject) => void;
+}
+
+function ProjectCard({ project, taskCount, completedTaskCount, noteCount, onEdit, onDelete, onClick }: ProjectCardProps) {
+  const colorStyle = getProjectColorStyle(project.color);
+  const progress = taskCount > 0 ? (completedTaskCount / taskCount) * 100 : 0;
+  const due = project.deadline ? formatDueDate(project.deadline) : null;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.18 }}
+      className="group relative rounded-xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-px"
+      style={{
+        background: "rgba(16, 15, 46, 0.55)",
+        border: `1px solid ${colorStyle.border}`,
+      }}
+      onClick={() => onClick(project)}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: colorStyle.bg }} />
+          <p className="text-sm font-semibold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {project.name}
+          </p>
+        </div>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Edit"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+
+      {project.description && (
+        <p className="text-xs mb-2.5 line-clamp-2" style={{ color: "var(--color-text-muted)" }}>
+          {project.description}
+        </p>
+      )}
+
+      {taskCount > 0 && (
+        <div className="mb-2.5">
+          <div className="h-1 rounded-full overflow-hidden mb-1" style={{ background: "rgba(37, 34, 96, 0.8)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progress}%`,
+                background: progress === 100 ? "rgba(52, 211, 153, 0.7)" : colorStyle.bg,
+              }}
+            />
+          </div>
+          <p className="text-[11px] tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
+            {completedTaskCount}/{taskCount} tasks · {Math.round(progress)}%
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        {due && (
+          <span
+            className="flex items-center gap-1 text-[11px]"
+            style={{
+              color: due.overdue ? "rgba(248, 113, 113, 0.9)" :
+                due.today ? "rgba(251, 191, 36, 0.9)" : "rgba(196, 184, 240, 0.7)",
+            }}
+          >
+            <Calendar size={10} />
+            {due.label}
+          </span>
+        )}
+        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+          <ListTodo size={10} />
+          {taskCount}
+        </span>
+        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+          <StickyNote size={10} />
+          {noteCount}
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Project Modal ─────────────────────────────────────────────────────────────
+
+interface ProjectModalProps {
+  project?: OrbitProject | null;
+  onSave: (data: { name: string; description: string; color: string; deadline: string | null }) => void;
+  onClose: () => void;
+}
+
+function ProjectModal({ project, onSave, onClose }: ProjectModalProps) {
+  const [name, setName] = useState(project?.name ?? "");
+  const [description, setDescription] = useState(project?.description ?? "");
+  const [color, setColor] = useState(project?.color ?? "violet");
+  const [deadline, setDeadline] = useState(project?.deadline?.slice(0, 10) ?? "");
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), description: description.trim(), color, deadline: deadline || null });
+  };
+
+  const handleBackdrop = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={handleBackdrop}
+    >
+      <motion.div
+        className="glass rounded-2xl w-full max-w-md p-5"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+            {project ? "Edit project" : "New project"}
+          </h3>
+          <button onClick={onClose} style={{ color: "var(--color-text-muted)" }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <input
+            ref={nameRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Project name…"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            style={{
+              background: "rgba(13, 12, 34, 0.8)",
+              border: "1px solid var(--color-border-dim)",
+              color: "var(--color-text-primary)",
+            }}
+          />
+
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description (optional)…"
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg text-sm resize-none outline-none"
+            style={{
+              background: "rgba(13, 12, 34, 0.8)",
+              border: "1px solid var(--color-border-dim)",
+              color: "var(--color-text-primary)",
+            }}
+          />
+
+          <div className="flex gap-2">
+            {/* Color picker */}
+            <div className="flex-1">
+              <label className="block text-xs mb-1" style={{ color: "var(--color-text-secondary)" }}>Color</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PROJECT_COLORS.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setColor(c.name)}
+                    className="w-5 h-5 rounded-full transition-all duration-150"
+                    style={{
+                      background: c.bg,
+                      boxShadow: color === c.name ? `0 0 0 2px rgba(255,255,255,0.5)` : "none",
+                    }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Deadline */}
+            <div className="flex-1">
+              <label className="block text-xs mb-1" style={{ color: "var(--color-text-secondary)" }}>Deadline</label>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full px-2 py-1.5 rounded-lg text-xs outline-none"
+                style={{
+                  background: "rgba(13, 12, 34, 0.8)",
+                  border: "1px solid var(--color-border-dim)",
+                  color: deadline ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                  colorScheme: "dark",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 rounded-lg text-sm transition-all duration-150"
+              style={{
+                background: "rgba(13, 12, 34, 0.6)",
+                border: "1px solid var(--color-border-dim)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim()}
+              className="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-150 disabled:opacity-40"
+              style={{
+                background: "rgba(124, 79, 240, 0.3)",
+                border: "1px solid rgba(124, 79, 240, 0.4)",
+                color: "var(--color-purple-200)",
+              }}
+            >
+              {project ? "Save" : "Create"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Project Detail Modal ──────────────────────────────────────────────────────
+
+interface ProjectDetailModalProps {
+  project: OrbitProject | null;
+  allTasks: OrbitTask[];
+  allNotes: OrbitNote[];
+  onClose: () => void;
+  onLinkTask: (projectId: string, taskId: string) => void;
+  onUnlinkTask: (projectId: string, taskId: string) => void;
+  onLinkNote: (projectId: string, noteId: string) => void;
+  onUnlinkNote: (projectId: string, noteId: string) => void;
+}
+
+function ProjectDetailModal({
+  project,
+  allTasks,
+  allNotes,
+  onClose,
+  onLinkTask,
+  onUnlinkTask,
+  onLinkNote,
+  onUnlinkNote,
+}: ProjectDetailModalProps) {
+  if (!project) return null;
+
+  const colorStyle = getProjectColorStyle(project.color);
+  const linkedTasks = allTasks.filter((t) => project.taskIds.includes(t.id) && !t.archived);
+  const linkedNotes = allNotes.filter((n) => project.noteIds.includes(n.id));
+  const unlinkable = allTasks.filter((t) => !project.taskIds.includes(t.id) && !t.archived);
+  const unlinkableNotes = allNotes.filter((n) => !project.noteIds.includes(n.id));
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+
+  const handleBackdrop = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={handleBackdrop}
+    >
+      <motion.div
+        className="glass rounded-2xl w-full max-w-lg p-5 max-h-[80vh] overflow-y-auto"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ background: colorStyle.bg }} />
+            <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+              {project.name}
+            </h3>
+          </div>
+          <button onClick={onClose} style={{ color: "var(--color-text-muted)" }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        {project.description && (
+          <p className="text-xs mb-4 leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
+            {project.description}
+          </p>
+        )}
+
+        {/* Tasks */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+              Tasks ({linkedTasks.length})
+            </span>
+            {unlinkable.length > 0 && (
+              <button
+                onClick={() => setAddTaskOpen((v) => !v)}
+                className="text-xs flex items-center gap-1 transition-colors"
+                style={{ color: "var(--color-purple-300)" }}
+              >
+                <Plus size={11} strokeWidth={2.5} />
+                Add
+              </button>
+            )}
+          </div>
+          {addTaskOpen && (
+            <div
+              className="mb-2 rounded-xl overflow-hidden"
+              style={{ border: "1px solid var(--color-border-dim)", background: "rgba(13, 12, 34, 0.8)" }}
+            >
+              {unlinkable.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { onLinkTask(project.id, t.id); setAddTaskOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  {t.title}
+                </button>
+              ))}
+            </div>
+          )}
+          {linkedTasks.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>No tasks linked yet.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {linkedTasks.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 group">
+                  {t.completed
+                    ? <CheckCircle2 size={14} style={{ color: "rgba(52, 211, 153, 0.8)", flexShrink: 0 }} />
+                    : <Circle size={14} style={{ color: "rgba(155, 120, 248, 0.5)", flexShrink: 0 }} />
+                  }
+                  <span
+                    className="flex-1 text-xs"
+                    style={{
+                      color: "var(--color-text-primary)",
+                      textDecoration: t.completed ? "line-through" : "none",
+                      opacity: t.completed ? 0.5 : 1,
+                    }}
+                  >
+                    {t.title}
+                  </span>
+                  <button
+                    onClick={() => onUnlinkTask(project.id, t.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                    style={{ color: "var(--color-text-muted)" }}
+                    title="Remove from project"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+              Notes ({linkedNotes.length})
+            </span>
+            {unlinkableNotes.length > 0 && (
+              <button
+                onClick={() => setAddNoteOpen((v) => !v)}
+                className="text-xs flex items-center gap-1 transition-colors"
+                style={{ color: "var(--color-purple-300)" }}
+              >
+                <Plus size={11} strokeWidth={2.5} />
+                Add
+              </button>
+            )}
+          </div>
+          {addNoteOpen && (
+            <div
+              className="mb-2 rounded-xl overflow-hidden"
+              style={{ border: "1px solid var(--color-border-dim)", background: "rgba(13, 12, 34, 0.8)" }}
+            >
+              {unlinkableNotes.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => { onLinkNote(project.id, n.id); setAddNoteOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  {n.title}
+                </button>
+              ))}
+            </div>
+          )}
+          {linkedNotes.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>No notes linked yet.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {linkedNotes.map((n) => (
+                <div key={n.id} className="flex items-center gap-2 group">
+                  <StickyNote size={13} style={{ color: "rgba(155, 120, 248, 0.5)", flexShrink: 0 }} />
+                  <span className="flex-1 text-xs" style={{ color: "var(--color-text-primary)" }}>{n.title}</span>
+                  <button
+                    onClick={() => onUnlinkNote(project.id, n.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                    style={{ color: "var(--color-text-muted)" }}
+                    title="Remove from project"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ── Main Orbit Page ──────────────────────────────────────────────────────────
 
 export default function Orbit() {
@@ -496,6 +1104,7 @@ export default function Orbit() {
   const {
     tasks,
     notes,
+    projects,
     createTask,
     updateTask,
     completeTask,
@@ -503,30 +1112,52 @@ export default function Orbit() {
     archiveTask,
     unarchiveTask,
     deleteTask,
+    addSubTask,
+    toggleSubTask,
+    updateSubTask,
+    deleteSubTask,
     createNote,
     updateNote,
     deleteNote,
+    createProject,
+    updateProject,
+    deleteProject,
+    linkTaskToProject,
+    unlinkTaskFromProject,
+    linkNoteToProject,
+    unlinkNoteFromProject,
   } = useOrbitStore();
 
   const [tab, setTab] = useState<Tab>("tasks");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("active");
   const [taskModal, setTaskModal] = useState<OrbitTask | null | "new">(null);
   const [noteModal, setNoteModal] = useState<OrbitNote | null | "new">(null);
+  const [projectModal, setProjectModal] = useState<OrbitProject | null | "new">(null);
+  const [detailProject, setDetailProject] = useState<OrbitProject | null>(null);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sort, setSort] = useState<"recent" | "priority" | "due">("recent");
   const sortRef = useRef<HTMLDivElement>(null);
 
+  // Keep detailProject in sync with store
+  useEffect(() => {
+    if (!detailProject) return;
+    const updated = projects.find((p) => p.id === detailProject.id);
+    if (updated) setDetailProject(updated);
+    else setDetailProject(null);
+  }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keyboard shortcut: N to create
   const openCreate = useCallback(() => {
     if (tab === "tasks") setTaskModal("new");
-    else setNoteModal("new");
+    else if (tab === "notes") setNoteModal("new");
+    else setProjectModal("new");
   }, [tab]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
         e.key === "n" && !e.ctrlKey && !e.metaKey && !e.altKey &&
-        taskModal === null && noteModal === null
+        taskModal === null && noteModal === null && projectModal === null
       ) {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -536,11 +1167,13 @@ export default function Orbit() {
       if (e.key === "Escape") {
         setTaskModal(null);
         setNoteModal(null);
+        setProjectModal(null);
+        setDetailProject(null);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openCreate, taskModal, noteModal]);
+  }, [openCreate, taskModal, noteModal, projectModal]);
 
   // Close sort menu on outside click
   useEffect(() => {
@@ -587,11 +1220,38 @@ export default function Orbit() {
     else completeTask(id);
   };
 
-  const handleSaveTask = (data: { title: string; description: string; priority: Priority; due_date: string | null }) => {
+  const handleSaveTask = (data: { title: string; description: string; priority: Priority; due_date: string | null; subTasks: OrbitSubTask[] }) => {
     if (taskModal === "new") {
-      createTask(data);
+      const taskId = createTask(data);
+      // Save sub-tasks by adding them one at a time
+      for (const st of data.subTasks) {
+        addSubTask(taskId, st.title);
+      }
+      // Sync completed state for newly added sub-tasks (shouldn't be completed on creation, but just in case)
     } else if (taskModal) {
+      const existingTask = tasks.find((t) => t.id === taskModal.id);
       updateTask(taskModal.id, data);
+      // Reconcile sub-tasks: remove deleted ones, add new ones, toggle changed ones
+      if (existingTask) {
+        const existingIds = new Set(existingTask.sub_tasks.map((s) => s.id));
+        const newIds = new Set(data.subTasks.map((s) => s.id));
+        // Delete removed sub-tasks
+        for (const st of existingTask.sub_tasks) {
+          if (!newIds.has(st.id)) deleteSubTask(taskModal.id, st.id);
+        }
+        // Add new sub-tasks and sync existing ones
+        for (const st of data.subTasks) {
+          if (!existingIds.has(st.id)) {
+            const newId = addSubTask(taskModal.id, st.title);
+            if (st.completed) toggleSubTask(taskModal.id, newId);
+          } else {
+            // Update title if changed
+            const orig = existingTask.sub_tasks.find((s) => s.id === st.id);
+            if (orig && orig.title !== st.title) updateSubTask(taskModal.id, st.id, st.title);
+            if (orig && orig.completed !== st.completed) toggleSubTask(taskModal.id, st.id);
+          }
+        }
+      }
     }
     setTaskModal(null);
   };
@@ -605,7 +1265,29 @@ export default function Orbit() {
     setNoteModal(null);
   };
 
+  const handleSaveProject = (data: { name: string; description: string; color: string; deadline: string | null }) => {
+    if (projectModal === "new") {
+      createProject(data);
+    } else if (projectModal) {
+      updateProject(projectModal.id, data);
+    }
+    setProjectModal(null);
+  };
+
+  // Project enrichment: compute completed task count for each project
+  const enrichedProjects = projects.map((p) => {
+    const linkedTasks = tasks.filter((t) => p.taskIds.includes(t.id) && !t.archived);
+    const completedCount = linkedTasks.filter((t) => t.completed).length;
+    return { project: p, taskCount: linkedTasks.length, completedTaskCount: completedCount, noteCount: p.noteIds.length };
+  });
+
   const SORT_LABELS = { recent: "Recent", priority: "Priority", due: "Due date" };
+
+  const TAB_ICONS: Record<Tab, React.ReactNode> = {
+    tasks: <ListTodo size={12} />,
+    notes: <StickyNote size={12} />,
+    projects: <FolderOpen size={12} />,
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -644,7 +1326,7 @@ export default function Orbit() {
             style={{ borderBottom: "1px solid rgba(37, 34, 96, 0.5)" }}
           >
             <div className="flex items-center gap-1">
-              {(["tasks", "notes"] as Tab[]).map((t) => (
+              {(["tasks", "notes", "projects"] as Tab[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -655,7 +1337,7 @@ export default function Orbit() {
                     color: tab === t ? "var(--color-purple-300)" : "var(--color-text-muted)",
                   }}
                 >
-                  {t === "tasks" ? <ListTodo size={12} /> : <StickyNote size={12} />}
+                  {TAB_ICONS[t]}
                   {t}
                 </button>
               ))}
@@ -806,6 +1488,38 @@ export default function Orbit() {
               )}
             </div>
           )}
+
+          {/* Projects view */}
+          {tab === "projects" && (
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
+              {projects.length === 0 ? (
+                <div
+                  className="flex flex-col items-center justify-center h-full gap-3 py-16"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  <FolderOpen size={28} style={{ opacity: 0.3 }} />
+                  <p className="text-sm">No projects yet — press N to create one</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <AnimatePresence mode="popLayout">
+                    {enrichedProjects.map(({ project, taskCount, completedTaskCount, noteCount }) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        taskCount={taskCount}
+                        completedTaskCount={completedTaskCount}
+                        noteCount={noteCount}
+                        onEdit={(p) => setProjectModal(p)}
+                        onDelete={deleteProject}
+                        onClick={(p) => setDetailProject(p)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -823,6 +1537,25 @@ export default function Orbit() {
             note={noteModal === "new" ? null : noteModal}
             onSave={handleSaveNote}
             onClose={() => setNoteModal(null)}
+          />
+        )}
+        {projectModal !== null && (
+          <ProjectModal
+            project={projectModal === "new" ? null : projectModal}
+            onSave={handleSaveProject}
+            onClose={() => setProjectModal(null)}
+          />
+        )}
+        {detailProject !== null && (
+          <ProjectDetailModal
+            project={detailProject}
+            allTasks={tasks}
+            allNotes={notes}
+            onClose={() => setDetailProject(null)}
+            onLinkTask={linkTaskToProject}
+            onUnlinkTask={unlinkTaskFromProject}
+            onLinkNote={linkNoteToProject}
+            onUnlinkNote={unlinkNoteFromProject}
           />
         )}
       </AnimatePresence>
