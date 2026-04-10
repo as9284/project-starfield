@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 function normalizeVersion(rawVersion) {
   const trimmed = rawVersion.trim();
@@ -64,15 +65,168 @@ function updateCargoTomlVersion(contents, version) {
   return `${nextLines.join(newline)}${newline}`;
 }
 
-const versionArg = process.argv[2];
+function parseArgs(argv) {
+  let versionArg = null;
+  let publish = false;
+  let remote = "origin";
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === "--publish") {
+      publish = true;
+      continue;
+    }
+
+    if (arg === "--remote") {
+      remote = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--remote=")) {
+      remote = arg.slice("--remote=".length);
+      continue;
+    }
+
+    if (!versionArg) {
+      versionArg = arg;
+      continue;
+    }
+
+    throw new Error(`Unexpected argument: ${arg}`);
+  }
+
+  return { versionArg, publish, remote };
+}
+
+function runCommand(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim();
+    const stdout = result.stdout?.trim();
+    throw new Error(
+      [`Command failed: ${command} ${args.join(" ")}`, stderr || stdout]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+
+  return result.stdout?.trim() ?? "";
+}
+
+function tryCommand(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result;
+}
+
+function ensureCleanWorkingTree(rootDir) {
+  const status = runCommand("git", ["status", "--porcelain"], { cwd: rootDir });
+  if (status) {
+    throw new Error(
+      `Release publish requires a clean git working tree before version bumping.\nCommit or stash existing changes first.\n\n${status}`,
+    );
+  }
+}
+
+function ensureRemoteExists(rootDir, remote) {
+  if (!remote) {
+    throw new Error("A git remote name is required.");
+  }
+
+  runCommand("git", ["remote", "get-url", remote], { cwd: rootDir });
+}
+
+function getCurrentBranch(rootDir) {
+  const branch = runCommand("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+    cwd: rootDir,
+  });
+
+  if (!branch || branch === "HEAD") {
+    throw new Error(
+      "Release publish must run from a named branch, not detached HEAD.",
+    );
+  }
+
+  return branch;
+}
+
+function ensureTagDoesNotExist(rootDir, tag, remote) {
+  const localTagCheck = tryCommand(
+    "git",
+    ["rev-parse", "-q", "--verify", `refs/tags/${tag}`],
+    { cwd: rootDir },
+  );
+  if (localTagCheck.status === 0) {
+    throw new Error(`Git tag ${tag} already exists locally.`);
+  }
+
+  const remoteTagOutput = runCommand(
+    "git",
+    ["ls-remote", "--tags", "--refs", remote, `refs/tags/${tag}`],
+    { cwd: rootDir },
+  );
+  if (remoteTagOutput) {
+    throw new Error(`Git tag ${tag} already exists on remote ${remote}.`);
+  }
+}
+
+function ensureVersionFilesChanged(rootDir) {
+  const diffCheck = tryCommand("git", ["diff", "--cached", "--quiet"], {
+    cwd: rootDir,
+  });
+
+  if (diffCheck.status === 0) {
+    throw new Error("Requested version is already set. Nothing to publish.");
+  }
+
+  if (diffCheck.status !== 1) {
+    const stderr = diffCheck.stderr?.trim();
+    throw new Error(stderr || "Unable to inspect staged version changes.");
+  }
+}
+
+const { versionArg, publish, remote } = parseArgs(process.argv.slice(2));
 
 if (!versionArg) {
-  console.error("Usage: npm run version:set -- <version>");
+  console.error(
+    "Usage: npm run version:set -- <version>\n       npm run release:publish -- <version>",
+  );
   process.exit(1);
 }
 
 const version = normalizeVersion(versionArg);
 const rootDir = process.cwd();
+const versionFiles = [
+  "package.json",
+  "package-lock.json",
+  "src-tauri/tauri.conf.json",
+  "src-tauri/Cargo.toml",
+];
+
+if (publish) {
+  ensureCleanWorkingTree(rootDir);
+  ensureRemoteExists(rootDir, remote);
+  ensureTagDoesNotExist(rootDir, `v${version}`, remote);
+}
 
 const packageJsonPath = path.join(rootDir, "package.json");
 const packageLockPath = path.join(rootDir, "package-lock.json");
@@ -101,6 +255,24 @@ const nextCargoToml = updateCargoTomlVersion(cargoToml, version);
 
 await fs.writeFile(cargoTomlPath, nextCargoToml, "utf8");
 
+if (!publish) {
+  console.log(
+    `Updated package.json, package-lock.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml to ${version}`,
+  );
+  process.exit(0);
+}
+
+const tag = `v${version}`;
+const branch = getCurrentBranch(rootDir);
+
+runCommand("git", ["add", ...versionFiles], { cwd: rootDir });
+ensureVersionFilesChanged(rootDir);
+runCommand("git", ["commit", "-m", `chore: release ${tag}`], { cwd: rootDir });
+runCommand("git", ["tag", "-a", tag, "-m", `Release ${tag}`], { cwd: rootDir });
+runCommand("git", ["push", remote, branch], { cwd: rootDir });
+runCommand("git", ["push", remote, tag], { cwd: rootDir });
+
+console.log(`Published ${tag} from ${branch} to ${remote}.`);
 console.log(
-  `Updated package.json, package-lock.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml to ${version}`,
+  "The GitHub Actions release workflow should now build the app, sign it, generate latest.json, and publish the release assets.",
 );

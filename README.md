@@ -99,7 +99,7 @@ Before you use it, add these repository secrets in GitHub:
 - `TAURI_SIGNING_PRIVATE_KEY`: the full contents of `src-tauri/keys/starfield.key`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: optional; set it only if the key has a password
 
-How to publish a release:
+How to publish a release manually:
 
 1. Update `package.json` and `src-tauri/tauri.conf.json` to the new version.
 2. Commit and push those changes.
@@ -107,6 +107,27 @@ How to publish a release:
 4. Push the tag: `git push origin v1.0.1`.
 5. Wait for the `Release` workflow to finish.
 6. The workflow will publish the GitHub release and upload `latest.json` plus the Windows installers.
+
+Preferred one-command flow:
+
+```bash
+npm run release:publish -- 1.0.2
+```
+
+That command will:
+
+- update `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`
+- create a release commit
+- create an annotated git tag like `v1.0.2`
+- push the branch and the tag to `origin`
+
+Once the tag reaches GitHub, the `Release` workflow starts automatically and publishes the update.
+
+Safety rules for `release:publish`:
+
+- it requires a clean git working tree before it starts
+- it refuses to reuse an existing local or remote tag
+- it publishes to the current branch and `origin` remote by default
 
 You can also rerun the workflow manually from the Actions tab with an existing tag. Manual runs let you choose whether `latest.json` points to the MSI or NSIS asset. The default is MSI.
 
