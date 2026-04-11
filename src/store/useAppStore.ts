@@ -6,6 +6,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  /** If true, the message is part of context but not rendered in the chat. */
+  hidden?: boolean;
 }
 
 export interface Conversation {
@@ -91,7 +93,10 @@ function makeConversation(): Conversation {
   };
 }
 
-function getActiveConvo(state: { conversations: Conversation[]; activeConversationId: string | null }) {
+function getActiveConvo(state: {
+  conversations: Conversation[];
+  activeConversationId: string | null;
+}) {
   return state.conversations.find((c) => c.id === state.activeConversationId);
 }
 
@@ -106,7 +111,11 @@ function updateActiveConvo(
 
 /** Check if a memory is similar enough to be considered a duplicate. */
 function isSimilarMemory(a: string, b: string): boolean {
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
   const na = normalize(a);
   const nb = normalize(b);
   return na === nb || na.includes(nb) || nb.includes(na);
@@ -181,7 +190,9 @@ export const useAppStore = create<AppState>()(
             const needSwitch = s.activeConversationId === id;
             return {
               conversations: remaining,
-              activeConversationId: needSwitch ? remaining[0].id : s.activeConversationId,
+              activeConversationId: needSwitch
+                ? remaining[0].id
+                : s.activeConversationId,
             };
           }),
 
@@ -196,68 +207,87 @@ export const useAppStore = create<AppState>()(
         addMessage: (m) =>
           set((s) => {
             if (!getActiveConvo(s)) return s;
-            return { conversations: updateActiveConvo(s, (c) => ({
-              ...c,
-              messages: [...c.messages, m],
-              updatedAt: Date.now(),
-            })) };
+            return {
+              conversations: updateActiveConvo(s, (c) => ({
+                ...c,
+                messages: [...c.messages, m],
+                updatedAt: Date.now(),
+              })),
+            };
           }),
 
         updateLastAssistantMessage: (text) =>
           set((s) => {
             if (!getActiveConvo(s)) return s;
-            return { conversations: updateActiveConvo(s, (c) => {
-              const msgs = [...c.messages];
-              for (let i = msgs.length - 1; i >= 0; i--) {
-                if (msgs[i].role === "assistant") {
-                  msgs[i] = { ...msgs[i], content: text };
-                  break;
+            return {
+              conversations: updateActiveConvo(s, (c) => {
+                const msgs = [...c.messages];
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  if (msgs[i].role === "assistant") {
+                    msgs[i] = { ...msgs[i], content: text };
+                    break;
+                  }
                 }
-              }
-              return { ...c, messages: msgs, updatedAt: Date.now() };
-            }) };
+                return { ...c, messages: msgs, updatedAt: Date.now() };
+              }),
+            };
           }),
 
         clearMessages: () =>
           set((s) => {
             if (!getActiveConvo(s)) return s;
-            return { conversations: updateActiveConvo(s, (c) => ({
-              ...c,
-              messages: [],
-              title: "New Conversation",
-              updatedAt: Date.now(),
-            })) };
+            return {
+              conversations: updateActiveConvo(s, (c) => ({
+                ...c,
+                messages: [],
+                title: "New Conversation",
+                updatedAt: Date.now(),
+              })),
+            };
           }),
 
         removeLastAssistantMessage: () =>
           set((s) => {
             if (!getActiveConvo(s)) return s;
-            return { conversations: updateActiveConvo(s, (c) => {
-              const lastAssistantIdx = [...c.messages].reverse().findIndex(m => m.role === "assistant");
-              if (lastAssistantIdx === -1) return c;
-              const idx = c.messages.length - 1 - lastAssistantIdx;
-              const msgs = [...c.messages.slice(0, idx), ...c.messages.slice(idx + 1)];
-              return { ...c, messages: msgs, updatedAt: Date.now() };
-            }) };
+            return {
+              conversations: updateActiveConvo(s, (c) => {
+                const lastAssistantIdx = [...c.messages]
+                  .reverse()
+                  .findIndex((m) => m.role === "assistant");
+                if (lastAssistantIdx === -1) return c;
+                const idx = c.messages.length - 1 - lastAssistantIdx;
+                const msgs = [
+                  ...c.messages.slice(0, idx),
+                  ...c.messages.slice(idx + 1),
+                ];
+                return { ...c, messages: msgs, updatedAt: Date.now() };
+              }),
+            };
           }),
 
         removeFromLastUserMessage: () => {
           let content = "";
           set((s) => {
             if (!getActiveConvo(s)) return s;
-            return { conversations: updateActiveConvo(s, (c) => {
-              const msgs = [...c.messages];
-              let lastUserIdx = -1;
-              for (let i = msgs.length - 1; i >= 0; i--) {
-                if (msgs[i].role === "user") {
-                  lastUserIdx = i;
-                  content = msgs[i].content;
-                  break;
+            return {
+              conversations: updateActiveConvo(s, (c) => {
+                const msgs = [...c.messages];
+                let lastUserIdx = -1;
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  if (msgs[i].role === "user" && !msgs[i].hidden) {
+                    lastUserIdx = i;
+                    content = msgs[i].content;
+                    break;
+                  }
                 }
-              }
-              if (lastUserIdx === -1) return c;
-              return { ...c, messages: msgs.slice(0, lastUserIdx), updatedAt: Date.now() };
-            }) };
+                if (lastUserIdx === -1) return c;
+                return {
+                  ...c,
+                  messages: msgs.slice(0, lastUserIdx),
+                  updatedAt: Date.now(),
+                };
+              }),
+            };
           });
           return content;
         },
@@ -267,9 +297,13 @@ export const useAppStore = create<AppState>()(
 
         addMemory: (content) =>
           set((s) => {
-            if (s.memories.some((m) => isSimilarMemory(m.content, content))) return s;
+            if (s.memories.some((m) => isSimilarMemory(m.content, content)))
+              return s;
             return {
-              memories: [...s.memories, { id: crypto.randomUUID(), content, createdAt: Date.now() }],
+              memories: [
+                ...s.memories,
+                { id: crypto.randomUUID(), content, createdAt: Date.now() },
+              ],
             };
           }),
 
@@ -281,7 +315,8 @@ export const useAppStore = create<AppState>()(
         importMemories: (incoming) =>
           set((s) => {
             const newOnes = incoming.filter(
-              (im) => !s.memories.some((m) => isSimilarMemory(m.content, im.content)),
+              (im) =>
+                !s.memories.some((m) => isSimilarMemory(m.content, im.content)),
             );
             return { memories: [...s.memories, ...newOnes] };
           }),
@@ -306,13 +341,22 @@ export const useAppStore = create<AppState>()(
         if (version === 1) {
           const state = persisted as Record<string, unknown>;
           // Migrate old flat messages array to conversations
-          if (state && "messages" in state && Array.isArray(state.messages) && !("conversations" in state)) {
+          if (
+            state &&
+            "messages" in state &&
+            Array.isArray(state.messages) &&
+            !("conversations" in state)
+          ) {
             const msgs = state.messages as ChatMessage[];
             const convo = makeConversation();
             convo.messages = msgs;
             if (msgs.length > 0) {
               const firstUser = msgs.find((m) => m.role === "user");
-              if (firstUser) convo.title = firstUser.content.slice(0, MAX_CONVERSATION_TITLE_LENGTH);
+              if (firstUser)
+                convo.title = firstUser.content.slice(
+                  0,
+                  MAX_CONVERSATION_TITLE_LENGTH,
+                );
             }
             return {
               ...state,

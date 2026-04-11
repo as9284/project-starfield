@@ -13,12 +13,23 @@ import {
   RotateCcw,
   Pencil,
   Check,
+  Copy,
+  CheckCheck,
+  HelpCircle,
+  ShoppingCart,
+  AlignLeft,
+  Sparkle,
+  Search,
+  Languages,
+  Settings,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 import { AiGlobe } from "../components/AiGlobe";
 import { StarParticles } from "../components/StarParticles";
+import { Switch } from "../components/Switch";
 import {
   useAppStore,
   MAX_CONVERSATION_TITLE_LENGTH,
@@ -39,6 +50,21 @@ import {
   constellationHandlers,
   inferNavigationTarget,
 } from "../lib/constellations";
+import type {
+  LunaControls,
+  SessionMode,
+  ClarificationQuestion,
+  DecisionStyle,
+  PersonalityIntensity,
+  CreativityLevel,
+  ResponseStyle,
+} from "../lib/luna-prompt";
+import {
+  loadLunaControls,
+  saveSettings,
+  MODE_CLARIFICATIONS,
+} from "../lib/luna-prompt";
+import { ClarificationCard } from "../components/ClarificationCard";
 
 type ControlledView = Exclude<AppView, "luna" | "settings">;
 
@@ -101,6 +127,39 @@ export default function Luna() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const streamAborted = useRef(false);
 
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [lunaControls, setLunaControls] =
+    useState<LunaControls>(loadLunaControls);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+
+  // Per-conversation session modes (not persisted — session-only)
+  const sessionModesRef = useRef<
+    Record<
+      string,
+      { shopping: boolean; research: boolean; translation: boolean }
+    >
+  >({});
+
+  // Clarification card data keyed by assistant message ID
+  const clarificationData = useRef<Record<string, ClarificationQuestion[]>>({});
+
+  // Sync session modes when switching conversations
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const stored = sessionModesRef.current[activeConversationId] ?? {
+      shopping: false,
+      research: false,
+      translation: false,
+    };
+    setLunaControls((prev) => ({
+      ...prev,
+      shopping: stored.shopping,
+      research: stored.research,
+      translation: stored.translation,
+    }));
+  }, [activeConversationId]);
+
   // Cleanup: if component unmounts while streaming, clear the streaming state
   useEffect(() => {
     return () => {
@@ -160,10 +219,7 @@ export default function Luna() {
 
       // Fallback navigation when user intent was detected but no
       // navigate-commands block was emitted by the model.
-      if (
-        fallbackView &&
-        !results.some((r) => r.type === "navigated")
-      ) {
+      if (fallbackView && !results.some((r) => r.type === "navigated")) {
         results.push({
           type: "navigated",
           handler: "navigate-commands",
@@ -233,6 +289,7 @@ export default function Luna() {
             }
           },
           memoryStrings,
+          lunaControls,
         );
 
         // Store clean content as final message
@@ -268,6 +325,7 @@ export default function Luna() {
       webSearchEnabled,
       hasTavilyKey,
       memoryStrings,
+      lunaControls,
       updateLastAssistantMessage,
       activeConversationId,
       renameConversation,
@@ -359,11 +417,204 @@ export default function Luna() {
     if (content) setInput(content);
   };
 
+  // ── Session mode activation (mutual exclusion + clarification card) ──
+  const handleModeActivation = useCallback(
+    (mode: SessionMode, enabled: boolean) => {
+      // Build controls with mutual exclusion
+      const next: LunaControls = {
+        ...lunaControls,
+        shopping: false,
+        research: false,
+        translation: false,
+        [mode]: enabled,
+      };
+      setLunaControls(next);
+
+      // Persist modes to per-conversation ref
+      if (activeConversationId) {
+        sessionModesRef.current[activeConversationId] = {
+          shopping: next.shopping,
+          research: next.research,
+          translation: next.translation,
+        };
+      }
+
+      // If disabling, just clear state — no card needed
+      if (!enabled) return;
+
+      setControlsOpen(false);
+
+      // Auto-enable web search for internet-backed session modes.
+      if (hasTavilyKey) {
+        setWebSearchEnabled(true);
+      }
+
+      // Ensure conversation exists
+      const convId = activeConversationId ?? createConversation();
+
+      // Rename if this is the first message
+      if (messages.length === 0 && convId) {
+        renameConversation(
+          convId,
+          `${mode.charAt(0).toUpperCase() + mode.slice(1)} Session`,
+        );
+      }
+
+      // Add the mode activation user message
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "user",
+        content: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`,
+        timestamp: Date.now(),
+      });
+
+      // Add an empty assistant message and attach the clarification questions
+      const assistantMsgId = crypto.randomUUID();
+      clarificationData.current[assistantMsgId] = MODE_CLARIFICATIONS[mode];
+      addMessage({
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+      });
+    },
+    [
+      lunaControls,
+      activeConversationId,
+      createConversation,
+      addMessage,
+      messages.length,
+      renameConversation,
+      hasTavilyKey,
+      setWebSearchEnabled,
+    ],
+  );
+
+  // ── Clarification card submission ─────────────────────────────────────
+  const handleClarificationSubmit = useCallback(
+    async (
+      questions: ClarificationQuestion[],
+      answers: Record<string, string>,
+    ) => {
+      const text = questions
+        .map((q) => `${q.label}: ${answers[q.id] ?? ""}`)
+        .filter((line) => !line.endsWith(": "))
+        .join("\n");
+      if (!text.trim()) return;
+
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        timestamp: Date.now(),
+        hidden: true,
+      });
+      setIsStreaming(true);
+      const assistantMsgId = crypto.randomUUID();
+      addMessage({
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+      });
+
+      const historyMessages = messages
+        .filter((m) => m.content.length > 0)
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      await runStream(text, historyMessages, assistantMsgId, false, null);
+    },
+    [messages, addMessage, setIsStreaming, runStream],
+  );
+
+  const handleCopyMessage = useCallback((content: string, id: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }, []);
+
+  const handleCopyCode = useCallback((code: string, id: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCodeId(id);
+      setTimeout(() => setCopiedCodeId(null), 2000);
+    });
+  }, []);
+
   const isEmpty = messages.length === 0;
   const lastAssistantId = [...messages]
     .reverse()
-    .find((m) => m.role === "assistant")?.id;
-  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
+    .find((m) => m.role === "assistant" && !m.hidden)?.id;
+  const lastUserId = [...messages]
+    .reverse()
+    .find((m) => m.role === "user" && !m.hidden)?.id;
+
+  const markdownComponents: Components = useMemo(
+    () => ({
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="luna-link"
+          onClick={(e) => {
+            if (href) {
+              e.preventDefault();
+              window.open(href, "_blank", "noopener,noreferrer");
+            }
+          }}
+        >
+          {children}
+        </a>
+      ),
+      table: ({ children }) => (
+        <div className="luna-table-wrapper">
+          <table className="luna-table">{children}</table>
+        </div>
+      ),
+      th: ({ children }) => <th className="luna-th">{children}</th>,
+      td: ({ children }) => <td className="luna-td">{children}</td>,
+      code: ({ className, children, ...props }) => {
+        const match = /language-(\w+)/.exec(className || "");
+        const isInline = !match && !className;
+        const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
+        const codeContent = String(children).replace(/\n$/, "");
+
+        if (isInline) {
+          return <code className="luna-inline-code">{children}</code>;
+        }
+
+        return (
+          <div className="luna-code-block">
+            <div className="luna-code-header">
+              <span className="luna-code-lang">
+                {match ? match[1] : "code"}
+              </span>
+              <button
+                className="luna-code-copy"
+                onClick={() => handleCopyCode(codeContent, codeId)}
+                title="Copy code"
+              >
+                {copiedCodeId === codeId ? (
+                  <CheckCheck size={13} />
+                ) : (
+                  <Copy size={13} />
+                )}
+              </button>
+            </div>
+            <pre className="luna-pre">
+              <code className={className} {...props}>
+                {children}
+              </code>
+            </pre>
+          </div>
+        );
+      },
+      pre: ({ children }) => <>{children}</>,
+    }),
+    [handleCopyCode, copiedCodeId],
+  );
 
   return (
     <div className="luna-shell">
@@ -416,7 +667,10 @@ export default function Luna() {
                     }}
                     whileHover={{ x: 2 }}
                   >
-                    <MessageSquare size={13} className="luna-sidebar-item-icon" />
+                    <MessageSquare
+                      size={13}
+                      className="luna-sidebar-item-icon"
+                    />
                     <span className="luna-sidebar-item-title">{c.title}</span>
                     <span className="luna-sidebar-item-time">
                       {relativeTime(c.updatedAt)}
@@ -511,15 +765,19 @@ export default function Luna() {
                 transition={{ duration: 0.2 }}
               >
                 {messages.map((msg, i) => {
+                  if (msg.hidden) return null;
                   const visibleAssistantContent =
                     msg.role === "assistant"
                       ? stripCommandBlocks(msg.content, constellationHandlers)
                       : "";
                   const actionCards = actionResults[msg.id] ?? [];
                   const hasPendingAction = pendingActions.has(msg.id);
+                  const hasClarificationCard =
+                    !!clarificationData.current[msg.id];
                   const isStreamingAssistantPlaceholder =
                     msg.role === "assistant" &&
                     !msg.content &&
+                    !hasClarificationCard &&
                     i === messages.length - 1 &&
                     isStreaming;
                   const isStreamingWithContent =
@@ -529,11 +787,13 @@ export default function Luna() {
                     isStreaming;
                   const shouldRenderAssistantBubble =
                     msg.role === "assistant" &&
+                    !hasClarificationCard &&
                     (isStreamingAssistantPlaceholder ||
                       visibleAssistantContent.trim().length > 0);
                   const showMessageActions =
                     hoveredMessageId === msg.id &&
                     !isStreaming &&
+                    !hasClarificationCard &&
                     (msg.id === lastAssistantId || msg.id === lastUserId);
 
                   return (
@@ -552,27 +812,48 @@ export default function Luna() {
                       onMouseLeave={() => setHoveredMessageId(null)}
                       style={{ position: "relative" }}
                     >
-                      {(msg.role === "user" || shouldRenderAssistantBubble) && (
-                        <div
-                          className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}
-                        >
+                      {/* User bubble */}
+                      {msg.role === "user" && (
+                        <div className="luna-bubble luna-bubble-user">
+                          <span>{msg.content}</span>
+                        </div>
+                      )}
+
+                      {/* AI: clarification card (replaces bubble) */}
+                      {hasClarificationCard && (
+                        <ClarificationCard
+                          questions={clarificationData.current[msg.id]}
+                          disabled={isStreaming || msg.id !== lastAssistantId}
+                          onSubmit={(answers) =>
+                            handleClarificationSubmit(
+                              clarificationData.current[msg.id],
+                              answers,
+                            )
+                          }
+                        />
+                      )}
+
+                      {/* AI: normal markdown bubble */}
+                      {shouldRenderAssistantBubble && (
+                        <div className="luna-bubble luna-bubble-ai">
                           {isStreamingAssistantPlaceholder ? (
                             <div className="luna-typing-container">
                               <span className="typing-dot" />
                               <span className="typing-dot" />
                               <span className="typing-dot" />
                             </div>
-                          ) : msg.role === "assistant" ? (
+                          ) : (
                             <div className="prose-starfield">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={markdownComponents}
+                              >
                                 {visibleAssistantContent}
                               </ReactMarkdown>
                               {isStreamingWithContent && (
                                 <span className="luna-stream-cursor" />
                               )}
                             </div>
-                          ) : (
-                            <span>{msg.content}</span>
                           )}
                         </div>
                       )}
@@ -629,6 +910,26 @@ export default function Luna() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.15 }}
                         >
+                          <motion.button
+                            className="luna-msg-action-btn"
+                            title="Copy"
+                            onClick={() =>
+                              handleCopyMessage(
+                                msg.role === "assistant"
+                                  ? visibleAssistantContent
+                                  : msg.content,
+                                msg.id,
+                              )
+                            }
+                            whileHover={{ scale: 1.12 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            {copiedId === msg.id ? (
+                              <CheckCheck size={11} />
+                            ) : (
+                              <Copy size={11} />
+                            )}
+                          </motion.button>
                           {msg.id === lastAssistantId && (
                             <motion.button
                               className="luna-msg-action-btn"
@@ -708,19 +1009,352 @@ export default function Luna() {
                   <Sparkles size={13} />
                   <span>Constellations</span>
                 </motion.button>
-              </div>
-              {messages.length > 0 && (
                 <motion.button
-                  onClick={clearMessages}
-                  className="luna-tool-btn"
-                  title="Clear conversation"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setControlsOpen(true)}
+                  title="Luna Controls"
+                  className={`luna-tool-btn ${controlsOpen ? "luna-tool-btn-active" : ""}`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <Trash2 size={13} />
+                  <Settings size={13} />
+                  <span>Controls</span>
                 </motion.button>
-              )}
+              </div>
+              <div className="luna-toolbar-right">
+                <div className="luna-modes-bar">
+                  {lunaControls.shopping && (
+                    <span className="luna-mode-badge luna-mode-shopping">
+                      <ShoppingCart size={10} />
+                    </span>
+                  )}
+                  {lunaControls.research && (
+                    <span className="luna-mode-badge luna-mode-research">
+                      <Search size={10} />
+                    </span>
+                  )}
+                  {lunaControls.translation && (
+                    <span className="luna-mode-badge luna-mode-translation">
+                      <Languages size={10} />
+                    </span>
+                  )}
+                  {lunaControls.clarification && (
+                    <span className="luna-mode-badge luna-mode-clarify">
+                      <HelpCircle size={10} />
+                    </span>
+                  )}
+                </div>
+                {messages.length > 0 && (
+                  <motion.button
+                    onClick={() => {
+                      if (activeConversationId) {
+                        sessionModesRef.current[activeConversationId] = {
+                          shopping: false,
+                          research: false,
+                          translation: false,
+                        };
+                      }
+                      setLunaControls((prev) => ({
+                        ...prev,
+                        shopping: false,
+                        research: false,
+                        translation: false,
+                      }));
+                      clearMessages();
+                    }}
+                    className="luna-tool-btn"
+                    title="Clear conversation"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <Trash2 size={13} />
+                  </motion.button>
+                )}
+              </div>
             </div>
+
+            <AnimatePresence>
+              {controlsOpen && (
+                <motion.div
+                  className="luna-modal-overlay"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setControlsOpen(false)}
+                >
+                  <motion.div
+                    className="luna-modal-card"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="luna-modal-header">
+                      <h2 className="luna-modal-title">
+                        <Sparkle size={16} />
+                        Luna Controls
+                      </h2>
+                      <button
+                        className="luna-modal-close"
+                        onClick={() => setControlsOpen(false)}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    <div className="luna-modal-content">
+                      <div className="luna-modal-section">
+                        <h3 className="luna-modal-section-title">Tuning</h3>
+                        <div className="luna-modal-grid">
+                          <div className="luna-control-item">
+                            <label className="luna-control-label">
+                              <HelpCircle size={12} />
+                              Decision Style
+                            </label>
+                            <div className="luna-radio-group">
+                              {(
+                                [
+                                  "measured",
+                                  "balanced",
+                                  "decisive",
+                                ] as DecisionStyle[]
+                              ).map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  className={`luna-radio-btn ${lunaControls.decisionStyle === v ? "luna-radio-btn-active" : ""}`}
+                                  onClick={() => {
+                                    const next = {
+                                      ...lunaControls,
+                                      decisionStyle: v,
+                                    };
+                                    setLunaControls(next);
+                                    saveSettings({ decisionStyle: v });
+                                  }}
+                                >
+                                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="luna-control-item">
+                            <label className="luna-control-label">
+                              <Sparkle size={12} />
+                              Personality
+                            </label>
+                            <div className="luna-radio-group">
+                              {(
+                                [
+                                  "subtle",
+                                  "balanced",
+                                  "sharp",
+                                ] as PersonalityIntensity[]
+                              ).map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  className={`luna-radio-btn ${lunaControls.personalityIntensity === v ? "luna-radio-btn-active" : ""}`}
+                                  onClick={() => {
+                                    const next = {
+                                      ...lunaControls,
+                                      personalityIntensity: v,
+                                    };
+                                    setLunaControls(next);
+                                    saveSettings({ personalityIntensity: v });
+                                  }}
+                                >
+                                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="luna-control-item">
+                            <label className="luna-control-label">
+                              <Sparkle size={12} />
+                              Creativity
+                            </label>
+                            <div className="luna-radio-group">
+                              {(
+                                [
+                                  "neutral",
+                                  "moderate",
+                                  "creative",
+                                ] as CreativityLevel[]
+                              ).map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  className={`luna-radio-btn ${lunaControls.creativity === v ? "luna-radio-btn-active" : ""}`}
+                                  onClick={() => {
+                                    const next = {
+                                      ...lunaControls,
+                                      creativity: v,
+                                    };
+                                    setLunaControls(next);
+                                    saveSettings({ creativity: v });
+                                  }}
+                                >
+                                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="luna-control-item">
+                            <label className="luna-control-label">
+                              <AlignLeft size={12} />
+                              Response Style
+                            </label>
+                            <div className="luna-radio-group">
+                              {(
+                                [
+                                  { value: "concise", label: "Concise" },
+                                  { value: "balanced", label: "Balanced" },
+                                  { value: "detailed", label: "Detailed" },
+                                ] as { value: ResponseStyle; label: string }[]
+                              ).map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  className={`luna-radio-btn ${lunaControls.responseStyle === opt.value ? "luna-radio-btn-active" : ""}`}
+                                  onClick={() => {
+                                    const next = {
+                                      ...lunaControls,
+                                      responseStyle: opt.value,
+                                    };
+                                    setLunaControls(next);
+                                    saveSettings({ responseStyle: opt.value });
+                                  }}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="luna-modal-section">
+                        <h3 className="luna-modal-section-title">
+                          Clarification
+                        </h3>
+                        <p className="luna-modal-section-desc">
+                          Luna will ask follow-up questions when your message is
+                          ambiguous. This setting persists.
+                        </p>
+                        <div className="luna-clarify-card">
+                          <div className="luna-clarify-card-left">
+                            <HelpCircle size={18} />
+                            <div>
+                              <div className="luna-clarify-card-title">
+                                Always clarify
+                              </div>
+                              <div className="luna-clarify-card-desc">
+                                Ask before answering if intent is unclear
+                              </div>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={lunaControls.clarification}
+                            onChange={(checked) => {
+                              const next = {
+                                ...lunaControls,
+                                clarification: checked,
+                              };
+                              setLunaControls(next);
+                              saveSettings({ clarification: checked });
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="luna-modal-section">
+                        <h3 className="luna-modal-section-title">
+                          Session Modes
+                        </h3>
+                        <p className="luna-modal-section-desc">
+                          Temporary modes for this conversation only. Activating
+                          one deactivates the others. Reset when you start a new
+                          conversation.
+                        </p>
+                        <div className="luna-modes-grid">
+                          <button
+                            type="button"
+                            className={`luna-mode-card ${lunaControls.shopping ? "luna-mode-card-active-shopping" : ""}`}
+                            disabled={isStreaming || !hasDeepSeekKey}
+                            onClick={() =>
+                              handleModeActivation(
+                                "shopping",
+                                !lunaControls.shopping,
+                              )
+                            }
+                          >
+                            <div className="luna-mode-card-header">
+                              <ShoppingCart size={16} />
+                              <span>Shopping</span>
+                            </div>
+                            <p className="luna-mode-card-desc">
+                              Product comparisons, pros/cons, recommendations
+                            </p>
+                            <div
+                              className={`luna-mode-indicator ${lunaControls.shopping ? "luna-mode-indicator-on" : ""}`}
+                            />
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`luna-mode-card ${lunaControls.research ? "luna-mode-card-active-research" : ""}`}
+                            disabled={isStreaming || !hasDeepSeekKey}
+                            onClick={() =>
+                              handleModeActivation(
+                                "research",
+                                !lunaControls.research,
+                              )
+                            }
+                          >
+                            <div className="luna-mode-card-header">
+                              <Search size={16} />
+                              <span>Research</span>
+                            </div>
+                            <p className="luna-mode-card-desc">
+                              Deep analysis, sources, thorough breakdowns
+                            </p>
+                            <div
+                              className={`luna-mode-indicator ${lunaControls.research ? "luna-mode-indicator-on" : ""}`}
+                            />
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`luna-mode-card ${lunaControls.translation ? "luna-mode-card-active-translation" : ""}`}
+                            disabled={isStreaming || !hasDeepSeekKey}
+                            onClick={() =>
+                              handleModeActivation(
+                                "translation",
+                                !lunaControls.translation,
+                              )
+                            }
+                          >
+                            <div className="luna-mode-card-header">
+                              <Languages size={16} />
+                              <span>Translation</span>
+                            </div>
+                            <p className="luna-mode-card-desc">
+                              Accurate translation with cultural context
+                            </p>
+                            <div
+                              className={`luna-mode-indicator ${lunaControls.translation ? "luna-mode-indicator-on" : ""}`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="luna-input-row">
               <TextareaAutosize
@@ -740,8 +1374,16 @@ export default function Luna() {
                 onClick={() => void handleSend()}
                 disabled={!input.trim() || isStreaming || !hasDeepSeekKey}
                 title="Send"
-                whileHover={!(!input.trim() || isStreaming || !hasDeepSeekKey) ? { scale: 1.1 } : {}}
-                whileTap={!(!input.trim() || isStreaming || !hasDeepSeekKey) ? { scale: 0.9 } : {}}
+                whileHover={
+                  !(!input.trim() || isStreaming || !hasDeepSeekKey)
+                    ? { scale: 1.1 }
+                    : {}
+                }
+                whileTap={
+                  !(!input.trim() || isStreaming || !hasDeepSeekKey)
+                    ? { scale: 0.9 }
+                    : {}
+                }
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <ArrowUp size={16} />
