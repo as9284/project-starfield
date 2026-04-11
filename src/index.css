@@ -699,11 +699,8 @@ body {
 .cst-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(5, 5, 14, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  /* will-change keeps the blur layer pre-promoted so opacity
-     animation has no snap and costs only a compositor blend */
+  background: rgba(3, 3, 10, 0.97);
+  /* Keep the backdrop fade on its own compositor layer. */
   will-change: opacity;
 }
 

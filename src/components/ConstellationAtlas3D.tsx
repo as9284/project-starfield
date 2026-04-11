@@ -21,6 +21,7 @@ import {
 
 const _v3 = new THREE.Vector3();
 const _scale = new THREE.Vector3();
+const _origin = new THREE.Vector3();
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,8 +35,8 @@ const DESC_COLOR = "#9d90d4";
 function IntroCamera() {
   const { camera } = useThree();
   const progress = useRef(0);
-  const startPos = useMemo(() => new THREE.Vector3(0, 18, 32), []);
-  const endPos = useMemo(() => new THREE.Vector3(0, 7, 14), []);
+  const startPos = useMemo(() => new THREE.Vector3(0, 22, 40), []);
+  const endPos = useMemo(() => new THREE.Vector3(0, 9, 20), []);
 
   useEffect(() => {
     camera.position.copy(startPos);
@@ -207,9 +208,9 @@ function LunaCore() {
       </Billboard>
 
       {/* Core light — strong */}
-      <pointLight color="#9060ff" intensity={7} distance={25} decay={2} />
+      <pointLight color="#9060ff" intensity={8} distance={32} decay={2} />
       {/* Warm secondary */}
-      <pointLight color="#c084fc" intensity={2} distance={14} decay={2} />
+      <pointLight color="#c084fc" intensity={2.5} distance={20} decay={2} />
     </group>
   );
 }
@@ -448,6 +449,50 @@ const DETAIL_MAP: Record<ConstellationId, React.FC> = {
   pulsar: PulsarDetail,
 };
 
+// ── Camera focus — sticky + gentle ────────────────────────────────────────────
+
+interface CameraFocusProps {
+  focusedId: ConstellationId | null;
+  introValues: number[];
+}
+
+function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
+  const { controls } = useThree();
+
+  useFrame((state, delta) => {
+    if (!controls) return;
+    const ctrl = controls as unknown as {
+      target: THREE.Vector3;
+      update: () => void;
+    };
+
+    if (focusedId !== null) {
+      const idx = CONSTELLATIONS.findIndex((c) => c.id === focusedId);
+      const entry = CONSTELLATIONS[idx];
+      if (!entry) return;
+      const introT = introValues[idx] ?? 1;
+      const t = state.clock.getElapsedTime();
+      const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
+      const r = entry.orbitRadius * introT;
+      const tilt = entry.orbitTilt;
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const y =
+        Math.sin(angle) * r * Math.sin(tilt) +
+        Math.sin(t * 0.25 + entry.orbitOffset) * 0.35 * introT;
+      _v3.set(x, y, z);
+      // Gentle follow — low lerp factor so the camera glides
+      ctrl.target.lerp(_v3, 1 - Math.pow(0.12, delta));
+    } else {
+      // Drift back to centre slowly
+      ctrl.target.lerp(_origin, 1 - Math.pow(0.35, delta));
+    }
+    ctrl.update();
+  });
+
+  return null;
+}
+
 // ── Constellation node ───────────────────────────────────────────────────────
 
 interface NodeProps {
@@ -472,14 +517,16 @@ function ConstellationNode({
   const sphereRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const atmosphereRef = useRef<THREE.Mesh>(null);
+  const textGroupRef = useRef<THREE.Group>(null);
   const color = useMemo(() => new THREE.Color(entry.glowHex), [entry.glowHex]);
 
   const isHovered = hovered === entry.id;
   const isActive = active === entry.id;
   const highlighted = isHovered || isActive;
 
-  const targetSphereScale = highlighted ? 1.25 : 1.0;
-  const targetGlowScale = highlighted ? 1.4 : 1.0;
+  const ps = entry.planetSize;
+  const targetSphereScale = (highlighted ? 1.25 : 1.0) * ps;
+  const targetGlowScale = (highlighted ? 1.4 : 1.0) * ps;
   const targetEmissive = highlighted ? 1.8 : 0.7;
 
   const DetailComponent = DETAIL_MAP[entry.id];
@@ -490,9 +537,12 @@ function ConstellationNode({
     // Smooth orbit motion — introT scales the orbit radius from 0→full
     const currentRadius = entry.orbitRadius * introT;
     const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
+    const tilt = entry.orbitTilt;
     const x = Math.cos(angle) * currentRadius;
     const z = Math.sin(angle) * currentRadius;
-    const y = Math.sin(t * 0.25 + entry.orbitOffset) * 0.12 * introT;
+    const y =
+      Math.sin(angle) * currentRadius * Math.sin(tilt) +
+      Math.sin(t * 0.25 + entry.orbitOffset) * 0.35 * introT;
 
     if (groupRef.current) {
       _v3.set(x, y, z);
@@ -516,12 +566,18 @@ function ConstellationNode({
     }
 
     if (atmosphereRef.current) {
-      const atmoScale = (highlighted ? 1.55 : 1.3) * introT;
+      const atmoScale = (highlighted ? 1.55 : 1.3) * introT * ps;
       _scale.setScalar(atmoScale);
       atmosphereRef.current.scale.lerp(_scale, 0.06);
       const mat = atmosphereRef.current.material as THREE.MeshStandardMaterial;
       mat.opacity +=
         ((highlighted ? 0.08 : 0.03) * introT - mat.opacity) * 0.06;
+    }
+
+    if (textGroupRef.current) {
+      const textScale = (highlighted ? 1.3 : 1.0) * Math.max(ps, 0.9) * introT;
+      _scale.setScalar(textScale);
+      textGroupRef.current.scale.lerp(_scale, 0.1);
     }
   });
 
@@ -574,41 +630,43 @@ function ConstellationNode({
         {/* Per-node light */}
         <pointLight
           color={entry.glowHex}
-          intensity={0.8}
-          distance={4}
+          intensity={1.0}
+          distance={6}
           decay={2}
         />
         {/* Label */}
-        <Billboard follow lockX={false} lockY={false} lockZ={false}>
-          <Text
-            position={[0, 0.65, 0]}
-            fontSize={0.24}
-            color={LABEL_COLOR}
-            anchorX="center"
-            anchorY="bottom"
-            font={undefined}
-            outlineWidth={0.015}
-            outlineColor="#08081a"
-          >
-            {entry.name}
-          </Text>
-          {highlighted && (
+        <group ref={textGroupRef}>
+          <Billboard follow lockX={false} lockY={false} lockZ={false}>
             <Text
-              position={[0, -0.55, 0]}
-              fontSize={0.13}
-              color={DESC_COLOR}
+              position={[0, 0.65, 0]}
+              fontSize={0.24}
+              color={LABEL_COLOR}
               anchorX="center"
-              anchorY="top"
-              maxWidth={2.2}
-              textAlign="center"
+              anchorY="bottom"
               font={undefined}
-              outlineWidth={0.008}
+              outlineWidth={0.015}
               outlineColor="#08081a"
             >
-              {entry.description}
+              {entry.name}
             </Text>
-          )}
-        </Billboard>
+            {highlighted && (
+              <Text
+                position={[0, -0.55, 0]}
+                fontSize={0.13}
+                color={DESC_COLOR}
+                anchorX="center"
+                anchorY="top"
+                maxWidth={2.2}
+                textAlign="center"
+                font={undefined}
+                outlineWidth={0.008}
+                outlineColor="#08081a"
+              >
+                {entry.description}
+              </Text>
+            )}
+          </Billboard>
+        </group>
       </group>
     </>
   );
@@ -623,6 +681,7 @@ interface SceneProps {
 
 function Scene({ activeView, onSelect }: SceneProps) {
   const [hovered, setHovered] = useState<ConstellationId | null>(null);
+  const [focusedId, setFocusedId] = useState<ConstellationId | null>(null);
 
   // Intro animation progress — one value per node, staggered
   const introStartTime = useRef(performance.now());
@@ -648,8 +707,10 @@ function Scene({ activeView, onSelect }: SceneProps) {
   // Global intro progress for orbit rings (fastest node)
   const ringIntro = Math.max(...introValues, 0);
 
+  // Hovering a planet makes it sticky-focused; clicking empty space unfocuses
   const handleHover = useCallback((id: ConstellationId | null) => {
     setHovered(id);
+    if (id !== null) setFocusedId(id);
     document.body.style.cursor = id ? "pointer" : "auto";
   }, []);
 
@@ -659,6 +720,28 @@ function Scene({ activeView, onSelect }: SceneProps) {
     },
     [onSelect],
   );
+
+  // Click on empty space (missed all planets) → clear focus
+  const handleMiss = useCallback(() => {
+    setFocusedId(null);
+  }, []);
+
+  // Left-drag on empty space also clears focus (pointerDown tracks intent)
+  const dragging = useRef(false);
+  const handlePointerDown = useCallback(
+    (e: THREE.Event<PointerEvent>) => {
+      if ((e as unknown as PointerEvent).button === 0 && focusedId !== null) {
+        dragging.current = true;
+      }
+    },
+    [focusedId],
+  );
+  const handlePointerMove = useCallback(() => {
+    if (dragging.current) {
+      dragging.current = false;
+      setFocusedId(null);
+    }
+  }, []);
 
   const radii = useMemo(
     () => [...new Set(CONSTELLATIONS.map((c) => c.orbitRadius))],
@@ -671,14 +754,14 @@ function Scene({ activeView, onSelect }: SceneProps) {
       <IntroCamera />
 
       {/* Ambient fill */}
-      <ambientLight intensity={0.15} color="#bba9fb" />
+      <ambientLight intensity={0.18} color="#bba9fb" />
       {/* Key lights */}
-      <pointLight position={[12, 10, 8]} intensity={0.5} color="#d946ef" />
-      <pointLight position={[-10, -6, -12]} intensity={0.3} color="#6366f1" />
-      <pointLight position={[0, -8, 0]} intensity={0.15} color="#4f46e5" />
+      <pointLight position={[14, 12, 10]} intensity={0.55} color="#d946ef" />
+      <pointLight position={[-12, -8, -14]} intensity={0.35} color="#6366f1" />
+      <pointLight position={[0, -10, 0]} intensity={0.18} color="#4f46e5" />
 
-      {/* Fog */}
-      <fog attach="fog" args={["#06060e", 12, 30]} />
+      {/* Fog — pushed far enough so the outer ring (r=7.8) is fully visible */}
+      <fog attach="fog" args={["#06060e", 18, 42]} />
 
       {/* Central star: Luna */}
       <LunaCore />
@@ -701,19 +784,38 @@ function Scene({ activeView, onSelect }: SceneProps) {
         />
       ))}
 
-      {/* Camera controls */}
+      {/* Camera focus — lerps OrbitControls target toward the focused planet */}
+      <CameraFocus focusedId={focusedId} introValues={introValues} />
+
+      {/* Click-miss clears focus; left-drag on empty space also re-centers */}
+      <mesh
+        visible={false}
+        onPointerMissed={handleMiss}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+      >
+        <planeGeometry args={[200, 200]} />
+      </mesh>
+
+      {/* Camera controls — rotate with right-click, left-click reserved for focus */}
       <OrbitControls
+        makeDefault
         enablePan={false}
         enableZoom={true}
         minDistance={4}
-        maxDistance={18}
+        maxDistance={28}
         maxPolarAngle={Math.PI * 0.65}
         minPolarAngle={Math.PI * 0.25}
-        autoRotate
+        autoRotate={focusedId === null}
         autoRotateSpeed={0.2}
         dampingFactor={0.05}
         enableDamping
         rotateSpeed={0.5}
+        mouseButtons={{
+          LEFT: undefined as unknown as THREE.MOUSE,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE,
+        }}
       />
     </>
   );
@@ -732,7 +834,7 @@ export default function ConstellationAtlas3D({
 }: ConstellationAtlas3DProps) {
   return (
     <Canvas
-      camera={{ position: [0, 18, 32], fov: 42 }}
+      camera={{ position: [0, 22, 40], fov: 44 }}
       style={{
         position: "absolute",
         inset: 0,

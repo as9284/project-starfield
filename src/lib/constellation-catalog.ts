@@ -48,6 +48,10 @@ export interface ConstellationEntry {
   orbitSpeed: number;
   /** Starting angle on the orbit (radians). */
   orbitOffset: number;
+  /** Vertical tilt of the orbit plane (radians). */
+  orbitTilt: number;
+  /** Planet sphere size multiplier (1 = default 0.3 radius). */
+  planetSize: number;
   /** Optional group tag for future categorisation. */
   group?: string;
   /** Optional search aliases for future search. */
@@ -67,9 +71,11 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     accentColor: "rgba(124, 79, 240, 0.55)",
     glowHex: "#7c4ff0",
     shortcutNum: "2",
-    orbitRadius: 3.6,
-    orbitSpeed: 0.8,
+    orbitRadius: 3.0,
+    orbitSpeed: 1.25,
     orbitOffset: 0,
+    orbitTilt: 0.05,
+    planetSize: 1.15,
     group: "productivity",
     aliases: ["tasks", "notes", "todo"],
   },
@@ -81,9 +87,11 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     accentColor: "rgba(217, 70, 239, 0.55)",
     glowHex: "#d946ef",
     shortcutNum: "3",
-    orbitRadius: 4.2,
-    orbitSpeed: 0.65,
+    orbitRadius: 5.2,
+    orbitSpeed: 0.45,
     orbitOffset: TAU / 5,
+    orbitTilt: -0.12,
+    planetSize: 1.4,
     group: "intelligence",
     aliases: ["weather", "forecast"],
   },
@@ -95,9 +103,11 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     accentColor: "rgba(99, 102, 241, 0.55)",
     glowHex: "#6366f1",
     shortcutNum: "4",
-    orbitRadius: 5.0,
-    orbitSpeed: 0.5,
+    orbitRadius: 7.8,
+    orbitSpeed: 0.28,
     orbitOffset: (TAU / 5) * 2,
+    orbitTilt: 0.18,
+    planetSize: 0.85,
     group: "development",
     aliases: ["code", "explore", "project"],
   },
@@ -109,9 +119,11 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     accentColor: "rgba(20, 184, 166, 0.55)",
     glowHex: "#14b8a6",
     shortcutNum: "5",
-    orbitRadius: 4.6,
-    orbitSpeed: 0.72,
+    orbitRadius: 6.4,
+    orbitSpeed: 0.68,
     orbitOffset: (TAU / 5) * 3,
+    orbitTilt: -0.08,
+    planetSize: 0.95,
     group: "utility",
     aliases: ["url", "shorten", "link"],
   },
@@ -123,9 +135,11 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     accentColor: "rgba(155, 120, 248, 0.55)",
     glowHex: "#9b78f8",
     shortcutNum: "6",
-    orbitRadius: 3.9,
-    orbitSpeed: 0.9,
+    orbitRadius: 4.1,
+    orbitSpeed: 1.05,
     orbitOffset: (TAU / 5) * 4,
+    orbitTilt: 0.22,
+    planetSize: 1.25,
     group: "media",
     aliases: ["download", "video", "music", "youtube"],
   },

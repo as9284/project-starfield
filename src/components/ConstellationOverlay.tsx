@@ -38,8 +38,7 @@ function prefersReducedMotion(): boolean {
 // ── Variants ─────────────────────────────────────────────────────────────────
 // Using a single variant tree so Framer Motion orchestrates all children as
 // one coordinated timeline instead of independent, potentially de-synced
-// animations. This also lets us animate backdropFilter as a string value so
-// the blur grows in smoothly rather than snapping at the end of an opacity fade.
+// animations. This keeps the backdrop fade and scene entrance aligned.
 
 const shellVariants = {
   hidden: { opacity: 0 },
@@ -61,9 +60,7 @@ const shellVariants = {
 };
 
 const backdropVariants = {
-  // Opacity-only: blur stays static in CSS so the GPU never recalculates
-  // it per-frame. will-change: opacity in CSS pre-promotes the layer so
-  // the blur texture is ready before the fade starts, eliminating the snap.
+  // Fade the dark backdrop without introducing extra backdrop processing.
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -151,7 +148,7 @@ export default function ConstellationOverlay() {
       animate="visible"
       exit="exit"
     >
-      {/* Backdrop — blur and background animate as one to avoid the snap */}
+      {/* Backdrop — keep it darker without blurring the app underneath */}
       <motion.div
         className="cst-backdrop"
         variants={backdropVariants}
