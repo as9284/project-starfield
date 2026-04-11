@@ -1,6 +1,6 @@
 [package]
 name = "starfield"
-version = "1.0.7"
+version = "1.0.8"
 description = "Starfield — an AI-powered universe of intelligent features"
 authors = ["as9284"]
 edition = "2021"
@@ -37,6 +37,7 @@ keyring = { version = "3", features = ["apple-native"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["linux-native-sync-persistent", "crypto-rust"] }
+
 
 
 
