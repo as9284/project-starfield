@@ -536,6 +536,42 @@ body {
   animation-delay: 0.4s;
 }
 
+.luna-typing-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: rgba(14, 13, 36, 0.5);
+  border: 1px solid rgba(124, 79, 240, 0.1);
+}
+
+.luna-typing-container .typing-dot {
+  box-shadow: 0 0 6px rgba(124, 79, 240, 0.4);
+}
+
+@keyframes stream-cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.luna-stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--color-purple-400);
+  border-radius: 1px;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: stream-cursor-blink 0.8s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(124, 79, 240, 0.5);
+}
+
 /* ── Prose markdown ─────────────────────────────────────────────────────── */
 .prose-starfield {
   color: var(--color-text-primary);
@@ -620,6 +656,17 @@ body {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -771,6 +818,20 @@ body {
   flex-direction: row;
   min-height: 0;
   position: relative;
+  overflow: hidden;
+}
+
+.star-particles-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.luna-shell > *:not(.star-particles-canvas) {
+  position: relative;
+  z-index: 1;
 }
 
 .luna-messages {
@@ -816,10 +877,48 @@ body {
 }
 
 .luna-greeting {
-  font-size: 1rem;
-  color: var(--color-text-secondary);
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
   text-align: center;
   margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.luna-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 460px;
+  margin-top: 0.25rem;
+}
+
+.luna-quick-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 79, 240, 0.18);
+  background: rgba(14, 13, 36, 0.6);
+  backdrop-filter: blur(12px);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
+}
+
+.luna-quick-chip:hover {
+  border-color: rgba(124, 79, 240, 0.35);
+  background: rgba(124, 79, 240, 0.1);
+  color: var(--color-text-primary);
+  box-shadow: 0 0 16px rgba(124, 79, 240, 0.12);
 }
 
 .luna-settings-link {
@@ -830,6 +929,11 @@ body {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.luna-settings-link:hover {
+  color: var(--color-purple-300);
 }
 
 .luna-chat-list {
@@ -867,17 +971,33 @@ body {
 }
 
 .luna-bubble-user {
-  background: rgba(124, 79, 240, 0.16);
-  border: 1px solid rgba(124, 79, 240, 0.28);
+  background: rgba(124, 79, 240, 0.14);
+  border: 1px solid rgba(124, 79, 240, 0.24);
   border-radius: 16px 16px 4px 16px;
   color: var(--color-text-primary);
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.luna-bubble-user:hover {
+  border-color: rgba(124, 79, 240, 0.35);
+  box-shadow: 0 0 20px rgba(124, 79, 240, 0.08);
 }
 
 .luna-bubble-ai {
-  background: transparent;
-  border: none;
+  background: rgba(14, 13, 36, 0.35);
+  border: 1px solid rgba(124, 79, 240, 0.08);
+  border-left: 2px solid rgba(124, 79, 240, 0.25);
+  border-radius: 4px 14px 14px 14px;
   color: var(--color-text-primary);
-  padding-left: 0.25rem;
+  padding-left: 0.85rem;
+  transition: border-color 0.2s ease;
+}
+
+.luna-bubble-ai:hover {
+  border-color: rgba(124, 79, 240, 0.18);
+  border-left-color: rgba(124, 79, 240, 0.4);
 }
 
 .luna-msg-action-btn {
@@ -935,11 +1055,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  transition: border-color 0.2s;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  backdrop-filter: blur(12px);
 }
 
 .luna-input-container:focus-within {
   border-color: rgba(124, 79, 240, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(124, 79, 240, 0.08),
+    0 0 24px -4px rgba(124, 79, 240, 0.12);
 }
 
 .luna-toolbar {
@@ -1010,7 +1136,7 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: var(--color-purple-700);
+  background: linear-gradient(135deg, var(--color-purple-600), var(--color-purple-800));
   border: none;
   cursor: pointer;
   display: flex;
@@ -1018,18 +1144,14 @@ body {
   justify-content: center;
   color: white;
   transition:
-    background 0.15s,
+    background 0.2s,
     opacity 0.15s,
-    transform 0.1s;
+    box-shadow 0.2s;
 }
 
 .luna-send-btn:hover:not(:disabled) {
-  background: var(--color-purple-600);
-  transform: scale(1.05);
-}
-
-.luna-send-btn:active:not(:disabled) {
-  transform: scale(0.95);
+  background: linear-gradient(135deg, var(--color-purple-500), var(--color-purple-700));
+  box-shadow: 0 0 20px rgba(124, 79, 240, 0.35);
 }
 
 .luna-send-btn:disabled {
@@ -1055,8 +1177,13 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: rgba(10, 8, 30, 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(10, 8, 30, 0.92),
+    rgba(6, 6, 14, 0.96)
+  );
   border-right: 1px solid rgba(124, 79, 240, 0.12);
+  backdrop-filter: blur(16px);
   z-index: 10;
 }
 
@@ -1065,7 +1192,6 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid rgba(124, 79, 240, 0.08);
 }
 
 .luna-sidebar-new {
@@ -1109,14 +1235,14 @@ body {
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.12s,
-    color 0.12s;
+    background 0.15s ease,
+    color 0.15s ease;
   position: relative;
 }
 
 .luna-sidebar-item:hover {
-  background: rgba(124, 79, 240, 0.06);
-  color: var(--color-text-secondary);
+  background: rgba(124, 79, 240, 0.07);
+  color: var(--color-text-primary);
 }
 
 .luna-sidebar-item-active {
@@ -1134,6 +1260,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.luna-sidebar-item-time {
+  flex-shrink: 0;
+  font-size: 0.675rem;
+  color: var(--color-text-dim);
+  margin-left: auto;
+  padding-left: 0.25rem;
 }
 
 .luna-sidebar-item-delete {
@@ -1294,6 +1428,14 @@ body {
   font-size: 0.8125rem;
   color: var(--color-text-primary);
   animation: fadeSlideUp 0.25s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+
+.luna-action-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .luna-action-card-error {

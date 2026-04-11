@@ -18,6 +18,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AiGlobe } from "../components/AiGlobe";
+import { StarParticles } from "../components/StarParticles";
 import {
   useAppStore,
   MAX_CONVERSATION_TITLE_LENGTH,
@@ -40,6 +41,20 @@ import {
 } from "../lib/constellations";
 
 type ControlledView = Exclude<AppView, "luna" | "settings">;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return `${Math.floor(days / 7)}w`;
+}
 
 // ── Main component ───────────────────────────────────────────────────────────
 
@@ -336,90 +351,110 @@ export default function Luna() {
 
   return (
     <div className="luna-shell">
+      {/* Ambient star particles */}
+      <StarParticles />
+
       {/* Sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             className="luna-sidebar"
-            initial={{ x: -260, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -260, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            initial={{ opacity: 0, marginLeft: -250 }}
+            animate={{ opacity: 1, marginLeft: 0 }}
+            exit={{ opacity: 0, marginLeft: -250 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
             <div className="luna-sidebar-header">
-              <button
+              <motion.button
                 className="luna-sidebar-new"
                 onClick={() => createConversation()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
                 <Plus size={14} />
                 <span>New Conversation</span>
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 className="luna-tool-btn"
                 onClick={() => setSidebarOpen(false)}
                 title="Close sidebar"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
               >
                 <PanelLeftClose size={15} />
-              </button>
+              </motion.button>
             </div>
             <div className="luna-sidebar-list">
-              {sortedConversations.map((c) => (
-                <button
-                  key={c.id}
-                  className={`luna-sidebar-item ${c.id === activeConversationId ? "luna-sidebar-item-active" : ""}`}
-                  onClick={() => switchConversation(c.id)}
-                >
-                  <MessageSquare size={13} className="luna-sidebar-item-icon" />
-                  <span className="luna-sidebar-item-title">{c.title}</span>
-                  {confirmDeleteConvId === c.id ? (
-                    <span
-                      className="luna-sidebar-item-delete flex items-center gap-0.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span
-                        className="text-[10px] mr-0.5"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        Delete?
-                      </span>
-                      <button
-                        className="inline-flex items-center p-0.5 rounded"
-                        style={{ color: "rgba(248, 113, 113, 0.9)" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversation(c.id);
-                          setConfirmDeleteConvId(null);
-                        }}
-                        title="Confirm delete"
-                      >
-                        <Check size={11} />
-                      </button>
-                      <button
-                        className="inline-flex items-center p-0.5 rounded"
-                        style={{ color: "var(--color-text-muted)" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmDeleteConvId(null);
-                        }}
-                        title="Cancel"
-                      >
-                        <X size={11} />
-                      </button>
+              <AnimatePresence>
+                {sortedConversations.map((c, i) => (
+                  <motion.button
+                    key={c.id}
+                    className={`luna-sidebar-item ${c.id === activeConversationId ? "luna-sidebar-item-active" : ""}`}
+                    onClick={() => switchConversation(c.id)}
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{
+                      duration: 0.2,
+                      delay: Math.min(i * 0.03, 0.15),
+                    }}
+                    whileHover={{ x: 2 }}
+                  >
+                    <MessageSquare size={13} className="luna-sidebar-item-icon" />
+                    <span className="luna-sidebar-item-title">{c.title}</span>
+                    <span className="luna-sidebar-item-time">
+                      {relativeTime(c.updatedAt)}
                     </span>
-                  ) : (
-                    <button
-                      className="luna-sidebar-item-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmDeleteConvId(c.id);
-                      }}
-                      title="Delete conversation"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </button>
-              ))}
+                    {confirmDeleteConvId === c.id ? (
+                      <span
+                        className="luna-sidebar-item-delete flex items-center gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span
+                          className="text-[10px] mr-0.5"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
+                          Delete?
+                        </span>
+                        <button
+                          className="inline-flex items-center p-0.5 rounded"
+                          style={{ color: "rgba(248, 113, 113, 0.9)" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConversation(c.id);
+                            setConfirmDeleteConvId(null);
+                          }}
+                          title="Confirm delete"
+                        >
+                          <Check size={11} />
+                        </button>
+                        <button
+                          className="inline-flex items-center p-0.5 rounded"
+                          style={{ color: "var(--color-text-muted)" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteConvId(null);
+                          }}
+                          title="Cancel"
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        className="luna-sidebar-item-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteConvId(c.id);
+                        }}
+                        title="Delete conversation"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
@@ -440,12 +475,15 @@ export default function Luna() {
               >
                 <AiGlobe size={240} />
                 {!hasDeepSeekKey && (
-                  <button
+                  <motion.button
                     className="luna-settings-link"
                     onClick={() => setView("settings")}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
                   >
-                    Open Settings
-                  </button>
+                    Open Settings to add your API key
+                  </motion.button>
                 )}
               </motion.div>
             ) : (
@@ -468,6 +506,11 @@ export default function Luna() {
                     !msg.content &&
                     i === messages.length - 1 &&
                     isStreaming;
+                  const isStreamingWithContent =
+                    msg.role === "assistant" &&
+                    !!msg.content &&
+                    i === messages.length - 1 &&
+                    isStreaming;
                   const shouldRenderAssistantBubble =
                     msg.role === "assistant" &&
                     (isStreamingAssistantPlaceholder ||
@@ -481,10 +524,12 @@ export default function Luna() {
                     <motion.div
                       key={msg.id}
                       className={`luna-msg ${msg.role === "user" ? "luna-msg-user" : "luna-msg-ai"}`}
-                      initial={{ opacity: 0, y: 8 }}
+                      initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{
-                        duration: 0.25,
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 24,
                         delay: Math.min(i * 0.03, 0.15),
                       }}
                       onMouseEnter={() => setHoveredMessageId(msg.id)}
@@ -496,7 +541,7 @@ export default function Luna() {
                           className={`luna-bubble ${msg.role === "user" ? "luna-bubble-user" : "luna-bubble-ai"}`}
                         >
                           {isStreamingAssistantPlaceholder ? (
-                            <div className="flex gap-1 items-center h-4">
+                            <div className="luna-typing-container">
                               <span className="typing-dot" />
                               <span className="typing-dot" />
                               <span className="typing-dot" />
@@ -506,6 +551,9 @@ export default function Luna() {
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {visibleAssistantContent}
                               </ReactMarkdown>
+                              {isStreamingWithContent && (
+                                <span className="luna-stream-cursor" />
+                              )}
                             </div>
                           ) : (
                             <span>{msg.content}</span>
@@ -522,11 +570,22 @@ export default function Luna() {
                             );
                             if (!handler) return null;
                             return (
-                              <handler.ResultCard
+                              <motion.div
                                 key={ri}
-                                result={result}
-                                onNavigate={(v) => setView(v as AppView)}
-                              />
+                                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 300,
+                                  damping: 24,
+                                  delay: ri * 0.08,
+                                }}
+                              >
+                                <handler.ResultCard
+                                  result={result}
+                                  onNavigate={(v) => setView(v as AppView)}
+                                />
+                              </motion.div>
                             );
                           })}
                         </div>
@@ -535,9 +594,11 @@ export default function Luna() {
                       {/* Pending indicator */}
                       {msg.role === "assistant" && hasPendingAction && (
                         <div className="luna-action-pending">
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
+                          <div className="luna-typing-container">
+                            <span className="typing-dot" />
+                            <span className="typing-dot" />
+                            <span className="typing-dot" />
+                          </div>
                           <span className="luna-action-pending-label">
                             Executing…
                           </span>
@@ -546,28 +607,35 @@ export default function Luna() {
 
                       {/* Hover action buttons */}
                       {showMessageActions && (
-                        <div
+                        <motion.div
                           className={`luna-msg-actions ${msg.role === "user" ? "luna-msg-actions-user" : "luna-msg-actions-ai"}`}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.15 }}
                         >
                           {msg.id === lastAssistantId && (
-                            <button
+                            <motion.button
                               className="luna-msg-action-btn"
                               title="Retry"
                               onClick={() => void handleRetry()}
+                              whileHover={{ scale: 1.12 }}
+                              whileTap={{ scale: 0.9 }}
                             >
                               <RotateCcw size={11} />
-                            </button>
+                            </motion.button>
                           )}
                           {msg.id === lastUserId && (
-                            <button
+                            <motion.button
                               className="luna-msg-action-btn"
                               title="Edit"
                               onClick={handleEdit}
+                              whileHover={{ scale: 1.12 }}
+                              whileTap={{ scale: 0.9 }}
                             >
                               <Pencil size={11} />
-                            </button>
+                            </motion.button>
                           )}
-                        </div>
+                        </motion.div>
                       )}
                     </motion.div>
                   );
@@ -583,18 +651,20 @@ export default function Luna() {
           <div className="luna-input-container">
             <div className="luna-toolbar">
               <div className="luna-toolbar-left">
-                <button
+                <motion.button
                   onClick={() => setSidebarOpen((v) => !v)}
                   title="Toggle conversations"
-                  className="luna-tool-btn"
+                  className={`luna-tool-btn ${sidebarOpen ? "luna-tool-btn-active" : ""}`}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
                 >
                   {sidebarOpen ? (
                     <PanelLeftClose size={13} />
                   ) : (
                     <PanelLeftOpen size={13} />
                   )}
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={() => hasTavilyKey && setWebSearchEnabled((v) => !v)}
                   title={
                     hasTavilyKey
@@ -606,27 +676,33 @@ export default function Luna() {
                     cursor: hasTavilyKey ? "pointer" : "not-allowed",
                     opacity: hasTavilyKey ? 1 : 0.4,
                   }}
+                  whileHover={hasTavilyKey ? { scale: 1.05 } : {}}
+                  whileTap={hasTavilyKey ? { scale: 0.95 } : {}}
                 >
                   <Globe size={13} />
                   <span>Search</span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={toggleConstellations}
                   title={`Constellations (${modLabel}K)`}
                   className={`luna-tool-btn ${showConstellations ? "luna-tool-btn-active" : ""}`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <Sparkles size={13} />
                   <span>Constellations</span>
-                </button>
+                </motion.button>
               </div>
               {messages.length > 0 && (
-                <button
+                <motion.button
                   onClick={clearMessages}
                   className="luna-tool-btn"
                   title="Clear conversation"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
                 >
                   <Trash2 size={13} />
-                </button>
+                </motion.button>
               )}
             </div>
 
@@ -643,14 +719,17 @@ export default function Luna() {
                 maxRows={5}
                 disabled={isStreaming || !hasDeepSeekKey}
               />
-              <button
+              <motion.button
                 className="luna-send-btn"
                 onClick={() => void handleSend()}
                 disabled={!input.trim() || isStreaming || !hasDeepSeekKey}
                 title="Send"
+                whileHover={!(!input.trim() || isStreaming || !hasDeepSeekKey) ? { scale: 1.1 } : {}}
+                whileTap={!(!input.trim() || isStreaming || !hasDeepSeekKey) ? { scale: 0.9 } : {}}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <ArrowUp size={16} />
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>

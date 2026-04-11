@@ -8,7 +8,7 @@
  */
 
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Text, Billboard, OrbitControls, Line } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -729,8 +729,8 @@ function Scene({ activeView, onSelect }: SceneProps) {
   // Left-drag on empty space also clears focus (pointerDown tracks intent)
   const dragging = useRef(false);
   const handlePointerDown = useCallback(
-    (e: THREE.Event<PointerEvent>) => {
-      if ((e as unknown as PointerEvent).button === 0 && focusedId !== null) {
+    (e: ThreeEvent<PointerEvent>) => {
+      if (e.button === 0 && focusedId !== null) {
         dragging.current = true;
       }
     },
