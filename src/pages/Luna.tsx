@@ -99,6 +99,20 @@ export default function Luna() {
   >({});
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const streamAborted = useRef(false);
+
+  // Cleanup: if component unmounts while streaming, clear the streaming state
+  useEffect(() => {
+    return () => {
+      if (streamAborted.current) return;
+      const state = useAppStore.getState();
+      if (state.isStreaming) {
+        state.setIsStreaming(false);
+        // Remove the empty/partial assistant message left by the aborted stream
+        state.removeLastAssistantMessage();
+      }
+    };
+  }, []);
 
   const sortedConversations = useMemo(
     () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -235,8 +249,10 @@ export default function Luna() {
 
         const extracted = extractMemories(text, accumulated);
         for (const mem of extracted) addMemory(mem);
+        streamAborted.current = true; // Stream completed successfully
       } catch (e) {
         updateLastAssistantMessage(`Error: ${String(e)}`);
+        streamAborted.current = true; // Stream errored, no cleanup needed
       } finally {
         setIsStreaming(false);
         const shouldExecute =

@@ -1,9 +1,14 @@
 import { Minus, Maximize2, X, Sparkles, Settings2 } from "lucide-react";
 import { minimizeWindow, maximizeWindow, closeWindow } from "../lib/tauri";
 import { useAppStore } from "../store/useAppStore";
+import type { AppView } from "../store/useAppStore";
 import { modLabel } from "../lib/platform";
 
-export default function TitleBar() {
+interface TitleBarProps {
+  onPrefetchView?: (view: AppView) => void;
+}
+
+export default function TitleBar({ onPrefetchView }: TitleBarProps) {
   const { view, setView, closeConstellations } = useAppStore();
 
   return (
@@ -20,6 +25,7 @@ export default function TitleBar() {
             closeConstellations();
             setView("luna");
           }}
+          onMouseEnter={() => onPrefetchView?.("luna")}
           className={`topbar-nav-btn${view === "luna" ? " topbar-nav-btn-active" : ""}`}
           title={`Luna (${modLabel}1)`}
         >
@@ -32,6 +38,7 @@ export default function TitleBar() {
             closeConstellations();
             setView("settings");
           }}
+          onMouseEnter={() => onPrefetchView?.("settings")}
           className={`topbar-nav-btn${view === "settings" ? " topbar-nav-btn-active" : ""}`}
           title={`Settings (${modLabel},)`}
         >

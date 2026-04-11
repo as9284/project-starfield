@@ -295,8 +295,8 @@ export const useAppStore = create<AppState>()(
       version: 1,
       partialize: (s) => ({
         conversations: s.conversations
-          .slice(0, 50)
-          .map((c) => ({ ...c, messages: c.messages.slice(-100) })),
+          .slice(0, 20)
+          .map((c) => ({ ...c, messages: c.messages.slice(-50) })),
         activeConversationId: s.activeConversationId,
         memories: s.memories,
         hasDeepSeekKey: s.hasDeepSeekKey,

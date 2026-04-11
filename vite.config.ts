@@ -16,6 +16,8 @@ export default defineConfig(async () => ({
           "vendor-framer": ["framer-motion"],
           "vendor-markdown": ["react-markdown", "remark-gfm"],
           "vendor-tauri": ["@tauri-apps/api"],
+          "vendor-three": ["three", "@react-three/fiber", "@react-three/drei"],
+          "vendor-recharts": ["recharts"],
         },
       },
     },

@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TitleBar from "./components/TitleBar";
 import ConstellationOverlay from "./components/ConstellationOverlay";
 import SplashScreen from "./components/SplashScreen";
 import Luna from "./pages/Luna";
-import Orbit from "./pages/Orbit";
-import Solaris from "./pages/Solaris";
-import Beacon from "./pages/Beacon";
-import Pulsar from "./pages/Pulsar";
-import Hyperlane from "./pages/Hyperlane";
-import Settings from "./pages/Settings";
 import { useAppStore } from "./store/useAppStore";
 import { getDeepSeekKey, getTavilyKey, getWeatherKey, win } from "./lib/tauri";
 import { buildShortcutMap } from "./lib/constellation-catalog";
 
 const SHORTCUT_MAP = buildShortcutMap();
+
+const Orbit = lazy(() => import("./pages/Orbit"));
+const Solaris = lazy(() => import("./pages/Solaris"));
+const Beacon = lazy(() => import("./pages/Beacon"));
+const Pulsar = lazy(() => import("./pages/Pulsar"));
+const Hyperlane = lazy(() => import("./pages/Hyperlane"));
+const Settings = lazy(() => import("./pages/Settings"));
+
+// Prefetch modules on hover
+function prefetch(module: () => Promise<unknown>) {
+  module();
+}
 
 const slideIn = {
   initial: { opacity: 0, x: 10 },
@@ -22,6 +28,12 @@ const slideIn = {
   exit: { opacity: 0, x: -10 },
   transition: { duration: 0.2 },
 };
+
+const pageFallback = (
+  <div className="flex-1 flex items-center justify-center">
+    <div className="status-dot" />
+  </div>
+);
 
 export default function App() {
   const {
@@ -36,11 +48,16 @@ export default function App() {
     isStreaming,
   } = useAppStore();
 
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
+
   const [isMaximized, setIsMaximized] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const splashStartRef = useRef(Date.now());
-  // Minimum time the splash is visible (ms)
-  const SPLASH_MIN_MS = 900;
+  const SPLASH_MIN_MS = 600;
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
@@ -114,72 +131,70 @@ export default function App() {
   }, [setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey]);
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────
+  // Use refs for state values so the listener is never re-attached
+  const showConstRef = useRef(showConstellations);
+  useEffect(() => { showConstRef.current = showConstellations; }, [showConstellations]);
+
+  const goBackRef = useRef(goBack);
+  useEffect(() => { goBackRef.current = goBack; }, [goBack]);
+
+  const setViewRef = useRef(setView);
+  useEffect(() => { setViewRef.current = setView; }, [setView]);
+
+  const toggleConstRef = useRef(toggleConstellations);
+  useEffect(() => { toggleConstRef.current = toggleConstellations; }, [toggleConstellations]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-      // Skip during AI streaming
-      if (isStreaming) return;
+      if (isStreamingRef.current) return;
 
       const isMod = e.ctrlKey || e.metaKey;
 
-      // Escape: go back (close constellations if open, else go back)
       if (e.key === "Escape") {
-        if (showConstellations) {
-          // ConstellationOverlay already handles its own Escape,
-          // but this catches it globally too
-          return;
-        }
-        if (view !== "luna") {
+        if (showConstRef.current) return;
+        if (viewRef.current !== "luna") {
           e.preventDefault();
-          goBack();
+          goBackRef.current();
         }
         return;
       }
 
-      // Ctrl/Cmd+K: toggle constellations
       if (isMod && e.key === "k") {
         e.preventDefault();
-        toggleConstellations();
+        toggleConstRef.current();
         return;
       }
 
-      // Ctrl/Cmd+,: settings
       if (isMod && e.key === ",") {
         e.preventDefault();
-        setView("settings");
+        setViewRef.current("settings");
         return;
       }
 
-      // Ctrl/Cmd + number: jump to constellation (catalog-driven)
       if (isMod && !e.shiftKey && !e.altKey) {
         const target = SHORTCUT_MAP[e.key];
         if (target) {
           e.preventDefault();
-          setView(target);
+          setViewRef.current(target);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    view,
-    showConstellations,
-    isStreaming,
-    goBack,
-    setView,
-    toggleConstellations,
-  ]);
+  }, []);
 
   return (
     <div
       className={`window-frame${isMaximized ? " window-frame-maximized" : ""}`}
     >
       <div className="app-shell bg-cosmic">
-        <TitleBar />
+        <TitleBar onPrefetchView={(v) => {
+          if (v === "orbit") prefetch(() => import("./pages/Orbit"));
+          if (v === "settings") prefetch(() => import("./pages/Settings"));
+        }} />
         <AnimatePresence mode="wait">
           {view === "luna" && (
             <motion.div
@@ -196,7 +211,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Orbit />
+              <Suspense fallback={pageFallback}><Orbit /></Suspense>
             </motion.div>
           )}
           {view === "solaris" && (
@@ -205,7 +220,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Solaris />
+              <Suspense fallback={pageFallback}><Solaris /></Suspense>
             </motion.div>
           )}
           {view === "beacon" && (
@@ -214,7 +229,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Beacon />
+              <Suspense fallback={pageFallback}><Beacon /></Suspense>
             </motion.div>
           )}
           {view === "pulsar" && (
@@ -223,7 +238,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Pulsar />
+              <Suspense fallback={pageFallback}><Pulsar /></Suspense>
             </motion.div>
           )}
           {view === "hyperlane" && (
@@ -232,7 +247,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Hyperlane />
+              <Suspense fallback={pageFallback}><Hyperlane /></Suspense>
             </motion.div>
           )}
           {view === "settings" && (
@@ -241,7 +256,7 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Settings />
+              <Suspense fallback={pageFallback}><Settings /></Suspense>
             </motion.div>
           )}
         </AnimatePresence>
