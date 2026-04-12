@@ -227,7 +227,7 @@ SEARCH {"query":"search terms"}
         store.setSearchResults([]); // Clear old results
         store.addToRecentlyPlayed(track);
         store.addToQueue(track);
-        store.setQueueIndex(store.queue.length); // Point to the newly added track
+        store.setQueueIndex(useLyraStore.getState().queue.length - 1); // Point to the newly added track
 
         // Get stream URL
         try {

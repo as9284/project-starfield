@@ -129,7 +129,14 @@ export const useLyraStore = create<LyraStore>()(
         if (repeat === "one") {
           nextIndex = queueIndex;
         } else if (shuffle) {
-          nextIndex = Math.floor(Math.random() * queue.length);
+          if (queue.length === 1) {
+            nextIndex = 0;
+          } else {
+            // Exclude current track from random selection
+            do {
+              nextIndex = Math.floor(Math.random() * queue.length);
+            } while (nextIndex === queueIndex);
+          }
         } else {
           nextIndex = queueIndex + 1;
           if (nextIndex >= queue.length) {
