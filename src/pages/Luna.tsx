@@ -50,6 +50,11 @@ import {
   constellationHandlers,
   inferNavigationTarget,
 } from "../lib/constellations";
+import {
+  getConstellation,
+  type ConstellationId,
+} from "../lib/constellation-catalog";
+import { prefetchPage } from "../App";
 import type {
   LunaControls,
   SessionMode,
@@ -104,6 +109,7 @@ export default function Luna() {
     hasDeepSeekKey,
     hasTavilyKey,
     setView,
+    startWormhole,
     toggleConstellations,
     showConstellations,
   } = useAppStore();
@@ -225,7 +231,9 @@ export default function Luna() {
           handler: "navigate-commands",
           to: fallbackView,
         });
-        setView(fallbackView);
+        prefetchPage(fallbackView);
+        const entry = getConstellation(fallbackView as ConstellationId);
+        startWormhole(fallbackView, entry?.glowHex ?? "#7c4ff0");
       }
 
       if (results.length > 0) {
@@ -241,7 +249,7 @@ export default function Luna() {
         return s;
       });
     },
-    [setView],
+    [startWormhole],
   );
 
   // ── Core send logic ───────────────────────────────────────────────────────
@@ -880,7 +888,18 @@ export default function Luna() {
                               >
                                 <handler.ResultCard
                                   result={result}
-                                  onNavigate={(v) => setView(v as AppView)}
+                                  onNavigate={(v) => {
+                                    const id = v as ConstellationId;
+                                    prefetchPage(id);
+                                    const entry = getConstellation(id);
+                                    startWormhole(
+                                      id as Exclude<
+                                        AppView,
+                                        "luna" | "settings"
+                                      >,
+                                      entry?.glowHex ?? "#7c4ff0",
+                                    );
+                                  }}
                                 />
                               </motion.div>
                             );

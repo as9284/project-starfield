@@ -194,7 +194,8 @@ LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks an
     )
       return "";
 
-    let ctx = "## Current Orbit State\n\n";
+    let ctx =
+      "## Orbit Data (available for reference — does not indicate the user is currently on Orbit)\n\n";
 
     if (activeTasks.length > 0) {
       ctx += `**Active Tasks (${activeTasks.length}):**\n`;

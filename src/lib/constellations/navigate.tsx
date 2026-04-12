@@ -4,8 +4,14 @@ import {
   Navigation,
   Link,
   Download,
+  ArrowRight,
 } from "lucide-react";
 import { useAppStore, type AppView } from "../../store/useAppStore";
+import {
+  getConstellation,
+  type ConstellationId,
+} from "../constellation-catalog";
+import { prefetchPage } from "../../App";
 import type {
   ConstellationHandler,
   ParsedCommand,
@@ -51,14 +57,50 @@ const icons: Record<string, React.ReactNode> = {
 
 function NavigatedCard({ result }: { result: ActionResult }) {
   const to = result.to as string;
+  // Whether the user was already on the target when the command was issued
+  const wasAlreadyThere = result.alreadyThere === true;
+  // Whether the wormhole was auto-fired by execute()
+  const autoNavigated = result.autoNavigated === true;
+
+  const handleGo = () => {
+    const entry = getConstellation(to as ConstellationId);
+    prefetchPage(to as AppView);
+    useAppStore
+      .getState()
+      .startWormhole(to as ControlledView, entry?.glowHex ?? "#7c4ff0");
+  };
+
+  // If user was already there, show a simple confirmation
+  if (wasAlreadyThere) {
+    return (
+      <div className="luna-action-card luna-action-card-navigate">
+        <div className="luna-navigate-header">
+          <span className="luna-navigate-icon">{icons[to]}</span>
+          <span className="luna-navigate-label">
+            You&rsquo;re already on {labels[to] ?? to}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="luna-action-card luna-action-card-navigate">
-      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-        <span style={{ color: "var(--color-nebula-teal)" }}>{icons[to]}</span>
+      <div className="luna-navigate-header">
+        <span className="luna-navigate-icon">{icons[to]}</span>
         <span className="luna-navigate-label">
-          Switched to {labels[to] ?? to}
+          {autoNavigated
+            ? `Navigating to ${labels[to] ?? to}`
+            : `Navigate to ${labels[to] ?? to}`}
         </span>
       </div>
+      {!autoNavigated && (
+        <div className="luna-navigate-actions">
+          <button className="luna-navigate-go" onClick={handleGo}>
+            Go <ArrowRight size={11} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -76,9 +118,13 @@ export const navigateHandler: ConstellationHandler = {
 NAVIGATE {"to":"orbit|solaris|beacon|hyperlane|pulsar"}
 \`\`\`
 
-Use this when the user asks to go to, open, or switch to a specific constellation. Only one command per block.`,
+Use this when the user asks to go to, open, or switch to a specific constellation.
+Only one command per block. The user will see a card with a button to launch the wormhole transition — you do not need to describe the navigation process.
+When the user says things like "go back" or "return to Luna", do NOT emit a navigate block — they will use the UI for that.`,
 
   buildContext(): string {
+    // Current view is now injected at the top of the system prompt by
+    // buildLunaSystemPrompt, so we don't duplicate it here.
     return "";
   },
 
@@ -89,8 +135,37 @@ Use this when the user asks to go to, open, or switch to a specific constellatio
     const destination = normalizeTarget(cmd.args.to);
     if (!destination) return [];
 
-    useAppStore.getState().setView(destination);
-    return [{ type: "navigated", handler: "navigate-commands", to: destination }];
+    const { view } = useAppStore.getState();
+
+    // If the user is already on the target, don't navigate — just show confirmation
+    if (view === destination) {
+      return [
+        {
+          type: "navigated",
+          handler: "navigate-commands",
+          to: destination,
+          alreadyThere: true,
+        },
+      ];
+    }
+
+    // Prefetch the page module so it's ready for the wormhole transition
+    prefetchPage(destination);
+
+    // Trigger wormhole transition
+    const entry = getConstellation(destination);
+    useAppStore
+      .getState()
+      .startWormhole(destination, entry?.glowHex ?? "#7c4ff0");
+
+    return [
+      {
+        type: "navigated",
+        handler: "navigate-commands",
+        to: destination,
+        autoNavigated: true,
+      },
+    ];
   },
 
   ResultCard: NavigatedCard,
@@ -105,23 +180,23 @@ export function inferNavigationTarget(text: string): ControlledView | null {
   const patterns: Array<[ControlledView, RegExp]> = [
     [
       "orbit",
-      /\b(?:open|go to|switch to|take me to|bring me to|show|navigate to)\s+(?:the\s+)?orbit\b/i,
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?orbit\b/i,
     ],
     [
       "solaris",
-      /\b(?:open|go to|switch to|take me to|bring me to|show|navigate to)\s+(?:the\s+)?solaris\b/i,
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?(?:solaris|weather)\b/i,
     ],
     [
       "beacon",
-      /\b(?:open|go to|switch to|take me to|bring me to|show|navigate to)\s+(?:the\s+)?beacon\b/i,
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?beacon\b/i,
     ],
     [
       "hyperlane",
-      /\b(?:open|go to|switch to|take me to|bring me to|show|navigate to)\s+(?:the\s+)?hyperlane\b/i,
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?hyperlane\b/i,
     ],
     [
       "pulsar",
-      /\b(?:open|go to|switch to|take me to|bring me to|show|navigate to)\s+(?:the\s+)?pulsar\b/i,
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?pulsar\b/i,
     ],
   ];
 
