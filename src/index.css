@@ -727,6 +727,28 @@ body {
   animation: status-pulse 2.5s infinite;
 }
 
+/* ── Page loader (Suspense fallback) ───────────────────────────────────── */
+.page-loader {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.page-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 79, 240, 0.12);
+  border-top-color: var(--color-purple-400);
+  animation: page-loader-spin 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Constellation overlay (3D atlas) ──────────────────────────────────── */
 .cst-shell {
   position: absolute;

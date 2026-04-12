@@ -1,5 +1,6 @@
 import {
   lazy,
+  type ReactNode,
   Suspense,
   useCallback,
   useEffect,
@@ -13,35 +14,96 @@ import SplashScreen from "./components/SplashScreen";
 import Luna from "./pages/Luna";
 import { WormholeTransition } from "./components/WormholeTransition";
 import { useAppStore } from "./store/useAppStore";
+import type { AppView } from "./store/useAppStore";
 import { getDeepSeekKey, getTavilyKey, getWeatherKey, win } from "./lib/tauri";
 import { buildShortcutMap } from "./lib/constellation-catalog";
 
 const SHORTCUT_MAP = buildShortcutMap();
 
-const Orbit = lazy(() => import("./pages/Orbit"));
-const Solaris = lazy(() => import("./pages/Solaris"));
-const Beacon = lazy(() => import("./pages/Beacon"));
-const Pulsar = lazy(() => import("./pages/Pulsar"));
-const Hyperlane = lazy(() => import("./pages/Hyperlane"));
-const Settings = lazy(() => import("./pages/Settings"));
+// ── Lazy page imports (+ prefetch map) ────────────────────────────────────────
 
-// Prefetch modules on hover
-function prefetch(module: () => Promise<unknown>) {
-  module();
-}
-
-const slideIn = {
-  initial: { opacity: 0, x: 10 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -10 },
-  transition: { duration: 0.2 },
+const pageImports: Record<
+  string,
+  () => Promise<{ default: React.ComponentType }>
+> = {
+  orbit: () => import("./pages/Orbit"),
+  solaris: () => import("./pages/Solaris"),
+  beacon: () => import("./pages/Beacon"),
+  pulsar: () => import("./pages/Pulsar"),
+  hyperlane: () => import("./pages/Hyperlane"),
+  settings: () => import("./pages/Settings"),
 };
 
-const pageFallback = (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="status-dot" />
-  </div>
-);
+const Orbit = lazy(pageImports.orbit);
+const Solaris = lazy(pageImports.solaris);
+const Beacon = lazy(pageImports.beacon);
+const Pulsar = lazy(pageImports.pulsar);
+const Hyperlane = lazy(pageImports.hyperlane);
+const Settings = lazy(pageImports.settings);
+
+/** Eagerly fetch a page module so it's cached before Suspense needs it. */
+const prefetched = new Set<string>();
+export function prefetchPage(view: AppView) {
+  if (view === "luna" || prefetched.has(view)) return;
+  prefetched.add(view);
+  pageImports[view]?.();
+}
+
+const pageTransition = {
+  initial: { opacity: 0, y: 6, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -4, filter: "blur(2px)" },
+  transition: {
+    duration: 0.28,
+    ease: [0.25, 0.1, 0.25, 1],
+  },
+};
+
+/** Transition variant when arriving via wormhole — no entrance anim needed. */
+const wormholeArrival = {
+  initial: { opacity: 1, y: 0, filter: "blur(0px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -4, filter: "blur(2px)" },
+  transition: { duration: 0.01 },
+};
+
+/** Animated Suspense fallback — fades in after a brief delay so fast loads flash nothing. */
+function PageLoader() {
+  return (
+    <motion.div
+      className="flex-1 flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, delay: 0.15 }}
+    >
+      <div className="page-loader">
+        <div className="page-loader-ring" />
+      </div>
+    </motion.div>
+  );
+}
+
+/** Wraps a lazy page in a motion container + Suspense. */
+function PageSlot({
+  id,
+  active,
+  arrivedViaWormhole,
+  children,
+}: {
+  id: string;
+  active: boolean;
+  arrivedViaWormhole: boolean;
+  children: ReactNode;
+}) {
+  if (!active) return null;
+  const variant = arrivedViaWormhole ? wormholeArrival : pageTransition;
+  return (
+    <motion.div key={id} className="flex-1 flex flex-col min-h-0" {...variant}>
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
+    </motion.div>
+  );
+}
 
 export default function App() {
   const {
@@ -80,9 +142,13 @@ export default function App() {
     wormholeTargetRef.current = wormholeTarget;
   }, [wormholeTarget]);
 
+  // Track whether the current page arrived via wormhole (suppress slideIn)
+  const [arrivedViaWormhole, setArrivedViaWormhole] = useState(false);
+
   const handleWormholeNavigate = useCallback(() => {
     const target = wormholeTargetRef.current;
     if (target) {
+      setArrivedViaWormhole(true);
       setView(target.id);
       closeConstellations();
     }
@@ -91,6 +157,21 @@ export default function App() {
   const handleWormholeDone = useCallback(() => {
     clearWormhole();
   }, [clearWormhole]);
+
+  // Prefetch the target page module as soon as the wormhole starts
+  useEffect(() => {
+    if (wormholeTarget) prefetchPage(wormholeTarget.id);
+  }, [wormholeTarget]);
+
+  // Reset the wormhole-arrival flag on the next *non-wormhole* navigation
+  const prevView = useRef(view);
+  useEffect(() => {
+    if (view !== prevView.current) {
+      // If the view changed but NOT because of a wormhole, clear the flag
+      if (!wormholeTarget) setArrivedViaWormhole(false);
+      prevView.current = view;
+    }
+  }, [view, wormholeTarget]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
@@ -232,88 +313,57 @@ export default function App() {
       className={`window-frame${isMaximized ? " window-frame-maximized" : ""}`}
     >
       <div className="app-shell bg-cosmic">
-        <TitleBar
-          onPrefetchView={(v) => {
-            if (v === "orbit") prefetch(() => import("./pages/Orbit"));
-            if (v === "settings") prefetch(() => import("./pages/Settings"));
-          }}
-        />
+        <TitleBar onPrefetchView={(v) => prefetchPage(v)} />
         <AnimatePresence mode="wait">
-          {view === "luna" && (
-            <motion.div
-              key="luna"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Luna />
-            </motion.div>
-          )}
-          {view === "orbit" && (
-            <motion.div
-              key="orbit"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Orbit />
-              </Suspense>
-            </motion.div>
-          )}
-          {view === "solaris" && (
-            <motion.div
-              key="solaris"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Solaris />
-              </Suspense>
-            </motion.div>
-          )}
-          {view === "beacon" && (
-            <motion.div
-              key="beacon"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Beacon />
-              </Suspense>
-            </motion.div>
-          )}
-          {view === "pulsar" && (
-            <motion.div
-              key="pulsar"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Pulsar />
-              </Suspense>
-            </motion.div>
-          )}
-          {view === "hyperlane" && (
-            <motion.div
-              key="hyperlane"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Hyperlane />
-              </Suspense>
-            </motion.div>
-          )}
-          {view === "settings" && (
-            <motion.div
-              key="settings"
-              className="flex-1 flex flex-col min-h-0"
-              {...slideIn}
-            >
-              <Suspense fallback={pageFallback}>
-                <Settings />
-              </Suspense>
-            </motion.div>
-          )}
+          <PageSlot
+            id="luna"
+            active={view === "luna"}
+            arrivedViaWormhole={false}
+          >
+            <Luna />
+          </PageSlot>
+          <PageSlot
+            id="orbit"
+            active={view === "orbit"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Orbit />
+          </PageSlot>
+          <PageSlot
+            id="solaris"
+            active={view === "solaris"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Solaris />
+          </PageSlot>
+          <PageSlot
+            id="beacon"
+            active={view === "beacon"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Beacon />
+          </PageSlot>
+          <PageSlot
+            id="pulsar"
+            active={view === "pulsar"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Pulsar />
+          </PageSlot>
+          <PageSlot
+            id="hyperlane"
+            active={view === "hyperlane"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Hyperlane />
+          </PageSlot>
+          <PageSlot
+            id="settings"
+            active={view === "settings"}
+            arrivedViaWormhole={false}
+          >
+            <Settings />
+          </PageSlot>
         </AnimatePresence>
 
         <AnimatePresence>

@@ -16,6 +16,7 @@ import {
   type ConstellationEntry,
 } from "../lib/constellation-catalog";
 import { modLabel } from "../lib/platform";
+import { prefetchPage } from "../App";
 
 // Lazy-load the 3D scene so the WebGL bundle is never on the critical path
 const ConstellationAtlas3D = lazy(() => import("./ConstellationAtlas3D"));
@@ -297,14 +298,16 @@ export default function ConstellationOverlay() {
     [startWormhole],
   );
 
-  // 3D scene hover sync
+  // 3D scene hover sync — and prefetch the page module on hover
   const onSceneHover = useCallback((id: ConstellationId | null) => {
     setHoveredId(id);
+    if (id) prefetchPage(id);
   }, []);
 
   // 3D scene click — focus camera, persistently select the planet
   const onSceneFocus = useCallback((id: ConstellationId | null) => {
     setSelectedId(id);
+    if (id) prefetchPage(id);
   }, []);
 
   // Clean up cursor when overlay unmounts
