@@ -79,6 +79,17 @@ interface AppState {
   // Streaming state
   isStreaming: boolean;
   setIsStreaming: (v: boolean) => void;
+
+  // Wormhole launch transition
+  wormholeTarget: {
+    id: Exclude<AppView, "luna" | "settings">;
+    color: string;
+  } | null;
+  startWormhole: (
+    id: Exclude<AppView, "luna" | "settings">,
+    color: string,
+  ) => void;
+  clearWormhole: () => void;
 }
 
 export const MAX_CONVERSATION_TITLE_LENGTH = 40;
@@ -323,6 +334,10 @@ export const useAppStore = create<AppState>()(
 
         isStreaming: false,
         setIsStreaming: (v) => set({ isStreaming: v }),
+
+        wormholeTarget: null,
+        startWormhole: (id, color) => set({ wormholeTarget: { id, color } }),
+        clearWormhole: () => set({ wormholeTarget: null }),
       };
     },
     {

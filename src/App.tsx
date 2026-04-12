@@ -1,9 +1,17 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TitleBar from "./components/TitleBar";
 import ConstellationOverlay from "./components/ConstellationOverlay";
 import SplashScreen from "./components/SplashScreen";
 import Luna from "./pages/Luna";
+import { WormholeTransition } from "./components/WormholeTransition";
 import { useAppStore } from "./store/useAppStore";
 import { getDeepSeekKey, getTavilyKey, getWeatherKey, win } from "./lib/tauri";
 import { buildShortcutMap } from "./lib/constellation-catalog";
@@ -46,18 +54,43 @@ export default function App() {
     goBack,
     toggleConstellations,
     isStreaming,
+    wormholeTarget,
+    clearWormhole,
+    closeConstellations,
   } = useAppStore();
 
   const isStreamingRef = useRef(isStreaming);
-  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   const viewRef = useRef(view);
-  useEffect(() => { viewRef.current = view; }, [view]);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
 
   const [isMaximized, setIsMaximized] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const splashStartRef = useRef(Date.now());
   const SPLASH_MIN_MS = 600;
+
+  // Wormhole transition callbacks — stable refs so the canvas effect doesn't restart
+  const wormholeTargetRef = useRef(wormholeTarget);
+  useEffect(() => {
+    wormholeTargetRef.current = wormholeTarget;
+  }, [wormholeTarget]);
+
+  const handleWormholeNavigate = useCallback(() => {
+    const target = wormholeTargetRef.current;
+    if (target) {
+      setView(target.id);
+      closeConstellations();
+    }
+  }, [setView, closeConstellations]);
+
+  const handleWormholeDone = useCallback(() => {
+    clearWormhole();
+  }, [clearWormhole]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
@@ -133,16 +166,24 @@ export default function App() {
   // ── Global keyboard shortcuts ──────────────────────────────────────────
   // Use refs for state values so the listener is never re-attached
   const showConstRef = useRef(showConstellations);
-  useEffect(() => { showConstRef.current = showConstellations; }, [showConstellations]);
+  useEffect(() => {
+    showConstRef.current = showConstellations;
+  }, [showConstellations]);
 
   const goBackRef = useRef(goBack);
-  useEffect(() => { goBackRef.current = goBack; }, [goBack]);
+  useEffect(() => {
+    goBackRef.current = goBack;
+  }, [goBack]);
 
   const setViewRef = useRef(setView);
-  useEffect(() => { setViewRef.current = setView; }, [setView]);
+  useEffect(() => {
+    setViewRef.current = setView;
+  }, [setView]);
 
   const toggleConstRef = useRef(toggleConstellations);
-  useEffect(() => { toggleConstRef.current = toggleConstellations; }, [toggleConstellations]);
+  useEffect(() => {
+    toggleConstRef.current = toggleConstellations;
+  }, [toggleConstellations]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -191,10 +232,12 @@ export default function App() {
       className={`window-frame${isMaximized ? " window-frame-maximized" : ""}`}
     >
       <div className="app-shell bg-cosmic">
-        <TitleBar onPrefetchView={(v) => {
-          if (v === "orbit") prefetch(() => import("./pages/Orbit"));
-          if (v === "settings") prefetch(() => import("./pages/Settings"));
-        }} />
+        <TitleBar
+          onPrefetchView={(v) => {
+            if (v === "orbit") prefetch(() => import("./pages/Orbit"));
+            if (v === "settings") prefetch(() => import("./pages/Settings"));
+          }}
+        />
         <AnimatePresence mode="wait">
           {view === "luna" && (
             <motion.div
@@ -211,7 +254,9 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Orbit /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Orbit />
+              </Suspense>
             </motion.div>
           )}
           {view === "solaris" && (
@@ -220,7 +265,9 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Solaris /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Solaris />
+              </Suspense>
             </motion.div>
           )}
           {view === "beacon" && (
@@ -229,7 +276,9 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Beacon /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Beacon />
+              </Suspense>
             </motion.div>
           )}
           {view === "pulsar" && (
@@ -238,7 +287,9 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Pulsar /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Pulsar />
+              </Suspense>
             </motion.div>
           )}
           {view === "hyperlane" && (
@@ -247,7 +298,9 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Hyperlane /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Hyperlane />
+              </Suspense>
             </motion.div>
           )}
           {view === "settings" && (
@@ -256,13 +309,27 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
               {...slideIn}
             >
-              <Suspense fallback={pageFallback}><Settings /></Suspense>
+              <Suspense fallback={pageFallback}>
+                <Settings />
+              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
           {showConstellations && <ConstellationOverlay />}
+        </AnimatePresence>
+
+        {/* Wormhole launch transition — portal renders to document.body */}
+        <AnimatePresence>
+          {wormholeTarget && (
+            <WormholeTransition
+              key={wormholeTarget.id}
+              accentHex={wormholeTarget.color}
+              onNavigate={handleWormholeNavigate}
+              onDone={handleWormholeDone}
+            />
+          )}
         </AnimatePresence>
 
         <AnimatePresence>{!splashDone && <SplashScreen />}</AnimatePresence>

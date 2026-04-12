@@ -20,8 +20,6 @@ import { modLabel } from "../lib/platform";
 // Lazy-load the 3D scene so the WebGL bundle is never on the critical path
 const ConstellationAtlas3D = lazy(() => import("./ConstellationAtlas3D"));
 
-type ConstellationView = Exclude<AppView, "luna" | "settings">;
-
 // ── Detect whether we should skip WebGL ──────────────────────────────────────
 
 function canUseWebGL(): boolean {
@@ -255,7 +253,7 @@ function hexToRgb(hex: string): string {
 // ── Overlay ──────────────────────────────────────────────────────────────────
 
 export default function ConstellationOverlay() {
-  const { view, closeConstellations, setView } = useAppStore();
+  const { view, closeConstellations, startWormhole } = useAppStore();
   const [hoveredId, setHoveredId] = useState<ConstellationId | null>(null);
   const [selectedId, setSelectedId] = useState<ConstellationId | null>(null);
 
@@ -287,12 +285,16 @@ export default function ConstellationOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [closeConstellations]);
 
-  // Navigation handler
+  // Navigation handler — fires wormhole transition
   const navigate = useCallback(
     (id: ConstellationId) => {
-      setView(id as ConstellationView);
+      const entry = CONSTELLATIONS.find((c) => c.id === id);
+      startWormhole(
+        id as Exclude<AppView, "luna" | "settings">,
+        entry?.glowHex ?? "#7c4ff0",
+      );
     },
-    [setView],
+    [startWormhole],
   );
 
   // 3D scene hover sync
