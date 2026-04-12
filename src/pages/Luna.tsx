@@ -70,6 +70,12 @@ import {
   MODE_CLARIFICATIONS,
 } from "../lib/luna-prompt";
 import { ClarificationCard } from "../components/ClarificationCard";
+import { CommandSuggestions } from "../components/CommandSuggestions";
+import {
+  matchCommands,
+  resolveSlashInput,
+  type SlashCommand,
+} from "../lib/slash-commands";
 
 type ControlledView = Exclude<AppView, "luna" | "settings">;
 
@@ -138,6 +144,66 @@ export default function Luna() {
     useState<LunaControls>(loadLunaControls);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+
+  // ── Slash command mode ──────────────────────────────────────────────────
+  const [cmdIndex, setCmdIndex] = useState(-1);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const isCommandMode = input.startsWith("/");
+
+  // Derive suggestion list + arg hint from current input
+  const { cmdSuggestions, cmdArgHint, cmdResolved } = useMemo(() => {
+    if (!isCommandMode) {
+      return {
+        cmdSuggestions: [] as SlashCommand[],
+        cmdArgHint: null as string | null,
+        cmdResolved: null,
+      };
+    }
+    const body = input.slice(1).trimStart();
+    const spaceIdx = body.indexOf(" ");
+    const typed = spaceIdx === -1 ? body : body.slice(0, spaceIdx);
+
+    // If there's no space yet, show matching commands
+    if (spaceIdx === -1) {
+      const matches = matchCommands(typed);
+      return { cmdSuggestions: matches, cmdArgHint: null, cmdResolved: null };
+    }
+
+    // A command is locked in — resolve it and show arg hint
+    const resolved = resolveSlashInput(input);
+    if (!resolved) {
+      return {
+        cmdSuggestions: [] as SlashCommand[],
+        cmdArgHint: null,
+        cmdResolved: null,
+      };
+    }
+    const { command, rawArgs } = resolved;
+    const parsedArgs = command.parseArgs(rawArgs);
+    const hint =
+      command.requiresArg && !parsedArgs ? `${command.argPlaceholder}` : null;
+    return {
+      cmdSuggestions: [] as SlashCommand[],
+      cmdArgHint: hint,
+      cmdResolved: resolved,
+    };
+  }, [input, isCommandMode]);
+
+  // Reset suggestion index when matches change
+  useEffect(() => {
+    setCmdIndex((prev) =>
+      cmdSuggestions.length === 0
+        ? -1
+        : Math.min(prev, cmdSuggestions.length - 1),
+    );
+  }, [cmdSuggestions]);
+
+  const selectCommand = useCallback((cmd: SlashCommand) => {
+    setInput(`/${cmd.name} `);
+    setCmdIndex(-1);
+    textareaRef.current?.focus();
+  }, []);
 
   // Per-conversation session modes (not persisted — session-only)
   const sessionModesRef = useRef<
@@ -343,9 +409,109 @@ export default function Luna() {
     ],
   );
 
+  const handleSlashCommand = useCallback(
+    async (slashInput: string) => {
+      const resolved = resolveSlashInput(slashInput);
+      if (!resolved) return false;
+
+      const { command, rawArgs } = resolved;
+      const args = command.parseArgs(rawArgs);
+
+      // If the command requires args and none are valid, don't send
+      if (command.requiresArg && !args) return false;
+
+      const finalArgs = args ?? {};
+
+      // Ensure conversation exists
+      if (!activeConversationId) createConversation();
+
+      const isFirstMessage = messages.length === 0;
+
+      // Add user message showing the slash command
+      const userMsgId = crypto.randomUUID();
+      addMessage({
+        id: userMsgId,
+        role: "user",
+        content: slashInput,
+        timestamp: Date.now(),
+      });
+
+      if (isFirstMessage && activeConversationId) {
+        renameConversation(
+          activeConversationId,
+          slashInput.slice(0, MAX_CONVERSATION_TITLE_LENGTH),
+        );
+      }
+
+      // Find the handler and execute directly
+      const handler = constellationHandlers.find(
+        (h) => h.tag === command.handlerTag,
+      );
+      if (!handler) return false;
+
+      const assistantMsgId = crypto.randomUUID();
+
+      // Show pending state
+      setPendingActions((prev) => new Set([...prev, assistantMsgId]));
+      addMessage({
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        hidden: true,
+      });
+
+      try {
+        const results = await handler.execute([
+          { command: command.handlerCommand, args: finalArgs },
+        ]);
+
+        if (results.length > 0) {
+          setActionResults((prev) => ({
+            ...prev,
+            [assistantMsgId]: [...(prev[assistantMsgId] ?? []), ...results],
+          }));
+        }
+      } catch {
+        // Handler errors are surfaced via their own result cards
+      } finally {
+        setPendingActions((prev) => {
+          const s = new Set(prev);
+          s.delete(assistantMsgId);
+          return s;
+        });
+      }
+
+      return true;
+    },
+    [
+      activeConversationId,
+      createConversation,
+      messages.length,
+      addMessage,
+      renameConversation,
+      setPendingActions,
+      setActionResults,
+    ],
+  );
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || isStreaming || !hasDeepSeekKey) return;
+    if (!text || isStreaming) return;
+
+    // ── Slash command fast path ──────────────────────────────────────────
+    if (text.startsWith("/")) {
+      const handled = await handleSlashCommand(text);
+      if (handled) {
+        setInput("");
+        setCmdIndex(-1);
+        return;
+      }
+      // If the slash command couldn't be resolved, fall through to normal chat
+      // so Luna can still interpret it naturally
+    }
+
+    if (!hasDeepSeekKey) return;
     if (!activeConversationId) createConversation();
     setInput("");
     const isFirstMessage = messages.length === 0;
@@ -378,6 +544,52 @@ export default function Luna() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // ── Command mode keyboard nav ──────────────────────────────────────
+    if (isCommandMode && cmdSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setCmdIndex((prev) =>
+          prev < cmdSuggestions.length - 1 ? prev + 1 : 0,
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setCmdIndex((prev) =>
+          prev > 0 ? prev - 1 : cmdSuggestions.length - 1,
+        );
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const target =
+          cmdIndex >= 0 ? cmdSuggestions[cmdIndex] : cmdSuggestions[0];
+        if (target) selectCommand(target);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setCmdIndex(-1);
+        setInput("");
+        return;
+      }
+      // Enter on highlighted suggestion: select it instead of sending
+      if (e.key === "Enter" && !e.shiftKey && cmdIndex >= 0) {
+        e.preventDefault();
+        const target = cmdSuggestions[cmdIndex];
+        if (target) selectCommand(target);
+        return;
+      }
+    }
+
+    // Escape in command mode (arg phase) clears input
+    if (isCommandMode && e.key === "Escape") {
+      e.preventDefault();
+      setCmdIndex(-1);
+      setInput("");
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
@@ -788,13 +1000,43 @@ export default function Luna() {
                   <CosmicEntity size={68} mood={entityMood} />
                 </div>
                 {messages.map((msg, i) => {
-                  if (msg.hidden) return null;
+                  const actionCards = actionResults[msg.id] ?? [];
+                  const hasPendingAction = pendingActions.has(msg.id);
+
+                  // Hidden messages only render their action cards (slash commands)
+                  if (msg.hidden) {
+                    if (actionCards.length === 0 && !hasPendingAction)
+                      return null;
+                    return (
+                      <div key={msg.id} className="luna-msg-row assistant">
+                        <div className="luna-msg-bubble assistant">
+                          {actionCards.map((res, ri) => {
+                            const h = constellationHandlers.find(
+                              (ch) => ch.tag === res.handler,
+                            );
+                            if (!h?.ResultCard) return null;
+                            return (
+                              <h.ResultCard
+                                key={`${res.handler}-${ri}`}
+                                result={res}
+                              />
+                            );
+                          })}
+                          {hasPendingAction && (
+                            <div className="luna-action-pending">
+                              <div className="luna-action-pending-dot" />
+                              Running…
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const visibleAssistantContent =
                     msg.role === "assistant"
                       ? stripCommandBlocks(msg.content, constellationHandlers)
                       : "";
-                  const actionCards = actionResults[msg.id] ?? [];
-                  const hasPendingAction = pendingActions.has(msg.id);
                   const hasClarificationCard =
                     !!clarificationData.current[msg.id];
                   const isStreamingAssistantPlaceholder =
@@ -1390,31 +1632,58 @@ export default function Luna() {
               )}
             </AnimatePresence>
 
+            <CommandSuggestions
+              commands={cmdSuggestions}
+              activeIndex={cmdIndex}
+              onSelect={selectCommand}
+              argHint={cmdArgHint}
+              visible={isCommandMode}
+            />
+
             <div className="luna-input-row">
               <TextareaAutosize
-                className="luna-textarea"
+                ref={textareaRef}
+                className={`luna-textarea${isCommandMode ? " luna-textarea-cmd" : ""}`}
                 placeholder={
-                  hasDeepSeekKey ? "Message Luna…" : "API key required…"
+                  hasDeepSeekKey
+                    ? isCommandMode
+                      ? cmdResolved
+                        ? `${cmdResolved.command.argPlaceholder}`
+                        : "Type a command…"
+                      : "Message Luna… (/ for commands)"
+                    : "API key required…"
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 minRows={1}
                 maxRows={5}
-                disabled={isStreaming || !hasDeepSeekKey}
+                disabled={isStreaming || (!hasDeepSeekKey && !isCommandMode)}
               />
               <motion.button
                 className="luna-send-btn"
                 onClick={() => void handleSend()}
-                disabled={!input.trim() || isStreaming || !hasDeepSeekKey}
+                disabled={
+                  !input.trim() ||
+                  isStreaming ||
+                  (!hasDeepSeekKey && !isCommandMode)
+                }
                 title="Send"
                 whileHover={
-                  !(!input.trim() || isStreaming || !hasDeepSeekKey)
+                  !(
+                    !input.trim() ||
+                    isStreaming ||
+                    (!hasDeepSeekKey && !isCommandMode)
+                  )
                     ? { scale: 1.1 }
                     : {}
                 }
                 whileTap={
-                  !(!input.trim() || isStreaming || !hasDeepSeekKey)
+                  !(
+                    !input.trim() ||
+                    isStreaming ||
+                    (!hasDeepSeekKey && !isCommandMode)
+                  )
                     ? { scale: 0.9 }
                     : {}
                 }

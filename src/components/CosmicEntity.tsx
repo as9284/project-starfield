@@ -161,17 +161,25 @@ export function CosmicEntity({
     const cC = cCanvas.getContext("2d", { alpha: true });
     if (!aC || !cC) return;
 
-    const px = size * DPR;
     const half = size / 2;
+    // Both canvases are expanded by `pad` on each side so:
+    //   - the CSS blur on the aurora layer decays naturally, and
+    //   - the core corona gradient never clips at the canvas edge.
 
-    for (const cv of [aCanvas, cCanvas]) {
-      cv.width = px;
-      cv.height = px;
-      cv.style.width = `${size}px`;
-      cv.style.height = `${size}px`;
+    const pad = Math.round(size * 0.35); // generous: covers corona + blur
+    const aSide = size + pad * 2; // aurora canvas px
+    const cSide = size + pad * 2; // core canvas px
+
+    for (const [cv, ctx2, side] of [
+      [aCanvas, aC, aSide],
+      [cCanvas, cC, cSide],
+    ] as const) {
+      cv.width = side * DPR;
+      cv.height = side * DPR;
+      cv.style.width = `${side}px`;
+      cv.style.height = `${side}px`;
+      ctx2.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
-    aC.setTransform(DPR, 0, 0, DPR, 0, 0);
-    cC.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     let frameId: number;
     let last = performance.now();
@@ -198,9 +206,9 @@ export function CosmicEntity({
       c.coreSize = lerp(c.coreSize, target.coreSize, lr);
 
       /* ── Aurora layer ──────────────────────────────────────────────── */
-      aC.clearRect(0, 0, size, size);
+      aC.clearRect(0, 0, aSide, aSide);
       aC.save();
-      aC.translate(half, half);
+      aC.translate(half + pad, half + pad);
 
       for (const b of BLOBS) {
         const ts = t * c.speed;
@@ -228,9 +236,9 @@ export function CosmicEntity({
       aC.restore();
 
       /* ── Core layer ────────────────────────────────────────────────── */
-      cC.clearRect(0, 0, size, size);
+      cC.clearRect(0, 0, cSide, cSide);
       cC.save();
-      cC.translate(half, half);
+      cC.translate(half + pad, half + pad);
 
       // Very slow breathing — period ≈ 16.5 s
       const breath = Math.sin(t * 0.38) * 0.5 + 0.5;
@@ -295,31 +303,43 @@ export function CosmicEntity({
     return () => cancelAnimationFrame(frameId);
   }, [size]);
 
-  // Blur scales with container size; minimum 3 px for the mini entity
   const blurPx = Math.max(3, Math.round(size * 0.088));
+  const pad = Math.round(size * 0.35);
 
   return (
     <div
       className={className}
-      style={{ position: "relative", width: size, height: size }}
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        overflow: "visible",
+      }}
     >
+      {/* Both canvases are expanded by `pad` on each side and negatively offset
+          so the visual centre stays aligned. This gives the CSS blur and the
+          core corona room to fade to zero before hitting any canvas edge. */}
       <canvas
         ref={auroraRef}
         style={{
           position: "absolute",
-          inset: 0,
+          left: -pad,
+          top: -pad,
           filter: `blur(${blurPx}px)`,
-          width: size,
-          height: size,
+          width: size + pad * 2,
+          height: size + pad * 2,
+          pointerEvents: "none",
         }}
       />
       <canvas
         ref={coreRef}
         style={{
           position: "absolute",
-          inset: 0,
-          width: size,
-          height: size,
+          left: -pad,
+          top: -pad,
+          width: size + pad * 2,
+          height: size + pad * 2,
+          pointerEvents: "none",
         }}
       />
     </div>
