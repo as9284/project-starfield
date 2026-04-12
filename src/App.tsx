@@ -31,6 +31,7 @@ const pageImports: Record<
   beacon: () => import("./pages/Beacon"),
   pulsar: () => import("./pages/Pulsar"),
   hyperlane: () => import("./pages/Hyperlane"),
+  lyra: () => import("./pages/Lyra"),
   settings: () => import("./pages/Settings"),
 };
 
@@ -39,6 +40,7 @@ const Solaris = lazy(pageImports.solaris);
 const Beacon = lazy(pageImports.beacon);
 const Pulsar = lazy(pageImports.pulsar);
 const Hyperlane = lazy(pageImports.hyperlane);
+const Lyra = lazy(pageImports.lyra);
 const Settings = lazy(pageImports.settings);
 
 /** Eagerly fetch a page module so it's cached before Suspense needs it. */
@@ -356,6 +358,13 @@ export default function App() {
             arrivedViaWormhole={arrivedViaWormhole}
           >
             <Hyperlane />
+          </PageSlot>
+          <PageSlot
+            id="lyra"
+            active={view === "lyra"}
+            arrivedViaWormhole={arrivedViaWormhole}
+          >
+            <Lyra />
           </PageSlot>
           <PageSlot
             id="settings"

@@ -3556,3 +3556,782 @@ body {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* ── Lyra — Streaming Constellation ────────────────────────────────────── */
+
+.lyra-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-dim);
+  flex-shrink: 0;
+}
+
+.lyra-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lyra-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lyra-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition: all 0.15s;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.lyra-back-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(124, 79, 240, 0.12);
+}
+
+.lyra-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lyra-title-icon {
+  color: #ec4899;
+}
+
+.lyra-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.lyra-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.12);
+  padding: 2px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.lyra-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 540;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lyra-mode-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(236, 72, 153, 0.08);
+}
+
+.lyra-mode-active {
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.3);
+}
+
+.lyra-queue-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.lyra-queue-toggle:hover {
+  color: var(--color-text-primary);
+  background: rgba(124, 79, 240, 0.08);
+}
+
+.lyra-queue-toggle-active {
+  color: var(--color-purple-400);
+  background: rgba(124, 79, 240, 0.12);
+  border-color: rgba(124, 79, 240, 0.3);
+}
+
+.lyra-queue-count {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: #ec4899;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
+.lyra-ytdlp-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
+.lyra-ytdlp-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(236, 72, 153, 0.15);
+  color: #ec4899;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lyra-ytdlp-install-btn:hover {
+  background: rgba(236, 72, 153, 0.25);
+}
+
+.lyra-content {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lyra-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lyra-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(16, 15, 46, 0.6);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s;
+}
+
+.lyra-search-bar:focus-within {
+  border-color: rgba(236, 72, 153, 0.5);
+}
+
+.lyra-search-icon {
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.lyra-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 0.88rem;
+}
+
+.lyra-search-input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.lyra-search-spinner {
+  color: #ec4899;
+  flex-shrink: 0;
+}
+
+/* Video player */
+.lyra-video-container {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16/9;
+  max-height: 360px;
+}
+
+.lyra-video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lyra-video-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Search results */
+.lyra-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lyra-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lyra-results-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.lyra-section-toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.lyra-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+/* Track card */
+.lyra-track-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(16, 15, 46, 0.5);
+  border: 1px solid var(--color-border-dim);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.lyra-track-card:hover {
+  border-color: rgba(236, 72, 153, 0.3);
+  background: rgba(16, 15, 46, 0.7);
+}
+
+.lyra-track-active {
+  border-color: rgba(236, 72, 153, 0.5);
+  background: rgba(236, 72, 153, 0.05);
+}
+
+.lyra-track-thumb-wrap {
+  position: relative;
+  aspect-ratio: 16/9;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.lyra-track-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lyra-track-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 15, 46, 0.8);
+  color: var(--color-text-dim);
+}
+
+.lyra-track-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.lyra-track-thumb-wrap:hover .lyra-track-play-overlay {
+  opacity: 1;
+}
+
+.lyra-track-duration {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: white;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.lyra-track-info {
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.lyra-track-title {
+  font-size: 0.78rem;
+  font-weight: 560;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyra-track-channel {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.lyra-track-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--color-text-dim);
+}
+
+.lyra-track-stats span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.lyra-track-mode-icon {
+  color: #ec4899;
+}
+
+.lyra-track-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.lyra-track-card:hover .lyra-track-actions {
+  opacity: 1;
+}
+
+.lyra-track-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lyra-track-action-btn:hover {
+  background: rgba(236, 72, 153, 0.6);
+}
+
+/* Empty state */
+.lyra-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.lyra-empty-icon {
+  color: rgba(236, 72, 153, 0.3);
+}
+
+.lyra-empty-title {
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.lyra-empty-desc {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* Queue panel */
+.lyra-queue-panel {
+  width: 260px;
+  border-left: 1px solid var(--color-border-dim);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.lyra-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-dim);
+}
+
+.lyra-queue-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.lyra-queue-clear {
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.lyra-queue-clear:hover {
+  color: #fca5a5;
+}
+
+.lyra-queue-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.lyra-queue-empty {
+  text-align: center;
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+  padding: 24px 12px;
+}
+
+.lyra-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+}
+
+.lyra-queue-item:hover {
+  background: rgba(124, 79, 240, 0.08);
+}
+
+.lyra-queue-item-active {
+  background: rgba(236, 72, 153, 0.08);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+}
+
+.lyra-queue-item-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.15);
+  color: #ec4899;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+
+.lyra-queue-item-play:hover {
+  background: rgba(236, 72, 153, 0.3);
+}
+
+.lyra-queue-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lyra-queue-item-title {
+  font-size: 0.72rem;
+  font-weight: 540;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyra-queue-item-channel {
+  font-size: 0.62rem;
+  color: var(--color-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyra-queue-item-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text-dim);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.12s;
+}
+
+.lyra-queue-item:hover .lyra-queue-item-remove {
+  opacity: 1;
+}
+
+.lyra-queue-item-remove:hover {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* Now Playing bar */
+.lyra-player-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 20px 12px;
+  border-top: 1px solid var(--color-border-dim);
+  background: rgba(16, 15, 46, 0.7);
+  flex-shrink: 0;
+}
+
+.lyra-player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lyra-player-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.lyra-player-thumb-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: rgba(236, 72, 153, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ec4899;
+  flex-shrink: 0;
+}
+
+.lyra-player-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lyra-player-title {
+  font-size: 0.8rem;
+  font-weight: 580;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyra-player-channel {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.lyra-caching-indicator {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.lyra-cached-indicator {
+  color: #86efac;
+  flex-shrink: 0;
+}
+
+.lyra-player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lyra-ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text-muted);
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.lyra-ctrl-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(124, 79, 240, 0.12);
+}
+
+.lyra-ctrl-active {
+  color: #ec4899 !important;
+}
+
+.lyra-play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.2);
+  color: #ec4899;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.lyra-play-btn:hover {
+  background: rgba(236, 72, 153, 0.3);
+}
+
+.lyra-play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lyra-player-seek-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lyra-time {
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-dim);
+  min-width: 36px;
+  text-align: center;
+}
+
+.lyra-seek-bar {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(124, 79, 240, 0.2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.lyra-seek-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ec4899;
+  cursor: pointer;
+}
+
+.lyra-volume-btn {
+  margin-left: 4px;
+}
+
+.lyra-volume-slider {
+  width: 70px;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(124, 79, 240, 0.2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.lyra-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-purple-400);
+  cursor: pointer;
+}

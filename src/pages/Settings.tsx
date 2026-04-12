@@ -22,6 +22,9 @@ import {
   Cpu,
   Zap,
   Settings as SettingsIcon,
+  Radio,
+  Music,
+  Video,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
@@ -40,6 +43,9 @@ import {
   deleteWeatherKey,
   pulsarCheckYtdlp,
   pulsarInstallYtdlp,
+  lyraGetCacheSizes,
+  lyraClearMusicCache,
+  lyraClearVideoCache,
 } from "../lib/tauri";
 
 // ── Section IDs ─────────────────────────────────────────────────────────────
@@ -50,6 +56,7 @@ type SectionId =
   | "websearch"
   | "weather"
   | "pulsar"
+  | "lyra"
   | "memory"
   | "shortcuts";
 
@@ -105,6 +112,20 @@ const SECTIONS: {
     ],
   },
   {
+    id: "lyra",
+    label: "Lyra",
+    icon: Radio,
+    keywords: [
+      "lyra",
+      "stream",
+      "cache",
+      "music",
+      "video",
+      "youtube",
+      "streaming",
+    ],
+  },
+  {
     id: "memory",
     label: "Memory",
     icon: Brain,
@@ -117,6 +138,16 @@ const SECTIONS: {
     keywords: ["keyboard", "shortcut", "hotkey", "keybind", "ctrl", "cmd"],
   },
 ];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatCacheSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 // ── KeyField component ───────────────────────────────────────────────────────
 
@@ -386,6 +417,51 @@ export default function Settings() {
       setYtdlpStatus(ok ? "found" : "failed");
     } catch {
       setYtdlpStatus("failed");
+    }
+  };
+
+  // ── Lyra cache ────────────────────────────────────────────────────────────
+  const [lyraMusicBytes, setLyraMusicBytes] = useState(0);
+  const [lyraVideoBytes, setLyraVideoBytes] = useState(0);
+  const [lyraMusicCount, setLyraMusicCount] = useState(0);
+  const [lyraVideoCount, setLyraVideoCount] = useState(0);
+  const [lyraCacheLoading, setLyraCacheLoading] = useState(true);
+  const [lyraClearingMusic, setLyraClearingMusic] = useState(false);
+  const [lyraClearingVideo, setLyraClearingVideo] = useState(false);
+
+  useEffect(() => {
+    lyraGetCacheSizes()
+      .then((sizes) => {
+        setLyraMusicBytes(sizes.music_bytes);
+        setLyraVideoBytes(sizes.video_bytes);
+        setLyraMusicCount(sizes.music_count);
+        setLyraVideoCount(sizes.video_count);
+      })
+      .catch(() => {})
+      .finally(() => setLyraCacheLoading(false));
+  }, []);
+
+  const handleClearMusicCache = async () => {
+    setLyraClearingMusic(true);
+    try {
+      await lyraClearMusicCache();
+      setLyraMusicBytes(0);
+      setLyraMusicCount(0);
+    } catch {
+    } finally {
+      setLyraClearingMusic(false);
+    }
+  };
+
+  const handleClearVideoCache = async () => {
+    setLyraClearingVideo(true);
+    try {
+      await lyraClearVideoCache();
+      setLyraVideoBytes(0);
+      setLyraVideoCount(0);
+    } catch {
+    } finally {
+      setLyraClearingVideo(false);
     }
   };
 
@@ -996,6 +1072,97 @@ export default function Settings() {
                 downloaded directly from GitHub; on other platforms pip is used.
                 You can also install it manually via your package manager.
               </p>
+            </section>
+          )}
+
+          {/* ── Lyra — Cache Management ─────────────────────────────── */}
+          {visibleSections.some((s) => s.id === "lyra") && (
+            <section
+              id="settings-lyra"
+              ref={(el) => {
+                sectionRefs.current["lyra"] = el;
+              }}
+              className="settings-section"
+            >
+              <SectionHeader icon={Radio} label="Lyra — Streaming Cache" color="pink" />
+
+              <div className="settings-desc" style={{ marginBottom: 12 }}>
+                Lyra caches music <strong>permanently</strong> for offline
+                playback, and caches video <strong>temporarily</strong> for
+                smoother streaming. You can clear each cache separately below.
+              </div>
+
+              {/* Music cache */}
+              <div className="settings-ytdlp-row" style={{ marginBottom: 8 }}>
+                <div className="settings-ytdlp-status">
+                  <Music
+                    size={16}
+                    style={{ color: "#ec4899", flexShrink: 0 }}
+                  />
+                  <div className="settings-ytdlp-text">
+                    <span className="settings-ytdlp-label">
+                      Music Cache
+                    </span>
+                    <span className="settings-ytdlp-sublabel">
+                      {lyraCacheLoading
+                        ? "Checking…"
+                        : lyraMusicCount === 0
+                          ? "No cached tracks"
+                          : `${lyraMusicCount} track${lyraMusicCount !== 1 ? "s" : ""} · ${formatCacheSize(lyraMusicBytes)}`}
+                    </span>
+                  </div>
+                </div>
+                {lyraMusicCount > 0 && (
+                  <button
+                    className="settings-ytdlp-install-btn"
+                    onClick={() => void handleClearMusicCache()}
+                    disabled={lyraClearingMusic}
+                    style={{ background: "rgba(239, 68, 68, 0.15)", color: "#fca5a5" }}
+                  >
+                    {lyraClearingMusic ? (
+                      <><Loader2 size={14} className="animate-spin" /> Clearing…</>
+                    ) : (
+                      <><Trash2 size={14} /> Clear music cache</>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Video cache */}
+              <div className="settings-ytdlp-row">
+                <div className="settings-ytdlp-status">
+                  <Video
+                    size={16}
+                    style={{ color: "#a78bfa", flexShrink: 0 }}
+                  />
+                  <div className="settings-ytdlp-text">
+                    <span className="settings-ytdlp-label">
+                      Video Cache
+                    </span>
+                    <span className="settings-ytdlp-sublabel">
+                      {lyraCacheLoading
+                        ? "Checking…"
+                        : lyraVideoCount === 0
+                          ? "No cached videos"
+                          : `${lyraVideoCount} video${lyraVideoCount !== 1 ? "s" : ""} · ${formatCacheSize(lyraVideoBytes)}`}
+                    </span>
+                  </div>
+                </div>
+                {lyraVideoCount > 0 && (
+                  <button
+                    className="settings-ytdlp-install-btn"
+                    onClick={() => void handleClearVideoCache()}
+                    disabled={lyraClearingVideo}
+                    style={{ background: "rgba(239, 68, 68, 0.15)", color: "#fca5a5" }}
+                  >
+                    {lyraClearingVideo ? (
+                      <><Loader2 size={14} className="animate-spin" /> Clearing…</>
+                    ) : (
+                      <><Trash2 size={14} /> Clear video cache</>
+                    )}
+                  </button>
+                )}
+              </div>
             </section>
           )}
 

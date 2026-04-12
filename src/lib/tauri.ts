@@ -182,3 +182,50 @@ export const pulsarDeleteFile = (filePath: string) =>
 
 export const aiText = (prompt: string, maxTokens: number) =>
   invoke<string>("ai_text", { prompt, maxTokens });
+
+// ── Lyra: YouTube streaming & caching ────────────────────────────────────
+
+export interface LyraSearchResult {
+  id: string;
+  title: string;
+  channel: string;
+  duration: number;
+  thumbnail: string;
+  view_count: number;
+}
+
+export interface LyraStreamInfo {
+  video_url: string | null;
+  audio_url: string | null;
+}
+
+export interface LyraCacheSizes {
+  music_bytes: number;
+  video_bytes: number;
+  music_count: number;
+  video_count: number;
+}
+
+export const lyraSearch = (query: string, maxResults: number) =>
+  invoke<LyraSearchResult[]>("lyra_search", { query, maxResults });
+
+export const lyraGetStreamUrl = (videoId: string) =>
+  invoke<LyraStreamInfo>("lyra_get_stream_url", { videoId });
+
+export const lyraCacheAudio = (videoId: string, title: string) =>
+  invoke<string>("lyra_cache_audio", { videoId, title });
+
+export const lyraCacheVideo = (videoId: string, title: string) =>
+  invoke<string>("lyra_cache_video", { videoId, title });
+
+export const lyraCheckAudioCache = (videoId: string) =>
+  invoke<string | null>("lyra_check_audio_cache", { videoId });
+
+export const lyraGetCacheSizes = () =>
+  invoke<LyraCacheSizes>("lyra_get_cache_sizes");
+
+export const lyraClearMusicCache = () =>
+  invoke<number>("lyra_clear_music_cache");
+
+export const lyraClearVideoCache = () =>
+  invoke<number>("lyra_clear_video_cache");

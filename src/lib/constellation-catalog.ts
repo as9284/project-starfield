@@ -21,6 +21,7 @@ import {
   FolderSearch,
   Link as LinkIcon,
   Download,
+  Radio,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -142,6 +143,22 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
     planetSize: 1.25,
     group: "media",
     aliases: ["download", "video", "music", "youtube"],
+  },
+  {
+    id: "lyra",
+    name: "Lyra",
+    description: "Stream music & video from the cosmic ether.",
+    icon: Radio,
+    accentColor: "rgba(236, 72, 153, 0.55)",
+    glowHex: "#ec4899",
+    shortcutNum: "7",
+    orbitRadius: 5.8,
+    orbitSpeed: 0.75,
+    orbitOffset: (TAU / 6) * 5,
+    orbitTilt: 0,
+    planetSize: 1.3,
+    group: "media",
+    aliases: ["stream", "youtube", "music", "video", "play", "listen", "watch"],
   },
 ] as const;
 

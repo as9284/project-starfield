@@ -4,6 +4,7 @@ import {
   Navigation,
   Link,
   Download,
+  Radio,
   ArrowRight,
 } from "lucide-react";
 import { useAppStore, type AppView } from "../../store/useAppStore";
@@ -28,6 +29,7 @@ const VALID_TARGETS: ControlledView[] = [
   "beacon",
   "hyperlane",
   "pulsar",
+  "lyra",
 ];
 
 function normalizeTarget(value: unknown): ControlledView | null {
@@ -45,6 +47,7 @@ const labels: Record<string, string> = {
   beacon: "Beacon",
   hyperlane: "Hyperlane",
   pulsar: "Pulsar",
+  lyra: "Lyra",
 };
 
 const icons: Record<string, React.ReactNode> = {
@@ -53,6 +56,7 @@ const icons: Record<string, React.ReactNode> = {
   beacon: <Navigation size={13} />,
   hyperlane: <Link size={13} />,
   pulsar: <Download size={13} />,
+  lyra: <Radio size={13} />,
 };
 
 function NavigatedCard({ result }: { result: ActionResult }) {
@@ -115,7 +119,7 @@ export const navigateHandler: ConstellationHandler = {
   promptInstructions: `### Navigation — Switch Constellation
 
 \`\`\`navigate-commands
-NAVIGATE {"to":"orbit|solaris|beacon|hyperlane|pulsar"}
+NAVIGATE {"to":"orbit|solaris|beacon|hyperlane|pulsar|lyra"}
 \`\`\`
 
 Use this when the user asks to go to, open, or switch to a specific constellation.
@@ -197,6 +201,10 @@ export function inferNavigationTarget(text: string): ControlledView | null {
     [
       "pulsar",
       /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?pulsar\b/i,
+    ],
+    [
+      "lyra",
+      /\b(?:open|go\s*to|switch\s*to|take\s*me\s*to|bring\s*me\s*to|show|navigate\s*to|launch)\s+(?:the\s+)?lyra\b/i,
     ],
   ];
 

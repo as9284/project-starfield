@@ -31,6 +31,7 @@ export type AppView =
   | "beacon"
   | "pulsar"
   | "hyperlane"
+  | "lyra"
   | "settings";
 
 interface AppState {

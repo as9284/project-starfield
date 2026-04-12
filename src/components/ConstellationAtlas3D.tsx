@@ -770,6 +770,69 @@ function PulsarDetail({ highlighted }: { highlighted: boolean }) {
   );
 }
 
+function LyraDetail({ highlighted }: { highlighted: boolean }) {
+  const ring1Ref = useRef<THREE.Mesh>(null);
+  const ring2Ref = useRef<THREE.Mesh>(null);
+  const noteRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const beat = Math.abs(Math.sin(t * 3.0));
+    if (ring1Ref.current) {
+      const s = 0.8 + beat * 0.3;
+      ring1Ref.current.scale.setScalar(s);
+      ring1Ref.current.rotation.z = t * 0.4;
+    }
+    if (ring2Ref.current) {
+      const s2 = 0.7 + Math.abs(Math.sin(t * 2.0 + 1.0)) * 0.35;
+      ring2Ref.current.scale.setScalar(s2);
+      ring2Ref.current.rotation.z = -t * 0.3 + Math.PI * 0.3;
+    }
+    if (noteRef.current) {
+      noteRef.current.position.y = Math.sin(t * 2.0) * 0.08;
+      const mat = noteRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 1.5 + beat * (highlighted ? 4.0 : 2.5);
+      mat.opacity = 0.3 + beat * (highlighted ? 0.5 : 0.3);
+    }
+  });
+
+  return (
+    <>
+      <mesh ref={ring1Ref} rotation={[Math.PI * 0.5, 0, 0]}>
+        <torusGeometry args={[0.35, 0.015, 8, 32, Math.PI * 1.5]} />
+        <meshStandardMaterial
+          color="#fbcfe8"
+          emissive="#ec4899"
+          emissiveIntensity={highlighted ? 3.5 : 2.0}
+          transparent
+          opacity={highlighted ? 0.7 : 0.5}
+        />
+      </mesh>
+      <mesh ref={ring2Ref} rotation={[Math.PI * 0.35, 0.4, 0]}>
+        <torusGeometry args={[0.28, 0.01, 8, 24, Math.PI * 1.0]} />
+        <meshStandardMaterial
+          color="#fce7f3"
+          emissive="#f472b6"
+          emissiveIntensity={highlighted ? 2.5 : 1.5}
+          transparent
+          opacity={highlighted ? 0.55 : 0.4}
+        />
+      </mesh>
+      <mesh ref={noteRef}>
+        <sphereGeometry args={[0.18, 12, 12]} />
+        <meshStandardMaterial
+          color="#fda4af"
+          emissive="#ec4899"
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.3}
+          side={THREE.BackSide}
+        />
+      </mesh>
+    </>
+  );
+}
+
 type DetailProps = { highlighted: boolean };
 const DETAIL_MAP: Record<ConstellationId, React.FC<DetailProps>> = {
   orbit: OrbitDetail,
@@ -777,6 +840,7 @@ const DETAIL_MAP: Record<ConstellationId, React.FC<DetailProps>> = {
   beacon: BeaconDetail,
   hyperlane: HyperlaneDetail,
   pulsar: PulsarDetail,
+  lyra: LyraDetail,
 };
 
 // ── Camera focus ─────────────────────────────────────────────────────────────

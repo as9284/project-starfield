@@ -8,6 +8,10 @@ use commands::{
         get_tavily_key, get_weather_key, save_deepseek_key, save_tavily_key, save_weather_key,
     },
     luna::stream_luna,
+    lyra::{
+        lyra_cache_audio, lyra_cache_video, lyra_check_audio_cache, lyra_clear_music_cache,
+        lyra_clear_video_cache, lyra_get_cache_sizes, lyra_get_stream_url, lyra_search,
+    },
     pulsar::{
         pulsar_cancel_download, pulsar_check_ytdlp, pulsar_delete_file, pulsar_download,
         pulsar_get_downloads_dir, pulsar_install_ytdlp, PulsarState,
@@ -57,6 +61,14 @@ pub fn run() {
             pulsar_cancel_download,
             pulsar_install_ytdlp,
             pulsar_delete_file,
+            lyra_search,
+            lyra_get_stream_url,
+            lyra_cache_audio,
+            lyra_cache_video,
+            lyra_check_audio_cache,
+            lyra_get_cache_sizes,
+            lyra_clear_music_cache,
+            lyra_clear_video_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Starfield");
