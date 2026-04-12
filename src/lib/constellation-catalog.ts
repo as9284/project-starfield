@@ -66,7 +66,7 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
   {
     id: "orbit",
     name: "Orbit",
-    description: "Tasks & notes that stay in formation.",
+    description: "Tasks & notes locked in gravitational sync.",
     icon: ListTodo,
     accentColor: "rgba(124, 79, 240, 0.55)",
     glowHex: "#7c4ff0",
@@ -82,7 +82,7 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
   {
     id: "solaris",
     name: "Solaris",
-    description: "Weather intelligence, solar-powered.",
+    description: "Solar-powered atmospheric intelligence.",
     icon: CloudSun,
     accentColor: "rgba(217, 70, 239, 0.55)",
     glowHex: "#d946ef",
@@ -98,7 +98,7 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
   {
     id: "beacon",
     name: "Beacon",
-    description: "Codebase exploration, lit from orbit.",
+    description: "Deep-scan your codebase from orbit.",
     icon: FolderSearch,
     accentColor: "rgba(99, 102, 241, 0.55)",
     glowHex: "#6366f1",
@@ -114,7 +114,7 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
   {
     id: "hyperlane",
     name: "Hyperlane",
-    description: "Links compressed into tiny jumps.",
+    description: "Compress any link into a micro-jump.",
     icon: LinkIcon,
     accentColor: "rgba(20, 184, 166, 0.55)",
     glowHex: "#14b8a6",
@@ -130,7 +130,7 @@ export const CONSTELLATIONS: readonly ConstellationEntry[] = [
   {
     id: "pulsar",
     name: "Pulsar",
-    description: "Media downloads with glow on demand.",
+    description: "Pull media from the void on demand.",
     icon: Download,
     accentColor: "rgba(155, 120, 248, 0.55)",
     glowHex: "#9b78f8",
