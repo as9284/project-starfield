@@ -8,7 +8,7 @@
  */
 
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Text, Billboard, OrbitControls, Line } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -22,6 +22,8 @@ import {
 const _v3 = new THREE.Vector3();
 const _scale = new THREE.Vector3();
 const _origin = new THREE.Vector3();
+const _defaultCamPos = new THREE.Vector3(0, 9, 20);
+const _focusOffset = new THREE.Vector3(0, 2.5, 5.5);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,135 +60,181 @@ function IntroCamera() {
 function LunaCore() {
   const groupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
-  const bandsRef = useRef<THREE.Mesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
+  const innerGlowRef = useRef<THREE.Mesh>(null);
   const coronaRef = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
-  const eyeRingRef = useRef<THREE.Mesh>(null);
+  const ray1Ref = useRef<THREE.Mesh>(null);
+  const ray2Ref = useRef<THREE.Mesh>(null);
+  const ray3Ref = useRef<THREE.Mesh>(null);
+  const flare1Ref = useRef<THREE.Mesh>(null);
+  const flare2Ref = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
-    // Core: slow tumble
     if (coreRef.current) {
-      coreRef.current.rotation.y = t * 0.08;
-      coreRef.current.rotation.x = Math.sin(t * 0.04) * 0.06;
+      coreRef.current.rotation.y = t * 0.06;
+      const pulse = 1.0 + Math.sin(t * 1.8) * 0.03;
+      coreRef.current.scale.setScalar(pulse);
+      const mat = coreRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 3.0 + Math.sin(t * 2.2) * 0.8;
     }
-    // Atmospheric bands: counter-rotate for depth
-    if (bandsRef.current) {
-      bandsRef.current.rotation.y = -t * 0.05;
-      bandsRef.current.rotation.z = 0.15;
+
+    if (innerGlowRef.current) {
+      const p = 1.0 + Math.sin(t * 1.2) * 0.06;
+      innerGlowRef.current.scale.setScalar(p);
+      innerGlowRef.current.rotation.y = -t * 0.03;
+      const mat = innerGlowRef.current.material as THREE.MeshStandardMaterial;
+      mat.opacity = 0.22 + Math.sin(t * 1.5) * 0.06;
     }
-    // Mid glow shell: breathe
-    if (glowRef.current) {
-      const pulse = 1.0 + Math.sin(t * 0.7) * 0.05;
-      glowRef.current.scale.setScalar(pulse);
-    }
-    // Corona: slow drift
+
     if (coronaRef.current) {
-      const p2 = 1.0 + Math.sin(t * 0.4 + 1.2) * 0.07;
+      const p2 = 1.0 + Math.sin(t * 0.5 + 1.0) * 0.08;
       coronaRef.current.scale.setScalar(p2);
-      coronaRef.current.rotation.y = -t * 0.025;
+      coronaRef.current.rotation.y = -t * 0.02;
     }
-    // Halo: subtle throb
+
     if (haloRef.current) {
-      haloRef.current.scale.setScalar(1.0 + Math.sin(t * 0.25) * 0.04);
+      haloRef.current.scale.setScalar(1.0 + Math.sin(t * 0.3) * 0.04);
     }
-    // Eye ring: gentle wobble
-    if (eyeRingRef.current) {
-      eyeRingRef.current.rotation.x = Math.PI * 0.5 + Math.sin(t * 0.3) * 0.08;
-      eyeRingRef.current.rotation.z = t * 0.06;
+
+    if (ray1Ref.current) {
+      ray1Ref.current.rotation.z = t * 0.015;
+      const s = 1.0 + Math.sin(t * 1.0) * 0.1;
+      ray1Ref.current.scale.set(s, 1, 1);
+    }
+    if (ray2Ref.current) {
+      ray2Ref.current.rotation.z = t * 0.015 + Math.PI / 3;
+      const s = 1.0 + Math.sin(t * 1.0 + 2) * 0.1;
+      ray2Ref.current.scale.set(s, 1, 1);
+    }
+    if (ray3Ref.current) {
+      ray3Ref.current.rotation.z = t * 0.015 - Math.PI / 3;
+      const s = 1.0 + Math.sin(t * 1.0 + 4) * 0.1;
+      ray3Ref.current.scale.set(s, 1, 1);
+    }
+
+    if (flare1Ref.current) {
+      flare1Ref.current.scale.setScalar(1.0 + Math.sin(t * 2.0) * 0.15);
+      flare1Ref.current.rotation.z = Math.sin(t * 0.4) * 0.2;
+    }
+    if (flare2Ref.current) {
+      flare2Ref.current.scale.setScalar(1.0 + Math.sin(t * 1.7 + 1.5) * 0.12);
+      flare2Ref.current.rotation.z = Math.PI * 0.5 + Math.sin(t * 0.35) * 0.15;
     }
   });
 
   return (
     <group ref={groupRef}>
-      {/* Deep core — bright inner surface */}
+      {/* White-hot core */}
       <mesh ref={coreRef}>
         <sphereGeometry args={[0.55, 48, 48]} />
         <meshStandardMaterial
-          color="#5a30d0"
-          emissive="#9060ff"
-          emissiveIntensity={2.0}
-          roughness={0.1}
-          metalness={0.9}
+          color="#fff8e7"
+          emissive="#ffd088"
+          emissiveIntensity={3.0}
+          roughness={0.0}
+          metalness={1.0}
         />
       </mesh>
 
-      {/* Atmospheric bands — translucent shell with banding effect */}
-      <mesh ref={bandsRef}>
+      {/* Inner glow — warm yellow orange shell */}
+      <mesh ref={innerGlowRef}>
         <sphereGeometry args={[0.62, 48, 48]} />
         <meshStandardMaterial
-          color="#7c4ff0"
+          color="#ffb347"
           transparent
-          opacity={0.25}
-          emissive="#a78bfa"
-          emissiveIntensity={0.8}
-          roughness={0.3}
-          metalness={0.6}
-          wireframe={false}
+          opacity={0.22}
+          emissive="#ff9f43"
+          emissiveIntensity={1.2}
+          roughness={0.2}
+          metalness={0.3}
+          side={THREE.FrontSide}
         />
       </mesh>
 
-      {/* AI "eye" ring — a thin torus orbiting the globe */}
-      <mesh ref={eyeRingRef}>
-        <torusGeometry args={[0.78, 0.015, 16, 100]} />
+      {/* Corona rays — 6 pointed star shape using thin scaled boxes */}
+      <group ref={ray1Ref}>
+        <mesh>
+          <boxGeometry args={[2.4, 0.04, 0.04]} />
+          <meshStandardMaterial
+            color="#ffe4b5"
+            emissive="#ffd700"
+            emissiveIntensity={3.0}
+            transparent
+            opacity={0.45}
+          />
+        </mesh>
+      </group>
+      <group ref={ray2Ref}>
+        <mesh>
+          <boxGeometry args={[2.4, 0.04, 0.04]} />
+          <meshStandardMaterial
+            color="#ffe4b5"
+            emissive="#ffd700"
+            emissiveIntensity={3.0}
+            transparent
+            opacity={0.45}
+          />
+        </mesh>
+      </group>
+      <group ref={ray3Ref}>
+        <mesh>
+          <boxGeometry args={[2.4, 0.04, 0.04]} />
+          <meshStandardMaterial
+            color="#ffe4b5"
+            emissive="#ffd700"
+            emissiveIntensity={3.0}
+            transparent
+            opacity={0.45}
+          />
+        </mesh>
+      </group>
+
+      {/* Solar prominences / flares */}
+      <mesh ref={flare1Ref} rotation={[0, 0, 0.4]}>
+        <torusGeometry args={[0.75, 0.03, 8, 32, Math.PI * 0.4]} />
         <meshStandardMaterial
-          color="#c4b5fd"
-          emissive="#c4b5fd"
+          color="#ff6b35"
+          emissive="#ff4500"
           emissiveIntensity={2.5}
           transparent
-          opacity={0.7}
+          opacity={0.5}
         />
       </mesh>
-
-      {/* Secondary eye ring — perpendicular */}
-      <mesh rotation={[0, Math.PI * 0.5, Math.PI * 0.3]}>
-        <torusGeometry args={[0.85, 0.01, 16, 100]} />
+      <mesh ref={flare2Ref} rotation={[0, 0, -0.6]}>
+        <torusGeometry args={[0.82, 0.02, 8, 24, Math.PI * 0.3]} />
         <meshStandardMaterial
-          color="#a78bfa"
-          emissive="#a78bfa"
-          emissiveIntensity={1.8}
+          color="#ff8c42"
+          emissive="#ff6600"
+          emissiveIntensity={2.0}
           transparent
-          opacity={0.4}
+          opacity={0.35}
         />
       </mesh>
 
       {/* Mid glow shell */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[0.82, 32, 32]} />
-        <meshStandardMaterial
-          color="#7c4ff0"
-          transparent
-          opacity={0.1}
-          emissive="#9060ff"
-          emissiveIntensity={1.0}
-          side={THREE.BackSide}
-        />
-      </mesh>
-
-      {/* Corona — slow-rotating atmosphere */}
       <mesh ref={coronaRef}>
         <sphereGeometry args={[1.15, 28, 28]} />
         <meshStandardMaterial
-          color="#8b5cf6"
+          color="#ff9f43"
           transparent
-          opacity={0.05}
-          emissive="#a78bfa"
-          emissiveIntensity={0.6}
+          opacity={0.07}
+          emissive="#ffd700"
+          emissiveIntensity={0.8}
           side={THREE.BackSide}
         />
       </mesh>
 
-      {/* Outer halo — wide diffuse glow */}
+      {/* Outer halo — diffuse warm glow */}
       <mesh ref={haloRef}>
-        <sphereGeometry args={[1.7, 20, 20]} />
+        <sphereGeometry args={[1.8, 20, 20]} />
         <meshStandardMaterial
-          color="#7c4ff0"
+          color="#ffd700"
           transparent
-          opacity={0.02}
-          emissive="#7c4ff0"
-          emissiveIntensity={0.25}
+          opacity={0.025}
+          emissive="#ff8c00"
+          emissiveIntensity={0.3}
           side={THREE.BackSide}
         />
       </mesh>
@@ -196,7 +244,7 @@ function LunaCore() {
         <Text
           position={[0, 1.1, 0]}
           fontSize={0.22}
-          color="#c4b5fd"
+          color="#ffe4b5"
           anchorX="center"
           anchorY="bottom"
           font={undefined}
@@ -207,10 +255,10 @@ function LunaCore() {
         </Text>
       </Billboard>
 
-      {/* Core light — strong */}
-      <pointLight color="#9060ff" intensity={8} distance={32} decay={2} />
-      {/* Warm secondary */}
-      <pointLight color="#c084fc" intensity={2.5} distance={20} decay={2} />
+      {/* Core star light — warm bright */}
+      <pointLight color="#ffd088" intensity={10} distance={36} decay={2} />
+      {/* Secondary warm fill */}
+      <pointLight color="#ffb347" intensity={3} distance={22} decay={2} />
     </group>
   );
 }
@@ -296,60 +344,251 @@ function ConnectorLine({
 
 // ── Per-planet unique detail components ──────────────────────────────────────
 
-/** Orbit — Saturn-like tilted ring */
+/** Orbit — Saturn-like multi-ring system, structured and disciplined */
 function OrbitDetail() {
-  const ref = useRef<THREE.Mesh>(null);
+  const innerRef = useRef<THREE.Mesh>(null);
+  const midRef = useRef<THREE.Mesh>(null);
+  const outerRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.rotation.z = clock.getElapsedTime() * 0.04;
+    const t = clock.getElapsedTime();
+    if (innerRef.current) innerRef.current.rotation.z = t * 0.04;
+    if (midRef.current) midRef.current.rotation.z = -t * 0.025;
+    if (outerRef.current) outerRef.current.rotation.z = t * 0.015;
   });
   return (
-    <mesh ref={ref} rotation={[0.6, 0, 0.2]}>
-      <torusGeometry args={[0.48, 0.012, 12, 80]} />
-      <meshStandardMaterial
-        color="#7c4ff0"
-        emissive="#7c4ff0"
-        emissiveIntensity={1.5}
-        transparent
-        opacity={0.55}
-      />
-    </mesh>
+    <>
+      <mesh ref={innerRef} rotation={[0.55, 0.1, 0]}>
+        <torusGeometry args={[0.42, 0.018, 12, 100]} />
+        <meshStandardMaterial
+          color="#a78bfa"
+          emissive="#7c4ff0"
+          emissiveIntensity={2.0}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+      <mesh ref={midRef} rotation={[0.55, 0.1, 0]}>
+        <torusGeometry args={[0.52, 0.012, 10, 100]} />
+        <meshStandardMaterial
+          color="#c4b5fd"
+          emissive="#a78bfa"
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.45}
+        />
+      </mesh>
+      <mesh ref={outerRef} rotation={[0.55, 0.1, 0]}>
+        <torusGeometry args={[0.60, 0.007, 8, 100]} />
+        <meshStandardMaterial
+          color="#ddd6fe"
+          emissive="#c4b5fd"
+          emissiveIntensity={1.0}
+          transparent
+          opacity={0.3}
+        />
+      </mesh>
+    </>
   );
 }
 
-/** Solaris — animated solar flare wisps */
+/** Solaris — mini sun with warm corona and prominences */
 function SolarisDetail() {
-  const ref1 = useRef<THREE.Mesh>(null);
-  const ref2 = useRef<THREE.Mesh>(null);
+  const coronaRef = useRef<THREE.Mesh>(null);
+  const flare1Ref = useRef<THREE.Mesh>(null);
+  const flare2Ref = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (ref1.current) {
-      const s = 1.0 + Math.sin(t * 1.5) * 0.3;
-      ref1.current.scale.set(s, s * 0.6, s);
-      ref1.current.rotation.z = t * 0.2;
+    if (coronaRef.current) {
+      coronaRef.current.rotation.y = t * 0.15;
+      coronaRef.current.scale.setScalar(1.0 + Math.sin(t * 1.5) * 0.08);
     }
-    if (ref2.current) {
-      const s = 1.0 + Math.sin(t * 1.2 + 2) * 0.25;
-      ref2.current.scale.set(s * 0.7, s, s * 0.7);
-      ref2.current.rotation.z = -t * 0.15;
+    if (flare1Ref.current) {
+      flare1Ref.current.scale.setScalar(1.0 + Math.sin(t * 2.0) * 0.25);
+      flare1Ref.current.rotation.z = Math.sin(t * 0.3) * 0.3;
+    }
+    if (flare2Ref.current) {
+      flare2Ref.current.scale.setScalar(1.0 + Math.sin(t * 1.7 + 1.5) * 0.2);
+      flare2Ref.current.rotation.z = Math.PI + Math.sin(t * 0.25 + 1) * 0.25;
+    }
+    if (glowRef.current) {
+      glowRef.current.scale.setScalar(1.0 + Math.sin(t * 1.2) * 0.05);
     }
   });
   return (
     <>
-      <mesh ref={ref1} position={[0.2, 0.25, 0]}>
-        <sphereGeometry args={[0.12, 12, 12]} />
+      <mesh ref={coronaRef}>
+        <sphereGeometry args={[0.48, 20, 20]} />
         <meshStandardMaterial
-          color="#f472b6"
-          emissive="#d946ef"
+          color="#ff9f43"
+          transparent
+          opacity={0.12}
+          emissive="#ff6b35"
+          emissiveIntensity={1.0}
+          side={THREE.BackSide}
+        />
+      </mesh>
+      <mesh ref={flare1Ref} rotation={[0, 0, 0.4]}>
+        <torusGeometry args={[0.55, 0.02, 8, 24, Math.PI * 0.5]} />
+        <meshStandardMaterial
+          color="#ff6348"
+          emissive="#ff4500"
+          emissiveIntensity={2.5}
+          transparent
+          opacity={0.55}
+        />
+      </mesh>
+      <mesh ref={flare2Ref} rotation={[0.3, 0, -0.5]}>
+        <torusGeometry args={[0.60, 0.015, 8, 20, Math.PI * 0.35]} />
+        <meshStandardMaterial
+          color="#ffbe76"
+          emissive="#ff9f43"
+          emissiveIntensity={1.8}
+          transparent
+          opacity={0.4}
+        />
+      </mesh>
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[0.38, 16, 16]} />
+        <meshStandardMaterial
+          color="#feca57"
+          transparent
+          opacity={0.15}
+          emissive="#ff9f43"
+          emissiveIntensity={1.5}
+          side={THREE.FrontSide}
+        />
+      </mesh>
+    </>
+  );
+}
+
+/** Beacon — scanning lighthouse with rotating sweep beam */
+function BeaconDetail() {
+  const sweepRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const beamRef = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (sweepRef.current) {
+      sweepRef.current.rotation.y = t * 0.8;
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.y = -t * 0.3;
+    }
+    if (beamRef.current) {
+      beamRef.current.rotation.y = t * 1.2;
+    }
+  });
+  return (
+    <>
+      <mesh ref={sweepRef} rotation={[Math.PI * 0.5, 0, 0]}>
+        <torusGeometry args={[0.40, 0.01, 8, 48, Math.PI * 0.7]} />
+        <meshStandardMaterial
+          color="#818cf8"
+          emissive="#6366f1"
+          emissiveIntensity={2.5}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+      <mesh ref={ringRef} rotation={[Math.PI * 0.45, 0.3, 0]}>
+        <torusGeometry args={[0.50, 0.006, 8, 64]} />
+        <meshStandardMaterial
+          color="#a5b4fc"
+          emissive="#818cf8"
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.4}
+        />
+      </mesh>
+      <group ref={beamRef}>
+        <mesh position={[0, 0.55, 0.1]}>
+          <boxGeometry args={[0.02, 0.5, 0.02]} />
+          <meshStandardMaterial
+            color="#e0e7ff"
+            emissive="#c7d2fe"
+            emissiveIntensity={3.0}
+            transparent
+            opacity={0.6}
+          />
+        </mesh>
+      </group>
+    </>
+  );
+}
+
+/** Hyperlane — warp streaks with speed trails and energy ring */
+function HyperlaneDetail() {
+  const ring1Ref = useRef<THREE.Mesh>(null);
+  const ring2Ref = useRef<THREE.Mesh>(null);
+  const trail1Ref = useRef<THREE.Mesh>(null);
+  const trail2Ref = useRef<THREE.Mesh>(null);
+  const trail3Ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ring1Ref.current) ring1Ref.current.rotation.y = t * 0.6;
+    if (ring2Ref.current) ring2Ref.current.rotation.y = -t * 0.45;
+    if (trail1Ref.current) {
+      trail1Ref.current.rotation.y = t * 0.2;
+      trail1Ref.current.scale.x = 1.0 + Math.sin(t * 3.0) * 0.15;
+    }
+    if (trail2Ref.current) {
+      trail2Ref.current.rotation.y = t * 0.2 + Math.PI * 0.66;
+      trail2Ref.current.scale.x = 1.0 + Math.sin(t * 2.7 + 2) * 0.12;
+    }
+    if (trail3Ref.current) {
+      trail3Ref.current.rotation.y = t * 0.2 + Math.PI * 1.33;
+      trail3Ref.current.scale.x = 1.0 + Math.sin(t * 2.4 + 4) * 0.1;
+    }
+  });
+  return (
+    <>
+      <mesh ref={ring1Ref} rotation={[0.8, 0, 0.4]}>
+        <torusGeometry args={[0.44, 0.007, 8, 64]} />
+        <meshStandardMaterial
+          color="#2dd4bf"
+          emissive="#14b8a6"
+          emissiveIntensity={2.5}
+          transparent
+          opacity={0.6}
+        />
+      </mesh>
+      <mesh ref={ring2Ref} rotation={[1.2, 0.5, 0]}>
+        <torusGeometry args={[0.38, 0.005, 8, 64]} />
+        <meshStandardMaterial
+          color="#5eead4"
+          emissive="#14b8a6"
+          emissiveIntensity={1.8}
+          transparent
+          opacity={0.4}
+        />
+      </mesh>
+      <mesh ref={trail1Ref} rotation={[0, 0, 0]}>
+        <boxGeometry args={[0.6, 0.008, 0.008]} />
+        <meshStandardMaterial
+          color="#99f6e4"
+          emissive="#2dd4bf"
+          emissiveIntensity={3.0}
+          transparent
+          opacity={0.5}
+        />
+      </mesh>
+      <mesh ref={trail2Ref} rotation={[0, 0, 0]}>
+        <boxGeometry args={[0.5, 0.008, 0.008]} />
+        <meshStandardMaterial
+          color="#99f6e4"
+          emissive="#2dd4bf"
           emissiveIntensity={2.5}
           transparent
           opacity={0.35}
         />
       </mesh>
-      <mesh ref={ref2} position={[-0.15, -0.2, 0.1]}>
-        <sphereGeometry args={[0.1, 12, 12]} />
+      <mesh ref={trail3Ref} rotation={[0, 0, 0]}>
+        <boxGeometry args={[0.45, 0.006, 0.006]} />
         <meshStandardMaterial
-          color="#e879f9"
-          emissive="#d946ef"
+          color="#ccfbf1"
+          emissive="#5eead4"
           emissiveIntensity={2.0}
           transparent
           opacity={0.25}
@@ -359,85 +598,82 @@ function SolarisDetail() {
   );
 }
 
-/** Beacon — scanning sweep ring */
-function BeaconDetail() {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (ref.current) {
-      ref.current.rotation.y = clock.getElapsedTime() * 0.8;
-    }
-  });
-  return (
-    <mesh ref={ref} rotation={[Math.PI * 0.5, 0, 0]}>
-      <torusGeometry args={[0.42, 0.008, 8, 32, Math.PI * 0.7]} />
-      <meshStandardMaterial
-        color="#818cf8"
-        emissive="#6366f1"
-        emissiveIntensity={2.0}
-        transparent
-        opacity={0.6}
-      />
-    </mesh>
-  );
-}
-
-/** Hyperlane — warp streaks (two tilted rings) */
-function HyperlaneDetail() {
-  const ref1 = useRef<THREE.Mesh>(null);
-  const ref2 = useRef<THREE.Mesh>(null);
+/** Pulsar — pulsing energy arcs with periodic bright flash */
+function PulsarDetail() {
+  const arc1Ref = useRef<THREE.Mesh>(null);
+  const arc2Ref = useRef<THREE.Mesh>(null);
+  const pulseRef = useRef<THREE.Mesh>(null);
+  const coreGlowRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (ref1.current) ref1.current.rotation.y = t * 0.5;
-    if (ref2.current) ref2.current.rotation.y = -t * 0.4;
+    const pulse = Math.abs(Math.sin(t * 2.5));
+    if (arc1Ref.current) {
+      const s = 0.7 + pulse * 0.5;
+      arc1Ref.current.scale.setScalar(s);
+      arc1Ref.current.rotation.z = t * 0.3;
+    }
+    if (arc2Ref.current) {
+      const s2 = 0.7 + Math.abs(Math.sin(t * 2.5 + 1.5)) * 0.4;
+      arc2Ref.current.scale.setScalar(s2);
+      arc2Ref.current.rotation.z = -t * 0.25 + Math.PI * 0.5;
+    }
+    if (pulseRef.current) {
+      const flash = pulse;
+      pulseRef.current.scale.setScalar(0.3 + flash * 0.35);
+      const mat = pulseRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 1.0 + flash * 4.0;
+      mat.opacity = 0.15 + flash * 0.25;
+    }
+    if (coreGlowRef.current) {
+      const glow = 0.6 + pulse * 0.4;
+      coreGlowRef.current.scale.setScalar(glow);
+    }
   });
   return (
     <>
-      <mesh ref={ref1} rotation={[0.8, 0, 0.4]}>
-        <torusGeometry args={[0.44, 0.006, 8, 48]} />
+      <mesh ref={arc1Ref} rotation={[Math.PI * 0.5, 0, 0]}>
+        <torusGeometry args={[0.38, 0.015, 8, 32, Math.PI * 1.2]} />
         <meshStandardMaterial
-          color="#2dd4bf"
-          emissive="#14b8a6"
-          emissiveIntensity={2.0}
+          color="#c4b5fd"
+          emissive="#9b78f8"
+          emissiveIntensity={2.5}
           transparent
-          opacity={0.5}
+          opacity={0.6}
         />
       </mesh>
-      <mesh ref={ref2} rotation={[1.2, 0.5, 0]}>
-        <torusGeometry args={[0.4, 0.006, 8, 48]} />
+      <mesh ref={arc2Ref} rotation={[Math.PI * 0.4, 0.2, 0]}>
+        <torusGeometry args={[0.32, 0.01, 8, 28, Math.PI * 0.8]} />
         <meshStandardMaterial
-          color="#5eead4"
-          emissive="#14b8a6"
+          color="#ddd6fe"
+          emissive="#c4b5fd"
+          emissiveIntensity={2.0}
+          transparent
+          opacity={0.45}
+        />
+      </mesh>
+      <mesh ref={pulseRef}>
+        <sphereGeometry args={[0.15, 12, 12]} />
+        <meshStandardMaterial
+          color="#e9d5ff"
+          emissive="#9b78f8"
+          emissiveIntensity={1.0}
+          transparent
+          opacity={0.15}
+          side={THREE.BackSide}
+        />
+      </mesh>
+      <mesh ref={coreGlowRef}>
+        <dodecahedronGeometry args={[0.22, 0]} />
+        <meshStandardMaterial
+          color="#9b78f8"
+          emissive="#7c3aed"
           emissiveIntensity={1.5}
           transparent
-          opacity={0.35}
+          opacity={0.4}
+          wireframe
         />
       </mesh>
     </>
-  );
-}
-
-/** Pulsar — pulsing energy arcs */
-function PulsarDetail() {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (ref.current) {
-      const s = 0.8 + Math.sin(t * 2.5) * 0.4;
-      ref.current.scale.setScalar(s);
-      ref.current.rotation.z = t * 0.3;
-    }
-  });
-  return (
-    <mesh ref={ref} rotation={[Math.PI * 0.5, 0, 0]}>
-      <torusGeometry args={[0.38, 0.015, 8, 32, Math.PI * 1.2]} />
-      <meshStandardMaterial
-        color="#c4b5fd"
-        emissive="#9b78f8"
-        emissiveIntensity={2.5}
-        transparent
-        opacity={0.5}
-      />
-    </mesh>
   );
 }
 
@@ -457,7 +693,8 @@ interface CameraFocusProps {
 }
 
 function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
-  const { controls } = useThree();
+  const { controls, camera } = useThree();
+  const canControl = useRef(false);
 
   useFrame((state, delta) => {
     if (!controls) return;
@@ -465,6 +702,9 @@ function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
       target: THREE.Vector3;
       update: () => void;
     };
+
+    const introDone = introValues.every((v) => v >= 0.95);
+    if (!canControl.current && introDone) canControl.current = true;
 
     if (focusedId !== null) {
       const idx = CONSTELLATIONS.findIndex((c) => c.id === focusedId);
@@ -474,18 +714,26 @@ function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
       const t = state.clock.getElapsedTime();
       const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
       const r = entry.orbitRadius * introT;
-      const tilt = entry.orbitTilt;
-      const x = Math.cos(angle) * r;
-      const z = Math.sin(angle) * r;
-      const y =
-        Math.sin(angle) * r * Math.sin(tilt) +
-        Math.sin(t * 0.25 + entry.orbitOffset) * 0.35 * introT;
-      _v3.set(x, y, z);
-      // Gentle follow — low lerp factor so the camera glides
-      ctrl.target.lerp(_v3, 1 - Math.pow(0.12, delta));
+      const px = Math.cos(angle) * r;
+      const pz = Math.sin(angle) * r;
+
+      _v3.set(px, 0, pz);
+      ctrl.target.lerp(_v3, 1 - Math.pow(0.1, delta));
+
+      if (canControl.current) {
+        _v3.set(
+          px + _focusOffset.x,
+          _focusOffset.y,
+          pz + _focusOffset.z,
+        );
+        camera.position.lerp(_v3, 1 - Math.pow(0.1, delta));
+      }
     } else {
-      // Drift back to centre slowly
-      ctrl.target.lerp(_origin, 1 - Math.pow(0.35, delta));
+      ctrl.target.lerp(_origin, 1 - Math.pow(0.12, delta));
+
+      if (canControl.current && camera.position.distanceTo(_defaultCamPos) > 0.5) {
+        camera.position.lerp(_defaultCamPos, 1 - Math.pow(0.08, delta));
+      }
     }
     ctrl.update();
   });
@@ -537,12 +785,9 @@ function ConstellationNode({
     // Smooth orbit motion — introT scales the orbit radius from 0→full
     const currentRadius = entry.orbitRadius * introT;
     const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
-    const tilt = entry.orbitTilt;
     const x = Math.cos(angle) * currentRadius;
     const z = Math.sin(angle) * currentRadius;
-    const y =
-      Math.sin(angle) * currentRadius * Math.sin(tilt) +
-      Math.sin(t * 0.25 + entry.orbitOffset) * 0.35 * introT;
+    const y = 0;
 
     if (groupRef.current) {
       _v3.set(x, y, z);
@@ -677,11 +922,12 @@ function ConstellationNode({
 interface SceneProps {
   activeView: ConstellationId | null;
   onSelect: (id: ConstellationId) => void;
+  focusedId: ConstellationId | null;
+  setFocusedId: React.Dispatch<React.SetStateAction<ConstellationId | null>>;
 }
 
-function Scene({ activeView, onSelect }: SceneProps) {
+function Scene({ activeView, onSelect, focusedId, setFocusedId }: SceneProps) {
   const [hovered, setHovered] = useState<ConstellationId | null>(null);
-  const [focusedId, setFocusedId] = useState<ConstellationId | null>(null);
 
   // Intro animation progress — one value per node, staggered
   const introStartTime = useRef(performance.now());
@@ -707,7 +953,7 @@ function Scene({ activeView, onSelect }: SceneProps) {
   // Global intro progress for orbit rings (fastest node)
   const ringIntro = Math.max(...introValues, 0);
 
-  // Hovering a planet makes it sticky-focused; clicking empty space unfocuses
+  // Hovering a planet makes it focused (zoom in); clicking empty space unfocuses (zoom out)
   const handleHover = useCallback((id: ConstellationId | null) => {
     setHovered(id);
     if (id !== null) setFocusedId(id);
@@ -721,44 +967,17 @@ function Scene({ activeView, onSelect }: SceneProps) {
     [onSelect],
   );
 
-  // Click on empty space (missed all planets) → clear focus
-  const handleMiss = useCallback(() => {
-    setFocusedId(null);
-  }, []);
-
-  // Left-drag on empty space also clears focus (pointerDown tracks intent)
-  const dragging = useRef(false);
-  const handlePointerDown = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (e.button === 0 && focusedId !== null) {
-        dragging.current = true;
-      }
-    },
-    [focusedId],
-  );
-  const handlePointerMove = useCallback(() => {
-    if (dragging.current) {
-      dragging.current = false;
-      setFocusedId(null);
-    }
-  }, []);
-
-  const radii = useMemo(
-    () => [...new Set(CONSTELLATIONS.map((c) => c.orbitRadius))],
-    [],
-  );
-
   return (
     <>
       {/* Intro camera zoom */}
       <IntroCamera />
 
       {/* Ambient fill */}
-      <ambientLight intensity={0.18} color="#bba9fb" />
+      <ambientLight intensity={0.15} color="#e8d5f5" />
       {/* Key lights */}
-      <pointLight position={[14, 12, 10]} intensity={0.55} color="#d946ef" />
-      <pointLight position={[-12, -8, -14]} intensity={0.35} color="#6366f1" />
-      <pointLight position={[0, -10, 0]} intensity={0.18} color="#4f46e5" />
+      <pointLight position={[14, 12, 10]} intensity={0.45} color="#d946ef" />
+      <pointLight position={[-12, -8, -14]} intensity={0.3} color="#6366f1" />
+      <pointLight position={[0, -10, 0]} intensity={0.15} color="#4f46e5" />
 
       {/* Fog — pushed far enough so the outer ring (r=7.8) is fully visible */}
       <fog attach="fog" args={["#06060e", 18, 42]} />
@@ -767,8 +986,12 @@ function Scene({ activeView, onSelect }: SceneProps) {
       <LunaCore />
 
       {/* Orbit rings */}
-      {radii.map((r) => (
-        <OrbitRing key={r} radius={r} introT={ringIntro} />
+      {CONSTELLATIONS.map((entry) => (
+        <OrbitRing
+          key={entry.id}
+          radius={entry.orbitRadius}
+          introT={ringIntro}
+        />
       ))}
 
       {/* Constellation nodes */}
@@ -786,16 +1009,6 @@ function Scene({ activeView, onSelect }: SceneProps) {
 
       {/* Camera focus — lerps OrbitControls target toward the focused planet */}
       <CameraFocus focusedId={focusedId} introValues={introValues} />
-
-      {/* Click-miss clears focus; left-drag on empty space also re-centers */}
-      <mesh
-        visible={false}
-        onPointerMissed={handleMiss}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-      >
-        <planeGeometry args={[200, 200]} />
-      </mesh>
 
       {/* Camera controls — rotate with right-click, left-click reserved for focus */}
       <OrbitControls
@@ -832,9 +1045,16 @@ export default function ConstellationAtlas3D({
   activeView,
   onSelect,
 }: ConstellationAtlas3DProps) {
+  const [focusedId, setFocusedId] = useState<ConstellationId | null>(null);
+
+  const handleMiss = useCallback(() => {
+    setFocusedId(null);
+  }, []);
+
   return (
     <Canvas
       camera={{ position: [0, 22, 40], fov: 44 }}
+      onPointerMissed={handleMiss}
       style={{
         position: "absolute",
         inset: 0,
@@ -850,7 +1070,12 @@ export default function ConstellationAtlas3D({
       dpr={[1, 1.5]}
       frameloop="always"
     >
-      <Scene activeView={activeView} onSelect={onSelect} />
+      <Scene
+        activeView={activeView}
+        onSelect={onSelect}
+        focusedId={focusedId}
+        setFocusedId={setFocusedId}
+      />
     </Canvas>
   );
 }
