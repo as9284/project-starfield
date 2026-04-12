@@ -27,7 +27,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
-import { AiGlobe } from "../components/AiGlobe";
+import { CosmicEntity, type EntityMood } from "../components/CosmicEntity";
 import { StarParticles } from "../components/StarParticles";
 import { Switch } from "../components/Switch";
 import {
@@ -558,6 +558,18 @@ export default function Luna() {
     .reverse()
     .find((m) => m.role === "user" && !m.hidden)?.id;
 
+  // Derive the cosmic entity's mood from interaction state
+  let entityMood: EntityMood = "idle";
+  if (isStreaming) {
+    const lastMsg = messages[messages.length - 1];
+    entityMood =
+      lastMsg?.role === "assistant" && lastMsg.content.length > 0
+        ? "speaking"
+        : "thinking";
+  } else if (input.trim().length > 0) {
+    entityMood = "listening";
+  }
+
   const markdownComponents: Components = useMemo(
     () => ({
       a: ({ href, children }) => (
@@ -751,7 +763,7 @@ export default function Luna() {
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.35 }}
               >
-                <AiGlobe size={240} />
+                <CosmicEntity size={320} mood={entityMood} />
                 {!hasDeepSeekKey && (
                   <motion.button
                     className="luna-settings-link"
@@ -772,6 +784,9 @@ export default function Luna() {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
               >
+                <div className="luna-entity-mini">
+                  <CosmicEntity size={68} mood={entityMood} />
+                </div>
                 {messages.map((msg, i) => {
                   if (msg.hidden) return null;
                   const visibleAssistantContent =

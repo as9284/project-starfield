@@ -1100,6 +1100,12 @@ body {
   padding: 2rem;
 }
 
+.luna-entity-mini {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0 0.25rem;
+}
+
 .luna-orb {
   display: flex;
   align-items: center;
