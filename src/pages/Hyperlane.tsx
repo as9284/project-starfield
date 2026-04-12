@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { motion } from "framer-motion";
 import {
   Link,
   ArrowLeft,
@@ -89,18 +90,31 @@ function ResultCard({
   onCopy: () => void;
 }) {
   return (
-    <div className="glass rounded-xl p-4 flex items-center gap-3 w-full">
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="rounded-2xl p-4 flex items-center gap-3 w-full relative overflow-hidden"
+      style={{
+        background: "rgba(16, 15, 46, 0.7)",
+        border: "1px solid rgba(20, 184, 166, 0.35)",
+        boxShadow: "0 0 24px rgba(20,184,166,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
+      }}
+    >
+      <div className="absolute inset-0 opacity-20" style={{
+        background: "linear-gradient(135deg, rgba(20,184,166,0.08) 0%, transparent 60%)",
+      }} />
       <a
         href={shortUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex-1 font-mono text-sm truncate transition-colors"
-        style={{ color: "var(--color-purple-200)" }}
+        className="flex-1 font-mono text-sm truncate transition-colors relative z-10"
+        style={{ color: "var(--color-nebula-teal)" }}
       >
         {shortUrl}
       </a>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0 relative z-10">
         <a
           href={shortUrl}
           target="_blank"
@@ -122,9 +136,9 @@ function ResultCard({
                   borderColor: "rgba(34,197,94,0.3)",
                 }
               : {
-                  color: "var(--color-purple-300)",
-                  background: "rgba(124,79,240,0.08)",
-                  borderColor: "rgba(124,79,240,0.2)",
+                  color: "var(--color-nebula-teal)",
+                  background: "rgba(20,184,166,0.08)",
+                  borderColor: "rgba(20,184,166,0.2)",
                 }
           }
         >
@@ -132,7 +146,7 @@ function ResultCard({
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -186,10 +200,11 @@ function HistoryList({
         {entries.map((entry) => (
           <div
             key={entry.id}
-            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:-translate-y-px"
             style={{
-              background: "rgba(16, 15, 46, 0.5)",
-              border: "1px solid rgba(37, 34, 96, 0.4)",
+              background: "rgba(16, 15, 46, 0.55)",
+              border: "1px solid rgba(37, 34, 96, 0.5)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
             }}
           >
             <div className="flex-1 min-w-0">
@@ -203,8 +218,8 @@ function HistoryList({
                 href={entry.short}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-mono transition-colors leading-snug"
-                style={{ color: "var(--color-purple-300)" }}
+                className="text-sm font-mono transition-colors leading-snug block truncate"
+                style={{ color: "var(--color-nebula-teal)" }}
               >
                 {entry.short}
               </a>
@@ -212,7 +227,7 @@ function HistoryList({
 
             <button
               onClick={() => onCopy(entry.short, entry.id)}
-              className="win-btn shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="win-btn shrink-0 opacity-0 group-hover:opacity-100 transition-all"
               title="Copy short link"
             >
               {copiedId === entry.id ? (
@@ -349,28 +364,33 @@ export default function Hyperlane() {
           <div className="flex flex-col items-center px-6 py-10 gap-8 max-w-xl mx-auto w-full">
             {/* Title */}
             <div className="text-center">
-              <div className="flex items-center justify-center gap-2.5 mb-2">
+              <div className="relative inline-flex items-center justify-center mb-3">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  className="absolute inset-0 rounded-2xl blur-xl opacity-40"
+                  style={{ background: "rgba(20,184,166,0.2)" }}
+                />
+                <div
+                  className="relative w-14 h-14 rounded-2xl flex items-center justify-center"
                   style={{
                     background: "rgba(20, 184, 166, 0.15)",
-                    border: "1px solid rgba(20, 184, 166, 0.25)",
+                    border: "1px solid rgba(20, 184, 166, 0.3)",
+                    boxShadow: "0 0 24px rgba(20,184,166,0.15)",
                   }}
                 >
-                  <Link size={20} style={{ color: "var(--color-nebula-teal)" }} />
+                  <Link size={24} style={{ color: "var(--color-nebula-teal)" }} />
                 </div>
               </div>
               <h2
-                className="text-xl font-bold"
+                className="text-2xl font-bold tracking-tight"
                 style={{ color: "var(--color-text-primary)" }}
               >
                 Hyperlane
               </h2>
               <p
-                className="text-sm mt-1"
+                className="text-sm mt-1.5"
                 style={{ color: "var(--color-text-muted)" }}
               >
-                Shorten the distance between you and anywhere.
+                Compress any link into its shortest form.
               </p>
             </div>
 
@@ -389,6 +409,16 @@ export default function Hyperlane() {
                   className="settings-input flex-1"
                   autoComplete="url"
                   spellCheck={false}
+                  style={{
+                    boxShadow: url ? "0 0 0 1px rgba(20,184,166,0.25)" : undefined,
+                    transition: "box-shadow 0.2s ease",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.boxShadow = "0 0 0 2px rgba(20,184,166,0.35), 0 0 16px rgba(20,184,166,0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.boxShadow = url ? "0 0 0 1px rgba(20,184,166,0.25)" : "none";
+                  }}
                 />
                 <button
                   type="submit"

@@ -403,17 +403,24 @@ function BeaconHome() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{
-            background: "rgba(124, 79, 240, 0.15)",
-            border: "1px solid rgba(124, 79, 240, 0.25)",
-          }}
-        >
-          <FolderSearch size={32} style={{ color: "var(--color-purple-400)" }} />
+        <div className="relative inline-flex items-center justify-center">
+          <div
+            className="absolute inset-0 rounded-2xl blur-xl opacity-30"
+            style={{ background: "rgba(124,79,240,0.25)" }}
+          />
+          <div
+            className="relative w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{
+              background: "rgba(124,79,240,0.15)",
+              border: "1px solid rgba(124,79,240,0.3)",
+              boxShadow: "0 0 32px rgba(124,79,240,0.2)",
+            }}
+          >
+            <FolderSearch size={32} style={{ color: "var(--color-purple-400)" }} />
+          </div>
         </div>
         <h2
-          className="text-2xl font-bold"
+          className="text-2xl font-bold tracking-tight"
           style={{ color: "var(--color-text-primary)" }}
         >
           Beacon
@@ -433,8 +440,12 @@ function BeaconHome() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
       >
-        {/* Open local folder */}
-        <div className="glass rounded-xl overflow-hidden">
+{/* Open local folder */}
+        <div className="rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-px" style={{
+          background: "rgba(16, 15, 46, 0.55)",
+          border: "1px solid rgba(37, 34, 96, 0.6)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+        }}>
           <button
             className="flex items-center gap-3.5 px-4 py-3.5 text-left w-full transition-colors duration-200 group"
             onClick={() => { handleLocalFolder(); }}
@@ -468,15 +479,22 @@ function BeaconHome() {
             ) : (
               <ArrowRight
                 size={14}
-                className="shrink-0 opacity-0 group-hover:opacity-50 transition-all"
+                className="shrink-0 opacity-0 group-hover:opacity-60 transition-all"
                 style={{ color: "var(--color-purple-400)" }}
               />
             )}
           </button>
         </div>
 
-        {/* Import GitHub repository */}
-        <div className="glass rounded-xl overflow-hidden">
+{/* Import GitHub repository */}
+        <div
+          className="rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-px"
+          style={{
+            background: "rgba(16, 15, 46, 0.55)",
+            border: "1px solid rgba(37, 34, 96, 0.6)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}
+        >
           <button
             className="flex items-center gap-3.5 px-4 py-3.5 text-left w-full transition-colors duration-200 group"
             onClick={() => setMode(mode === "github" ? "none" : "github")}
@@ -503,15 +521,14 @@ function BeaconHome() {
             </div>
             <ArrowRight
               size={14}
-              className={`shrink-0 transition-all ${
+className={`shrink-0 transition-all ${
                 mode === "github"
-                  ? "opacity-50 rotate-90"
-                  : "opacity-0 group-hover:opacity-50"
+                  ? "opacity-60 rotate-90"
+                  : "opacity-0 group-hover:opacity-60"
               }`}
               style={{ color: "var(--color-purple-400)" }}
             />
           </button>
-
           <AnimatePresence>
             {mode === "github" && (
               <motion.div
@@ -521,7 +538,7 @@ function BeaconHome() {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex gap-2">
+                <div className="flex gap-2 mt-3">
                   <input
                     className="settings-input flex-1"
                     placeholder="https://github.com/owner/repo"
@@ -554,6 +571,7 @@ function BeaconHome() {
             )}
           </AnimatePresence>
         </div>
+
       </motion.div>
 
       {/* Error */}

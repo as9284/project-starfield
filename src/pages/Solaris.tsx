@@ -40,6 +40,27 @@ function getPrecipIcon(code: number) {
   return "💧";
 }
 
+const WEATHER_AMBIENCE: Record<string, string> = {
+  "clear": "rgba(251,191,36,0.08)",
+  "mainly clear": "rgba(251,191,36,0.06)",
+  "partly cloudy": "rgba(139,92,246,0.07)",
+  "overcast": "rgba(99,102,241,0.06)",
+  "fog": "rgba(139,92,246,0.05)",
+  "drizzle": "rgba(56,189,248,0.08)",
+  "rain": "rgba(56,189,248,0.10)",
+  "snow": "rgba(200,230,255,0.12)",
+  "thunderstorm": "rgba(239,68,68,0.12)",
+};
+
+function getAmbientBg(desc: string | undefined): string {
+  if (!desc) return "rgba(124,79,240,0.06)";
+  const lower = desc.toLowerCase();
+  for (const [key, val] of Object.entries(WEATHER_AMBIENCE)) {
+    if (lower.includes(key)) return val;
+  }
+  return "rgba(124,79,240,0.06)";
+}
+
 function formatDate(isoString: string) {
   const date = new Date(isoString);
   return date.toLocaleDateString([], {
@@ -68,20 +89,21 @@ function StatTile({
 }) {
   return (
     <div
-      className="rounded-xl p-3 flex flex-col items-center justify-center text-center gap-0.5"
+      className="rounded-xl p-3 flex flex-col items-center justify-center text-center gap-0.5 relative overflow-hidden"
       style={{
         background: "rgba(16, 15, 46, 0.6)",
         border: "1px solid rgba(37, 34, 96, 0.6)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
       }}
     >
       <span
-        className="text-[11px] uppercase tracking-[0.15em]"
+        className="text-[10px] uppercase tracking-[0.18em] font-semibold"
         style={{ color: "var(--color-text-secondary)" }}
       >
         {label}
       </span>
       <span
-        className="text-lg font-bold"
+        className="text-lg font-bold leading-none"
         style={{ color: "var(--color-text-primary)" }}
       >
         {value}
@@ -96,7 +118,7 @@ function StatTile({
       </span>
       {sub && (
         <span
-          className="text-[11px] font-medium"
+          className="text-[10px] font-medium mt-0.5"
           style={{ color: "var(--color-text-muted)" }}
         >
           {sub}
@@ -121,20 +143,21 @@ function DetailTile({
 }) {
   return (
     <div
-      className="rounded-xl p-3 flex flex-col gap-0.5 items-center text-center"
+      className="rounded-xl p-3 flex flex-col gap-0.5 items-center text-center relative overflow-hidden"
       style={{
         background: "rgba(16, 15, 46, 0.6)",
         border: "1px solid rgba(37, 34, 96, 0.6)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
       }}
     >
       <span
-        className="text-[11px] uppercase tracking-[0.15em]"
+        className="text-[10px] uppercase tracking-[0.18em] font-semibold"
         style={{ color: "var(--color-text-secondary)" }}
       >
         {label}
       </span>
       <span
-        className="font-bold text-sm flex items-center gap-1"
+        className="font-bold text-sm flex items-center gap-1 leading-none"
         style={{ color: "var(--color-text-primary)" }}
       >
         {icon && <span>{icon}</span>}
@@ -578,7 +601,8 @@ export default function Solaris() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="glass rounded-xl p-6"
+                className="glass rounded-2xl p-6"
+                style={{ background: getAmbientBg(currentWeather?.description) }}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                   {/* Left: location + temp */}
@@ -599,7 +623,12 @@ export default function Solaris() {
                     </p>
 
                     <div className="flex items-center gap-4 mt-4">
-                      <span className="text-7xl select-none">
+                      <span
+                        className="text-7xl select-none drop-shadow-lg"
+                        style={{
+                          filter: "drop-shadow(0 0 16px rgba(251,191,36,0.35))",
+                        }}
+                      >
                         {currentWeather?.icon || "🌡️"}
                       </span>
                       <div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   Download,
   ArrowLeft,
@@ -92,36 +93,21 @@ function ProgressBar({ percent }: { percent: number }) {
     <div
       className="w-full rounded-full overflow-hidden"
       style={{
-        height: 4,
-        background: "rgba(37, 34, 96, 0.6)",
+        height: 5,
+        background: "rgba(37, 34, 96, 0.7)",
+        boxShadow: "inset 0 1px 2px rgba(0,0,0,0.3)",
       }}
     >
       <div
-        className="h-full rounded-full transition-all duration-300"
+        className="h-full rounded-full transition-all duration-500 relative overflow-hidden"
         style={{
           width: `${Math.min(100, Math.max(0, percent))}%`,
-          background:
-            "linear-gradient(90deg, var(--color-purple-400), #a78bfa)",
+          background: "linear-gradient(90deg, var(--color-purple-400), #a78bfa, #c4b5fd)",
+          boxShadow: "0 0 8px rgba(167,139,250,0.5)",
         }}
       />
     </div>
   );
-}
-
-function statusColor(status: DownloadItem["status"]): string {
-  switch (status) {
-    case "done":
-      return "#86efac";
-    case "error":
-    case "cancelled":
-      return "#fca5a5";
-    case "paused":
-      return "#fcd34d";
-    case "downloading":
-    case "merging":
-    case "queued":
-      return "var(--color-purple-400)";
-  }
 }
 
 function statusLabel(item: DownloadItem): string {
@@ -148,6 +134,16 @@ function statusLabel(item: DownloadItem): string {
   }
 }
 
+const STATUS_ICONS = {
+    downloading: Download,
+    queued: Clock,
+    merging: Loader2,
+    paused: Pause,
+    done: CheckCircle2,
+    error: AlertCircle,
+    cancelled: X,
+  };
+
 function DownloadCard({
   item,
   onCancel,
@@ -168,6 +164,18 @@ function DownloadCard({
     item.status === "queued" ||
     item.status === "merging";
 
+  const statusColorMap: Record<string, string> = {
+    downloading: "#a78bfa",
+    queued: "#818cf8",
+    merging: "#c4b5fd",
+    paused: "#fcd34d",
+    done: "#86efac",
+    error: "#fca5a5",
+    cancelled: "#94a3b8",
+  };
+  const col = statusColorMap[item.status] ?? "#a78bfa";
+  const StatusIcon = STATUS_ICONS[item.status] ?? Download;
+
   const displayName = item.filename
     ? (item.filename.split("/").pop() ?? item.filename)
     : item.url.length > 60
@@ -176,57 +184,58 @@ function DownloadCard({
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
-    <div
-      className="glass rounded-xl px-4 py-3 flex flex-col gap-2"
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="rounded-2xl px-4 py-3.5 flex flex-col gap-3 relative overflow-hidden"
       style={{
-        borderColor: isActive
-          ? "rgba(124, 79, 240, 0.3)"
-          : item.status === "done"
-            ? "rgba(34,197,94,0.2)"
-            : item.status === "paused"
-              ? "rgba(252,211,77,0.25)"
-              : "rgba(239,68,68,0.2)",
+        background: "rgba(16, 15, 46, 0.65)",
+        border: "1px solid rgba(37, 34, 96, 0.6)",
+        borderTop: `2px solid ${col}`,
+        boxShadow: `0 0 20px ${col}18, inset 0 1px 0 rgba(255,255,255,0.04)`,
       }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+          style={{
+            background: `${col}18`,
+            border: `1px solid ${col}30`,
+            boxShadow: `0 0 12px ${col}30`,
+          }}
+        >
+          <StatusIcon
+            size={14}
+            style={{ color: col }}
+            className={item.status === "downloading" || item.status === "merging" ? "animate-spin" : ""}
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <p
-            className="text-xs font-medium truncate"
+            className="text-sm font-semibold truncate leading-tight"
             style={{ color: "var(--color-text-primary)" }}
             title={displayName}
           >
             {displayName}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span
-              className="text-xs"
-              style={{ color: statusColor(item.status) }}
-            >
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-xs font-semibold" style={{ color: col }}>
               {statusLabel(item)}
             </span>
-            {item.status === "downloading" &&
-              item.speed &&
-              item.speed !== "?" && (
-                <>
-                  <span style={{ color: "var(--color-text-secondary)" }}>
-                    ·
-                  </span>
-                  <span
-                    className="text-xs flex items-center gap-1"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    <Zap size={10} />
-                    {formatBytes(item.speed)}
-                  </span>
-                </>
-              )}
+            {item.status === "downloading" && item.speed && item.speed !== "?" && (
+              <>
+                <span style={{ color: "var(--color-text-muted)" }}>·</span>
+                <span className="text-xs flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+                  <Zap size={10} />
+                  {formatBytes(item.speed)}
+                </span>
+              </>
+            )}
             {item.status === "downloading" && item.eta && (
               <>
-                <span style={{ color: "var(--color-text-secondary)" }}>·</span>
-                <span
-                  className="text-xs flex items-center gap-1"
-                  style={{ color: "var(--color-text-secondary)" }}
-                >
+                <span style={{ color: "var(--color-text-muted)" }}>·</span>
+                <span className="text-xs flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
                   <Clock size={10} />
                   {item.eta}
                 </span>
@@ -234,17 +243,14 @@ function DownloadCard({
             )}
           </div>
           {item.status === "error" && item.error && (
-            <p
-              className="text-xs mt-1 line-clamp-2"
-              style={{ color: "#fca5a5" }}
-            >
+            <p className="text-xs mt-1.5 line-clamp-2" style={{ color: "#fca5a5" }}>
               {item.error}
             </p>
           )}
           {item.status === "done" && item.filePath && (
             <p
-              className="text-xs mt-0.5 truncate"
-              style={{ color: "var(--color-text-secondary)" }}
+              className="text-xs mt-1 truncate font-mono"
+              style={{ color: "var(--color-text-secondary)", fontSize: "0.72rem" }}
               title={item.filePath}
             >
               {item.filePath.split("/").pop() ?? item.filePath}
@@ -321,14 +327,12 @@ function DownloadCard({
       </div>
 
       {(item.status === "downloading" || item.status === "merging") && (
-        <ProgressBar
-          percent={item.status === "merging" ? 100 : item.progress}
-        />
+        <ProgressBar percent={item.status === "merging" ? 100 : item.progress} />
       )}
       {item.status === "paused" && item.progress > 0 && (
         <ProgressBar percent={item.progress} />
       )}
-    </div>
+    </motion.div>
   );
 }
 
