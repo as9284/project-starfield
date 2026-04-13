@@ -201,15 +201,19 @@ function isPreviewable(language?: string): boolean {
 function buildPreviewDoc(content: string, language: string): string {
   const lang = language.toLowerCase();
   if (lang === "css") {
-    return `<!DOCTYPE html><html><head><style>${content}</style></head><body><p style="font-family:sans-serif;padding:1rem;color:#ccc">CSS preview — add HTML elements to see results.</p></body></html>`;
+    // Escape </style> to prevent breaking out of the style tag
+    const safeContent = content.replace(/<\/style/gi, "<\\/style");
+    return `<!DOCTYPE html><html><head><style>${safeContent}</style></head><body><p style="font-family:sans-serif;padding:1rem;color:#ccc">CSS preview — add HTML elements to see results.</p></body></html>`;
   }
   if (lang === "javascript" || lang === "js") {
-    return `<!DOCTYPE html><html><head></head><body><script>${content}<\/script></body></html>`;
+    // Escape </script> to prevent breaking out of the script tag
+    const safeContent = content.replace(/<\/script/gi, "<\\/script");
+    return `<!DOCTYPE html><html><head></head><body><script>${safeContent}<\/script></body></html>`;
   }
   if (lang === "typescript" || lang === "ts") {
     return `<!DOCTYPE html><html><head></head><body><pre style="font-family:monospace;padding:1rem;color:#ccc;background:#0a0a1a;margin:0">TypeScript preview is not available in the browser sandbox.\nView the code tab for the source.</pre></body></html>`;
   }
-  // html
+  // html — rendered as-is; the iframe sandbox="allow-scripts" isolates execution
   return content;
 }
 
@@ -339,6 +343,7 @@ export default function SandboxModal() {
                   srcDoc={previewDoc}
                   sandbox="allow-scripts"
                   title="Code preview"
+                  referrerPolicy="no-referrer"
                 />
               )}
 
