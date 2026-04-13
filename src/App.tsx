@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import SandboxModal from "./components/SandboxModal";
 import TitleBar from "./components/TitleBar";
 import ConstellationOverlay from "./components/ConstellationOverlay";
 import SplashScreen from "./components/SplashScreen";
@@ -383,6 +384,9 @@ export default function App() {
         </AnimatePresence>
 
         <AnimatePresence>{!splashDone && <SplashScreen />}</AnimatePresence>
+
+        {/* Sandbox modal — rendered outside page AnimatePresence so position:fixed works */}
+        <SandboxModal />
       </div>
     </div>
   );

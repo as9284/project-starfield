@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Check, Code, LayoutList, BarChart3 } from "lucide-react";
+import { X, Copy, Check, Code, LayoutList, BarChart3, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -182,16 +182,62 @@ function SandboxChart({ config }: { config: ChartConfig }) {
   );
 }
 
+// ── Preview support ──────────────────────────────────────────────────────────
+
+const WEB_PREVIEW_LANGUAGES = new Set([
+  "html",
+  "css",
+  "javascript",
+  "js",
+  "typescript",
+  "ts",
+]);
+
+function isPreviewable(language?: string): boolean {
+  return !!language && WEB_PREVIEW_LANGUAGES.has(language.toLowerCase());
+}
+
+/** Wraps bare CSS or JS in a minimal HTML document for preview. */
+function buildPreviewDoc(content: string, language: string): string {
+  const lang = language.toLowerCase();
+  if (lang === "css") {
+    return `<!DOCTYPE html><html><head><style>${content}</style></head><body><p style="font-family:sans-serif;padding:1rem;color:#ccc">CSS preview — add HTML elements to see results.</p></body></html>`;
+  }
+  if (lang === "javascript" || lang === "js") {
+    return `<!DOCTYPE html><html><head></head><body><script>${content}<\/script></body></html>`;
+  }
+  if (lang === "typescript" || lang === "ts") {
+    return `<!DOCTYPE html><html><head></head><body><pre style="font-family:monospace;padding:1rem;color:#ccc;background:#0a0a1a;margin:0">TypeScript preview is not available in the browser sandbox.\nView the code tab for the source.</pre></body></html>`;
+  }
+  // html
+  return content;
+}
+
 // ── Main modal ───────────────────────────────────────────────────────────────
 
 export default function SandboxModal() {
   const { isOpen, activeItem, close, items, openById } = useSandboxStore();
   const [copied, setCopied] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   const chartConfig = useMemo(() => {
     if (!activeItem || activeItem.type !== "chart") return null;
     return parseChartConfig(activeItem.content);
   }, [activeItem]);
+
+  const canPreview =
+    activeItem?.type === "code" && isPreviewable(activeItem.language);
+
+  const previewDoc = useMemo(() => {
+    if (!canPreview || !activeItem?.language) return "";
+    return buildPreviewDoc(activeItem.content, activeItem.language);
+  }, [canPreview, activeItem]);
+
+  // Reset preview mode when switching items
+  const handleOpenById = (id: string) => {
+    setPreviewMode(false);
+    openById(id);
+  };
 
   const handleCopy = () => {
     if (!activeItem) return;
@@ -241,6 +287,26 @@ export default function SandboxModal() {
                 )}
               </div>
               <div className="sandbox-header-actions">
+                {canPreview && (
+                  <div className="sandbox-view-toggle">
+                    <button
+                      className={`sandbox-view-tab ${!previewMode ? "sandbox-view-tab-active" : ""}`}
+                      onClick={() => setPreviewMode(false)}
+                      title="View source code"
+                    >
+                      <Code size={13} />
+                      <span>Code</span>
+                    </button>
+                    <button
+                      className={`sandbox-view-tab ${previewMode ? "sandbox-view-tab-active" : ""}`}
+                      onClick={() => setPreviewMode(true)}
+                      title="Live preview"
+                    >
+                      <Eye size={13} />
+                      <span>Preview</span>
+                    </button>
+                  </div>
+                )}
                 <button
                   className="sandbox-action-btn"
                   onClick={handleCopy}
@@ -261,10 +327,19 @@ export default function SandboxModal() {
 
             {/* Content */}
             <div className="sandbox-content">
-              {activeItem.type === "code" && (
+              {activeItem.type === "code" && !previewMode && (
                 <pre className="sandbox-code">
                   <code>{activeItem.content}</code>
                 </pre>
+              )}
+
+              {activeItem.type === "code" && previewMode && canPreview && (
+                <iframe
+                  className="sandbox-preview"
+                  srcDoc={previewDoc}
+                  sandbox="allow-scripts"
+                  title="Code preview"
+                />
               )}
 
               {activeItem.type === "plan" && (
@@ -297,7 +372,7 @@ export default function SandboxModal() {
                     <button
                       key={item.id}
                       className={`sandbox-history-item ${item.id === activeItem.id ? "sandbox-history-item-active" : ""}`}
-                      onClick={() => openById(item.id)}
+                      onClick={() => handleOpenById(item.id)}
                       title={item.title}
                     >
                       {item.type === "code" ? (

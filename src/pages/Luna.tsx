@@ -30,7 +30,6 @@ import type { Components } from "react-markdown";
 import { CosmicEntity, type EntityMood } from "../components/CosmicEntity";
 import { StarParticles } from "../components/StarParticles";
 import { Switch } from "../components/Switch";
-import SandboxModal from "../components/SandboxModal";
 import {
   useAppStore,
   MAX_CONVERSATION_TITLE_LENGTH,
@@ -1696,9 +1695,6 @@ export default function Luna() {
           </div>
         </div>
       </div>
-
-      {/* Sandbox fullscreen modal */}
-      <SandboxModal />
     </div>
   );
 }
