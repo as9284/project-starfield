@@ -817,8 +817,6 @@ body {
   border: 1px solid rgba(124, 79, 240, 0.2);
   border-radius: 9px;
   background: rgba(10, 10, 28, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: var(--color-text-muted);
   cursor: pointer;
   transition:
@@ -879,8 +877,6 @@ body {
   border: 1px solid rgba(124, 79, 240, 0.08);
   border-radius: 9px;
   background: rgba(10, 10, 28, 0.5);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
   transition:
     background 0.2s,
@@ -984,8 +980,6 @@ body {
   border: 1px solid rgba(var(--panel-accent-rgb), 0.2);
   border-radius: 13px;
   background: rgba(10, 10, 28, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.3),
     0 0 20px rgba(var(--panel-accent-rgb), 0.08),
@@ -1442,7 +1436,7 @@ body {
   border-radius: 12px;
   padding: 4px;
   margin-bottom: 6px;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(124, 79, 240, 0.08);

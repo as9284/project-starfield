@@ -16,8 +16,39 @@ use commands::{
 };
 use tauri::Manager;
 
+// ── Windows: request dedicated (high-performance) GPU via UserGpuPreferences ──
+// Equivalent to "High performance" in Windows Settings → Display → Graphics.
+// Must run before the WebView2 process spawns, so it lives at the top of run().
+#[cfg(target_os = "windows")]
+fn set_gpu_preference() {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Ok(hkcu) = RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(
+            r"Software\Microsoft\DirectX\UserGpuPreferences",
+            KEY_SET_VALUE,
+        ) {
+            let path_str = exe_path.to_string_lossy().to_string();
+            // GpuPreference=2 → high-performance (discrete) GPU.
+            let _ = hkcu.set_value(&path_str, &"GpuPreference=2;");
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Apply GPU preference before WebView2 initialises.
+    #[cfg(target_os = "windows")]
+    set_gpu_preference();
+
+    // Ask the Chromium compositor inside WebView2 to use GPU rasterisation
+    // and zero-copy texture uploads, reducing CPU↔GPU transfer overhead.
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--enable-gpu-rasterization --enable-zero-copy",
+    );
+
     tauri::Builder::default()
         .setup(|app| {
             if let (Some(window), Some(icon)) = (

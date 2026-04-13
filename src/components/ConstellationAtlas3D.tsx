@@ -35,7 +35,7 @@ const DESC_COLOR = "#9d90d4";
 
 // ── Ambient nebula particles ─────────────────────────────────────────────────
 
-function NebulaParticles({ count = 600 }: { count?: number }) {
+function NebulaParticles({ count = 300 }: { count?: number }) {
   const ref = useRef<THREE.Points>(null);
 
   const [positions, colors] = useMemo(() => {
@@ -177,7 +177,7 @@ function LunaCore() {
     <group>
       {/* White-hot core */}
       <mesh ref={coreRef}>
-        <sphereGeometry args={[0.55, 48, 48]} />
+        <sphereGeometry args={[0.55, 32, 32]} />
         <meshStandardMaterial
           color="#fff8e7"
           emissive="#ffd088"
@@ -189,7 +189,7 @@ function LunaCore() {
 
       {/* Inner glow */}
       <mesh ref={innerGlowRef}>
-        <sphereGeometry args={[0.62, 48, 48]} />
+        <sphereGeometry args={[0.62, 32, 32]} />
         <meshStandardMaterial
           color="#ffb347"
           transparent
@@ -242,7 +242,7 @@ function LunaCore() {
 
       {/* Mid glow shell */}
       <mesh ref={coronaRef}>
-        <sphereGeometry args={[1.15, 28, 28]} />
+        <sphereGeometry args={[1.15, 20, 20]} />
         <meshStandardMaterial
           color="#ff9f43"
           transparent
@@ -255,7 +255,7 @@ function LunaCore() {
 
       {/* Outer halo */}
       <mesh ref={haloRef}>
-        <sphereGeometry args={[1.8, 20, 20]} />
+        <sphereGeometry args={[1.8, 14, 14]} />
         <meshStandardMaterial
           color="#ffd700"
           transparent
@@ -293,12 +293,17 @@ function LunaCore() {
 
 interface OrbitRingProps {
   radius: number;
-  introT: number;
+  introRef: { current: number[] };
   isHighlighted?: boolean;
   glowHex?: string;
 }
 
-function OrbitRing({ radius, introT, isHighlighted, glowHex }: OrbitRingProps) {
+function OrbitRing({
+  radius,
+  introRef,
+  isHighlighted,
+  glowHex,
+}: OrbitRingProps) {
   const ref = useRef<THREE.Group>(null);
 
   const points = useMemo(() => {
@@ -313,7 +318,7 @@ function OrbitRing({ radius, introT, isHighlighted, glowHex }: OrbitRingProps) {
 
   useFrame(() => {
     if (ref.current) {
-      ref.current.scale.setScalar(introT);
+      ref.current.scale.setScalar(Math.max(...introRef.current, 0));
     }
   });
 
@@ -328,7 +333,7 @@ function OrbitRing({ radius, introT, isHighlighted, glowHex }: OrbitRingProps) {
         points={points}
         color={color}
         transparent
-        opacity={opacity * introT}
+        opacity={opacity}
         lineWidth={width}
       />
     </group>
@@ -384,20 +389,22 @@ function ConnectorLine({
 
 function OrbitalTrail({
   entry,
-  introT,
+  introRef,
+  idx,
 }: {
   entry: ConstellationEntry;
-  introT: number;
+  introRef: { current: number[] };
+  idx: number;
 }) {
   const ref = useRef<THREE.Points>(null);
-  const trailCount = 40;
+  const trailCount = 20;
 
   const positions = useMemo(() => new Float32Array(trailCount * 3), []);
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
-    const r = entry.orbitRadius * introT;
+    const r = entry.orbitRadius * (introRef.current[idx] ?? 0);
 
     for (let i = 0; i < trailCount; i++) {
       const trailT = t - i * 0.08;
@@ -454,7 +461,7 @@ function OrbitDetail({ highlighted }: { highlighted: boolean }) {
   return (
     <>
       <mesh ref={innerRef} rotation={[0.55, 0.1, 0]}>
-        <torusGeometry args={[0.42, 0.02, 12, 100]} />
+        <torusGeometry args={[0.42, 0.02, 8, 48]} />
         <meshStandardMaterial
           color="#a78bfa"
           emissive="#7c4ff0"
@@ -464,7 +471,7 @@ function OrbitDetail({ highlighted }: { highlighted: boolean }) {
         />
       </mesh>
       <mesh ref={midRef} rotation={[0.55, 0.1, 0]}>
-        <torusGeometry args={[0.52, 0.014, 10, 100]} />
+        <torusGeometry args={[0.52, 0.014, 8, 48]} />
         <meshStandardMaterial
           color="#c4b5fd"
           emissive="#a78bfa"
@@ -474,7 +481,7 @@ function OrbitDetail({ highlighted }: { highlighted: boolean }) {
         />
       </mesh>
       <mesh ref={outerRef} rotation={[0.55, 0.1, 0]}>
-        <torusGeometry args={[0.62, 0.008, 8, 100]} />
+        <torusGeometry args={[0.62, 0.008, 6, 48]} />
         <meshStandardMaterial
           color="#ddd6fe"
           emissive="#c4b5fd"
@@ -599,7 +606,7 @@ function BeaconDetail({ highlighted }: { highlighted: boolean }) {
         />
       </mesh>
       <mesh ref={ringRef} rotation={[Math.PI * 0.45, 0.3, 0]}>
-        <torusGeometry args={[0.5, 0.007, 8, 64]} />
+        <torusGeometry args={[0.5, 0.007, 8, 48]} />
         <meshStandardMaterial
           color="#a5b4fc"
           emissive="#818cf8"
@@ -652,7 +659,7 @@ function HyperlaneDetail({ highlighted }: { highlighted: boolean }) {
   return (
     <>
       <mesh ref={ring1Ref} rotation={[0.8, 0, 0.4]}>
-        <torusGeometry args={[0.44, 0.008, 8, 64]} />
+        <torusGeometry args={[0.44, 0.008, 8, 48]} />
         <meshStandardMaterial
           color="#2dd4bf"
           emissive="#14b8a6"
@@ -662,7 +669,7 @@ function HyperlaneDetail({ highlighted }: { highlighted: boolean }) {
         />
       </mesh>
       <mesh ref={ring2Ref} rotation={[1.2, 0.5, 0]}>
-        <torusGeometry args={[0.38, 0.006, 8, 64]} />
+        <torusGeometry args={[0.38, 0.006, 8, 48]} />
         <meshStandardMaterial
           color="#5eead4"
           emissive="#14b8a6"
@@ -783,10 +790,10 @@ const DETAIL_MAP: Record<ConstellationId, React.FC<DetailProps>> = {
 
 interface CameraFocusProps {
   focusedId: ConstellationId | null;
-  introValues: number[];
+  introRef: { current: number[] };
 }
 
-function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
+function CameraFocus({ focusedId, introRef }: CameraFocusProps) {
   const { controls, camera } = useThree();
   const canControl = useRef(false);
 
@@ -797,14 +804,14 @@ function CameraFocus({ focusedId, introValues }: CameraFocusProps) {
       update: () => void;
     };
 
-    const introDone = introValues.every((v) => v >= 0.95);
+    const introDone = introRef.current.every((v) => v >= 0.95);
     if (!canControl.current && introDone) canControl.current = true;
 
     if (focusedId !== null) {
       const idx = CONSTELLATIONS.findIndex((c) => c.id === focusedId);
       const entry = CONSTELLATIONS[idx];
       if (!entry) return;
-      const introT = introValues[idx] ?? 1;
+      const introT = introRef.current[idx] ?? 1;
       const t = state.clock.getElapsedTime();
       const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
       const r = entry.orbitRadius * introT;
@@ -841,7 +848,8 @@ interface NodeProps {
   active: ConstellationId | null;
   onHover: (id: ConstellationId | null) => void;
   onClick: (id: ConstellationId) => void;
-  introT: number;
+  introRef: { current: number[] };
+  idx: number;
 }
 
 function ConstellationNode({
@@ -850,7 +858,8 @@ function ConstellationNode({
   active,
   onHover,
   onClick,
-  introT,
+  introRef,
+  idx,
 }: NodeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const sphereRef = useRef<THREE.Mesh>(null);
@@ -871,6 +880,7 @@ function ConstellationNode({
   const DetailComponent = DETAIL_MAP[entry.id];
 
   useFrame(({ clock }, delta) => {
+    const introT = introRef.current[idx] ?? 0;
     const t = clock.getElapsedTime();
     const currentRadius = entry.orbitRadius * introT;
     const angle = t * entry.orbitSpeed * 0.1 + entry.orbitOffset;
@@ -928,7 +938,7 @@ function ConstellationNode({
           onPointerOut={() => onHover(null)}
           onClick={() => onClick(entry.id)}
         >
-          <sphereGeometry args={[0.3, 36, 36]} />
+          <sphereGeometry args={[0.3, 24, 24]} />
           <meshStandardMaterial
             color={color}
             emissive={color}
@@ -939,7 +949,7 @@ function ConstellationNode({
         </mesh>
         {/* Inner glow shell */}
         <mesh ref={glowRef}>
-          <sphereGeometry args={[0.44, 24, 24]} />
+          <sphereGeometry args={[0.44, 16, 16]} />
           <meshStandardMaterial
             color={color}
             transparent
@@ -951,7 +961,7 @@ function ConstellationNode({
         </mesh>
         {/* Outer atmosphere */}
         <mesh ref={atmosphereRef}>
-          <sphereGeometry args={[0.58, 20, 20]} />
+          <sphereGeometry args={[0.58, 14, 14]} />
           <meshStandardMaterial
             color={color}
             transparent
@@ -1020,26 +1030,23 @@ interface SceneProps {
 function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
   const [hovered, setHovered] = useState<ConstellationId | null>(null);
 
-  // Intro animation progress
+  // Intro animation progress — written to a ref to avoid per-frame React re-renders
   const introStartTime = useRef(performance.now());
-  const [introValues, setIntroValues] = useState<number[]>(() =>
-    CONSTELLATIONS.map(() => 0),
-  );
+  const introValuesRef = useRef<number[]>(CONSTELLATIONS.map(() => 0));
+  const introCompleteRef = useRef(false);
 
   useFrame(() => {
+    if (introCompleteRef.current) return;
     const elapsed = (performance.now() - introStartTime.current) / 1000;
-    let anyChanged = false;
-    const next = CONSTELLATIONS.map((_, i) => {
+    let allDone = true;
+    for (let i = 0; i < CONSTELLATIONS.length; i++) {
       const delay = 0.3 + i * 0.12;
       const raw = Math.min(1, Math.max(0, (elapsed - delay) / 1.0));
-      const t = 1 - Math.pow(1 - raw, 4);
-      if (t !== introValues[i]) anyChanged = true;
-      return t;
-    });
-    if (anyChanged) setIntroValues(next);
+      introValuesRef.current[i] = 1 - Math.pow(1 - raw, 4);
+      if (introValuesRef.current[i] < 0.999) allDone = false;
+    }
+    if (allDone) introCompleteRef.current = true;
   });
-
-  const ringIntro = Math.max(...introValues, 0);
 
   const handleHover = useCallback(
     (id: ConstellationId | null) => {
@@ -1080,7 +1087,7 @@ function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
         <OrbitRing
           key={entry.id}
           radius={entry.orbitRadius}
-          introT={ringIntro}
+          introRef={introValuesRef}
           isHighlighted={hovered === entry.id || activeView === entry.id}
           glowHex={entry.glowHex}
         />
@@ -1091,7 +1098,8 @@ function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
         <OrbitalTrail
           key={entry.id}
           entry={entry}
-          introT={introValues[i] ?? 0}
+          introRef={introValuesRef}
+          idx={i}
         />
       ))}
 
@@ -1104,11 +1112,12 @@ function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
           active={activeView}
           onHover={handleHover}
           onClick={handleClick}
-          introT={introValues[i] ?? 0}
+          introRef={introValuesRef}
+          idx={i}
         />
       ))}
 
-      <CameraFocus focusedId={focusedId} introValues={introValues} />
+      <CameraFocus focusedId={focusedId} introRef={introValuesRef} />
 
       <OrbitControls
         makeDefault
@@ -1178,7 +1187,7 @@ export default function ConstellationAtlas3D({
         alpha: true,
         powerPreference: "high-performance",
       }}
-      dpr={[1, 1.5]}
+      dpr={1}
       frameloop="always"
     >
       <Scene

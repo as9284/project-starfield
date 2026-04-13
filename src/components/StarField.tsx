@@ -76,7 +76,10 @@ export default function StarField() {
       };
     };
 
-    const shootingInterval = setInterval(spawnShootingStar, SHOOTING_STAR_INTERVAL);
+    const shootingInterval = setInterval(
+      spawnShootingStar,
+      SHOOTING_STAR_INTERVAL,
+    );
     let then = performance.now();
 
     const draw = (now: number) => {
@@ -116,10 +119,7 @@ export default function StarField() {
           s.y - s.dy * (s.len / 10),
         );
         gradient.addColorStop(0, `rgba(255, 255, 255, ${s.opacity})`);
-        gradient.addColorStop(
-          0.4,
-          `rgba(190, 160, 255, ${s.opacity * 0.6})`,
-        );
+        gradient.addColorStop(0.4, `rgba(190, 160, 255, ${s.opacity * 0.6})`);
         gradient.addColorStop(1, "rgba(0,0,0,0)");
 
         ctx.beginPath();
@@ -142,21 +142,29 @@ export default function StarField() {
     resize();
     animFrameRef.current = requestAnimationFrame(draw);
 
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animFrameRef.current);
+      } else {
+        then = performance.now();
+        animFrameRef.current = requestAnimationFrame(draw);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     const observer = new ResizeObserver(resize);
     observer.observe(canvas.parentElement ?? document.body);
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       clearInterval(shootingInterval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       observer.disconnect();
     };
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="starfield-canvas"
-      aria-hidden="true"
-    />
+    <canvas ref={canvasRef} className="starfield-canvas" aria-hidden="true" />
   );
 }
