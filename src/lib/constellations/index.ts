@@ -15,6 +15,7 @@ import { solarisHandler } from "./solaris";
 import { hyperlaneHandler } from "./hyperlane";
 import { pulsarHandler } from "./pulsar";
 import { navigateHandler } from "./navigate";
+import { sandboxHandler } from "./sandbox";
 
 export const constellationHandlers: readonly ConstellationHandler[] = [
   navigateHandler,
@@ -22,6 +23,7 @@ export const constellationHandlers: readonly ConstellationHandler[] = [
   solarisHandler,
   hyperlaneHandler,
   pulsarHandler,
+  sandboxHandler,
 ];
 
 // Re-export the navigation fallback for Luna's input handling
