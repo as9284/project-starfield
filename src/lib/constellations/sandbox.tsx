@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Code, Copy, Check, ExternalLink, LayoutList } from "lucide-react";
+import {
+  Code,
+  Copy,
+  Check,
+  ExternalLink,
+  LayoutList,
+  BarChart3,
+} from "lucide-react";
 import {
   useSandboxStore,
   type SandboxItemType,
@@ -53,6 +60,11 @@ function SandboxResultCard({ result }: { result: ActionResult }) {
       <div className="luna-sandbox-card-header">
         {itemType === "code" ? (
           <Code
+            size={13}
+            style={{ color: "var(--color-nebula-blue)", flexShrink: 0 }}
+          />
+        ) : itemType === "chart" ? (
+          <BarChart3
             size={13}
             style={{ color: "var(--color-nebula-blue)", flexShrink: 0 }}
           />

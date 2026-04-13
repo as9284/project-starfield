@@ -100,7 +100,7 @@ function SandboxChart({ config }: { config: ChartConfig }) {
             stroke="rgba(0,0,0,0.3)"
             strokeWidth={2}
             label={({ name, percent }: { name?: string; percent?: number }) =>
-              `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
+              `${name ?? ""}: ${((percent ?? 0) * 100).toFixed(0)}%`
             }
           >
             {data.map((_, i) => (
@@ -283,7 +283,7 @@ export default function SandboxModal() {
 
               {activeItem.type === "chart" && !chartConfig && (
                 <div className="sandbox-chart-error">
-                  <p>Could not parse chart data. Expected a JSON object with chartType, data, xKey, and series fields.</p>
+                  <p>Could not parse chart data. Expected JSON: {`{"chartType":"bar|line|area|pie", "data":[...], "xKey":"...", "series":[{"key":"..."}]}`}</p>
                 </div>
               )}
             </div>
