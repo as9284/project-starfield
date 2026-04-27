@@ -46,6 +46,27 @@ function OrbitDoneCard({ result }: { result: ActionResult }) {
   );
 }
 
+function OrbitErrorCard({ result }: { result: ActionResult }) {
+  const cmd = String(result.command ?? "");
+  const msg = String(result.message ?? "Unknown error");
+  return (
+    <div
+      className="luna-action-card"
+      style={{
+        background: "rgba(248, 113, 113, 0.06)",
+        border: "1px solid rgba(248, 113, 113, 0.18)",
+      }}
+    >
+      <span style={{ color: "rgba(248, 113, 113, 0.7)", fontSize: 11 }}>
+        ✗
+      </span>
+      <span style={{ color: "rgba(248, 113, 113, 0.85)", fontSize: 12 }}>
+        {cmd ? `${cmd}: ${msg}` : msg}
+      </span>
+    </div>
+  );
+}
+
 function WritingResultCard({ result }: { result: ActionResult }) {
   const [copied, setCopied] = useState(false);
   const mode = result.mode as WritingMode;
@@ -134,6 +155,8 @@ function OrbitActionCard({
     return <WritingResultCard result={result} />;
   if (result.type === "meeting_opened")
     return <MeetingOpenedCard result={result} onNavigate={onNavigate} />;
+  if (result.type === "orbit_error")
+    return <OrbitErrorCard result={result} />;
   return <OrbitDoneCard result={result} />;
 }
 
@@ -147,7 +170,7 @@ export const orbitHandler: ConstellationHandler = {
   promptInstructions: `### Orbit Control — Tasks, Notes, Projects, Writing & Meetings
 
 \`\`\`orbit-commands
-CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
+CREATE_TASK {"title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null","sub_tasks":["...","..."]}
 UPDATE_TASK {"id":"...","title":"...","description":"...","priority":"low|medium|high","due_date":"YYYY-MM-DD or null"}
 COMPLETE_TASK {"id":"..."}
 UNCOMPLETE_TASK {"id":"..."}
@@ -173,6 +196,8 @@ OPEN_MEETING {"title":"..."}
 \`\`\`
 
 Rules: Multiple commands per block are allowed, one per line. Priorities default to "medium". Omit optional fields if not provided. Use null for due_date/deadline if none given. For UPDATE_* commands, only include fields you want to change.
+
+CREATE_TASK: When creating a task with sub-tasks, use the "sub_tasks" array field containing an array of title strings. All sub-tasks are created in one atomic operation.
 
 PROCESS_WRITING: Use when the user asks you to improve, fix, rephrase, expand, shorten, convert to bullets, continue, make formal/casual, or format as email. Always use this command to show the result as a copyable card rather than writing the text in your prose response. Text must be the exact content to transform, not a summary.
 
@@ -277,6 +302,11 @@ LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks an
       try {
         switch (command) {
           case "CREATE_TASK": {
+            const title = String(args.title ?? "").trim();
+            if (!title) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "CREATE_TASK", message: "Title is required." });
+              break;
+            }
             const rawDue = args.due_date;
             const dueDate =
               rawDue != null &&
@@ -285,45 +315,104 @@ LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks an
               rawDue.trim() !== ""
                 ? rawDue
                 : null;
-            store.createTask({
-              title: String(args.title ?? ""),
-              description:
-                args.description != null && args.description !== "null"
-                  ? String(args.description)
-                  : null,
-              priority: (["low", "medium", "high"].includes(
-                String(args.priority),
-              )
-                ? args.priority
-                : "medium") as "low" | "medium" | "high",
-              due_date: dueDate,
-            });
+            const rawSubTasks = args.sub_tasks;
+            const subTaskTitles: string[] =
+              Array.isArray(rawSubTasks)
+                ? rawSubTasks
+                    .filter((s) => typeof s === "string" && String(s).trim())
+                    .map((s) => String(s).trim())
+                : [];
+            if (subTaskTitles.length > 0) {
+              store.createTaskWithSubTasks(
+                {
+                  title,
+                  description:
+                    args.description != null && args.description !== "null"
+                      ? String(args.description)
+                      : null,
+                  priority: (["low", "medium", "high"].includes(
+                    String(args.priority),
+                  )
+                    ? args.priority
+                    : "medium") as "low" | "medium" | "high",
+                  due_date: dueDate,
+                },
+                subTaskTitles,
+              );
+            } else {
+              store.createTask({
+                title,
+                description:
+                  args.description != null && args.description !== "null"
+                    ? String(args.description)
+                    : null,
+                priority: (["low", "medium", "high"].includes(
+                  String(args.priority),
+                )
+                  ? args.priority
+                  : "medium") as "low" | "medium" | "high",
+                due_date: dueDate,
+              });
+            }
             count++;
             break;
           }
-          case "COMPLETE_TASK":
-            store.completeTask(String(args.id ?? ""));
+          case "COMPLETE_TASK": {
+            const id = String(args.id ?? "");
+            if (!id || !store.tasks.find((t) => t.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "COMPLETE_TASK", message: `Task not found: ${id}` });
+              break;
+            }
+            store.completeTask(id);
             count++;
             break;
-          case "UNCOMPLETE_TASK":
-            store.uncompleteTask(String(args.id ?? ""));
+          }
+          case "UNCOMPLETE_TASK": {
+            const id = String(args.id ?? "");
+            if (!id || !store.tasks.find((t) => t.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UNCOMPLETE_TASK", message: `Task not found: ${id}` });
+              break;
+            }
+            store.uncompleteTask(id);
             count++;
             break;
-          case "ARCHIVE_TASK":
-            store.archiveTask(String(args.id ?? ""));
+          }
+          case "ARCHIVE_TASK": {
+            const id = String(args.id ?? "");
+            if (!id || !store.tasks.find((t) => t.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "ARCHIVE_TASK", message: `Task not found: ${id}` });
+              break;
+            }
+            store.archiveTask(id);
             count++;
             break;
-          case "UNARCHIVE_TASK":
-            store.unarchiveTask(String(args.id ?? ""));
+          }
+          case "UNARCHIVE_TASK": {
+            const id = String(args.id ?? "");
+            if (!id || !store.tasks.find((t) => t.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UNARCHIVE_TASK", message: `Task not found: ${id}` });
+              break;
+            }
+            store.unarchiveTask(id);
             count++;
             break;
-          case "DELETE_TASK":
-            store.deleteTask(String(args.id ?? ""));
+          }
+          case "DELETE_TASK": {
+            const id = String(args.id ?? "");
+            if (!id || !store.tasks.find((t) => t.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "DELETE_TASK", message: `Task not found: ${id}` });
+              break;
+            }
+            store.deleteTask(id);
             count++;
             break;
+          }
           case "UPDATE_TASK": {
             const taskId = String(args.id ?? "");
-            if (!taskId) break;
+            if (!taskId || !store.tasks.find((t) => t.id === taskId)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UPDATE_TASK", message: `Task not found: ${taskId}` });
+              break;
+            }
             const taskUpdates: Parameters<typeof store.updateTask>[1] = {};
             if (args.title !== undefined)
               taskUpdates.title = String(args.title);
@@ -346,49 +435,103 @@ LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks an
             count++;
             break;
           }
-          case "ADD_SUBTASK":
-            store.addSubTask(
-              String(args.task_id ?? ""),
-              String(args.title ?? ""),
-            );
+          case "ADD_SUBTASK": {
+            const task_id = String(args.task_id ?? "");
+            if (!task_id || !store.tasks.find((t) => t.id === task_id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "ADD_SUBTASK", message: `Task not found: ${task_id}` });
+              break;
+            }
+            const title = String(args.title ?? "").trim();
+            if (!title) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "ADD_SUBTASK", message: "Sub-task title is required." });
+              break;
+            }
+            store.addSubTask(task_id, title);
             count++;
             break;
-          case "TOGGLE_SUBTASK":
-            store.toggleSubTask(
-              String(args.task_id ?? ""),
-              String(args.subtask_id ?? ""),
-            );
+          }
+          case "TOGGLE_SUBTASK": {
+            const task_id = String(args.task_id ?? "");
+            const subtask_id = String(args.subtask_id ?? "");
+            const task = store.tasks.find((t) => t.id === task_id);
+            if (!task_id || !task) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "TOGGLE_SUBTASK", message: `Task not found: ${task_id}` });
+              break;
+            }
+            if (!subtask_id || !task.sub_tasks.find((st) => st.id === subtask_id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "TOGGLE_SUBTASK", message: `Sub-task not found: ${subtask_id}` });
+              break;
+            }
+            store.toggleSubTask(task_id, subtask_id);
             count++;
             break;
-          case "DELETE_SUBTASK":
-            store.deleteSubTask(
-              String(args.task_id ?? ""),
-              String(args.subtask_id ?? ""),
-            );
+          }
+          case "DELETE_SUBTASK": {
+            const task_id = String(args.task_id ?? "");
+            const subtask_id = String(args.subtask_id ?? "");
+            const task = store.tasks.find((t) => t.id === task_id);
+            if (!task_id || !task) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "DELETE_SUBTASK", message: `Task not found: ${task_id}` });
+              break;
+            }
+            if (!subtask_id || !task.sub_tasks.find((st) => st.id === subtask_id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "DELETE_SUBTASK", message: `Sub-task not found: ${subtask_id}` });
+              break;
+            }
+            store.deleteSubTask(task_id, subtask_id);
             count++;
             break;
-          case "UPDATE_SUBTASK":
-            store.updateSubTask(
-              String(args.task_id ?? ""),
-              String(args.subtask_id ?? ""),
-              String(args.title ?? ""),
-            );
+          }
+          case "UPDATE_SUBTASK": {
+            const task_id = String(args.task_id ?? "");
+            const subtask_id = String(args.subtask_id ?? "");
+            const task = store.tasks.find((t) => t.id === task_id);
+            if (!task_id || !task) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UPDATE_SUBTASK", message: `Task not found: ${task_id}` });
+              break;
+            }
+            if (!subtask_id || !task.sub_tasks.find((st) => st.id === subtask_id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UPDATE_SUBTASK", message: `Sub-task not found: ${subtask_id}` });
+              break;
+            }
+            const title = String(args.title ?? "").trim();
+            if (!title) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UPDATE_SUBTASK", message: "Sub-task title is required." });
+              break;
+            }
+            store.updateSubTask(task_id, subtask_id, title);
             count++;
             break;
-          case "CREATE_NOTE":
+          }
+          case "CREATE_NOTE": {
+            const title = String(args.title ?? "").trim();
+            if (!title) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "CREATE_NOTE", message: "Title is required." });
+              break;
+            }
             store.createNote({
-              title: String(args.title ?? ""),
+              title,
               content: args.content != null ? String(args.content) : null,
             });
             count++;
             break;
-          case "DELETE_NOTE":
-            store.deleteNote(String(args.id ?? ""));
+          }
+          case "DELETE_NOTE": {
+            const id = String(args.id ?? "");
+            if (!id || !store.notes.find((n) => n.id === id)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "DELETE_NOTE", message: `Note not found: ${id}` });
+              break;
+            }
+            store.deleteNote(id);
             count++;
             break;
+          }
           case "UPDATE_NOTE": {
             const noteId = String(args.id ?? "");
-            if (!noteId) break;
+            if (!noteId || !store.notes.find((n) => n.id === noteId)) {
+              results.push({ type: "orbit_error", handler: "orbit-commands", command: "UPDATE_NOTE", message: `Note not found: ${noteId}` });
+              break;
+            }
             const noteUpdates: Parameters<typeof store.updateNote>[1] = {};
             if (args.title !== undefined)
               noteUpdates.title = String(args.title);
@@ -510,9 +653,9 @@ LINK_TASK / UNLINK_TASK / LINK_NOTE / UNLINK_NOTE: Use to add or remove tasks an
             break;
           }
         }
-      } catch {
-        /* skip malformed */
-      }
+        } catch (err) {
+          results.push({ type: "orbit_error", handler: "orbit-commands", command, message: String(err) });
+        }
     }
 
     if (count > 0) {

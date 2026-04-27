@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createIDBStorage, migrateLocalStorageToIDB } from "../lib/storage";
 
 export type Priority = "low" | "medium" | "high";
 
@@ -72,28 +73,27 @@ interface OrbitState {
   tasks: OrbitTask[];
   notes: OrbitNote[];
   projects: OrbitProject[];
+  lastSavedAt: string | null;
 
-  // Task operations
   createTask: (data: CreateTaskData) => string;
+  createTaskWithSubTasks: (data: CreateTaskData, subTaskTitles: string[]) => string;
   updateTask: (id: string, updates: Partial<CreateTaskData>) => void;
+  updateTaskWithSubTasks: (id: string, updates: Partial<CreateTaskData>, newSubTaskTitles: string[]) => void;
   completeTask: (id: string) => void;
   uncompleteTask: (id: string) => void;
   archiveTask: (id: string) => void;
   unarchiveTask: (id: string) => void;
   deleteTask: (id: string) => void;
 
-  // Sub-task operations
   addSubTask: (taskId: string, title: string) => string;
   toggleSubTask: (taskId: string, subTaskId: string) => void;
   updateSubTask: (taskId: string, subTaskId: string, title: string) => void;
   deleteSubTask: (taskId: string, subTaskId: string) => void;
 
-  // Note operations
   createNote: (data: CreateNoteData) => string;
   updateNote: (id: string, updates: Partial<CreateNoteData>) => void;
   deleteNote: (id: string) => void;
 
-  // Project operations
   createProject: (data: CreateProjectData) => string;
   updateProject: (id: string, updates: Partial<CreateProjectData>) => void;
   deleteProject: (id: string) => void;
@@ -109,6 +109,7 @@ export const useOrbitStore = create<OrbitState>()(
       tasks: [],
       notes: [],
       projects: [],
+      lastSavedAt: null,
 
       createTask: (data) => {
         const id = crypto.randomUUID();
@@ -126,7 +127,33 @@ export const useOrbitStore = create<OrbitState>()(
           updated_at: now,
           sub_tasks: [],
         };
-        set((s) => ({ tasks: [task, ...s.tasks] }));
+        set((s) => ({ tasks: [task, ...s.tasks], lastSavedAt: now }));
+        return id;
+      },
+
+      createTaskWithSubTasks: (data, subTaskTitles) => {
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const subTasks: OrbitSubTask[] = subTaskTitles.map((title, i) => ({
+          id: crypto.randomUUID(),
+          title: title.trim(),
+          completed: false,
+          position: i,
+        }));
+        const task: OrbitTask = {
+          id,
+          title: data.title.trim(),
+          description: data.description?.trim() || null,
+          priority: data.priority ?? "medium",
+          due_date: data.due_date ?? null,
+          completed: false,
+          archived: false,
+          archived_at: null,
+          created_at: now,
+          updated_at: now,
+          sub_tasks: subTasks,
+        };
+        set((s) => ({ tasks: [task, ...s.tasks], lastSavedAt: now }));
         return id;
       },
 
@@ -149,6 +176,39 @@ export const useOrbitStore = create<OrbitState>()(
         }));
       },
 
+      updateTaskWithSubTasks: (id, updates, newSubTaskTitles) => {
+        set((s) => {
+          const existing = s.tasks.find((t) => t.id === id);
+          if (!existing) return s;
+          const now = new Date().toISOString();
+          const newSubs: OrbitSubTask[] = newSubTaskTitles.map((title, i) => ({
+            id: crypto.randomUUID(),
+            title: title.trim(),
+            completed: false,
+            position: i,
+          }));
+          const updatedSubs = [...existing.sub_tasks, ...newSubs];
+          return {
+            tasks: s.tasks.map((t) =>
+              t.id === id
+                ? {
+                    ...t,
+                    ...(updates.title !== undefined && { title: updates.title.trim() }),
+                    ...(updates.description !== undefined && {
+                      description: updates.description?.trim() || null,
+                    }),
+                    ...(updates.priority !== undefined && { priority: updates.priority }),
+                    ...(updates.due_date !== undefined && { due_date: updates.due_date }),
+                    sub_tasks: updatedSubs,
+                    updated_at: now,
+                  }
+                : t,
+            ),
+            lastSavedAt: now,
+          };
+        });
+      },
+
       completeTask: (id) => {
         const archivedAt = new Date().toISOString();
         set((s) => ({
@@ -157,6 +217,7 @@ export const useOrbitStore = create<OrbitState>()(
               ? { ...t, completed: true, archived: true, archived_at: archivedAt, updated_at: archivedAt }
               : t,
           ),
+          lastSavedAt: archivedAt,
         }));
       },
 
@@ -168,6 +229,7 @@ export const useOrbitStore = create<OrbitState>()(
               ? { ...t, completed: false, archived: false, archived_at: null, updated_at: now }
               : t,
           ),
+          lastSavedAt: now,
         }));
       },
 
@@ -179,6 +241,7 @@ export const useOrbitStore = create<OrbitState>()(
               ? { ...t, archived: true, archived_at: archivedAt, updated_at: archivedAt }
               : t,
           ),
+          lastSavedAt: archivedAt,
         }));
       },
 
@@ -190,18 +253,20 @@ export const useOrbitStore = create<OrbitState>()(
               ? { ...t, archived: false, archived_at: null, completed: false, updated_at: now }
               : t,
           ),
+          lastSavedAt: now,
         }));
       },
 
       deleteTask: (id) => {
+        const now = new Date().toISOString();
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== id),
-          // Remove task from any projects it belongs to
           projects: s.projects.map((p) =>
             p.taskIds.includes(id)
-              ? { ...p, taskIds: p.taskIds.filter((tid) => tid !== id), updated_at: new Date().toISOString() }
+              ? { ...p, taskIds: p.taskIds.filter((tid) => tid !== id), updated_at: now }
               : p,
           ),
+          lastSavedAt: now,
         }));
       },
 
@@ -282,7 +347,7 @@ export const useOrbitStore = create<OrbitState>()(
           created_at: now,
           updated_at: now,
         };
-        set((s) => ({ notes: [note, ...s.notes] }));
+        set((s) => ({ notes: [note, ...s.notes], lastSavedAt: now }));
         return id;
       },
 
@@ -304,14 +369,15 @@ export const useOrbitStore = create<OrbitState>()(
       },
 
       deleteNote: (id) => {
+        const now = new Date().toISOString();
         set((s) => ({
           notes: s.notes.filter((n) => n.id !== id),
-          // Remove note from any projects it belongs to
           projects: s.projects.map((p) =>
             p.noteIds.includes(id)
-              ? { ...p, noteIds: p.noteIds.filter((nid) => nid !== id), updated_at: new Date().toISOString() }
+              ? { ...p, noteIds: p.noteIds.filter((nid) => nid !== id), updated_at: now }
               : p,
           ),
+          lastSavedAt: now,
         }));
       },
 
@@ -329,7 +395,7 @@ export const useOrbitStore = create<OrbitState>()(
           created_at: now,
           updated_at: now,
         };
-        set((s) => ({ projects: [project, ...s.projects] }));
+        set((s) => ({ projects: [project, ...s.projects], lastSavedAt: now }));
         return id;
       },
 
@@ -353,7 +419,8 @@ export const useOrbitStore = create<OrbitState>()(
       },
 
       deleteProject: (id) => {
-        set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+        const now = new Date().toISOString();
+        set((s) => ({ projects: s.projects.filter((p) => p.id !== id), lastSavedAt: now }));
       },
 
       linkTaskToProject: (projectId, taskId) => {
@@ -398,21 +465,32 @@ export const useOrbitStore = create<OrbitState>()(
     }),
     {
       name: "starfield-orbit-state",
-      version: 2,
-      migrate(persistedState, version) {
+      storage: createIDBStorage<OrbitState>(),
+      version: 3,
+      onRehydrateStorage: () => {
+        return (_state, error) => {
+          if (error) {
+            console.error("[Orbit] Rehydration failed, falling back to empty state", error);
+          }
+        };
+      },
+      migrate: async (_persistedState, version): Promise<OrbitState> => {
         if (version < 2) {
-          const old = persistedState as { tasks?: Array<OrbitTask & { sub_tasks?: OrbitSubTask[] }>; notes?: OrbitNote[] };
-          // Add sub_tasks array to all existing tasks and initialize projects array
+          const old = _persistedState as { tasks?: Array<OrbitTask & { sub_tasks?: OrbitSubTask[] }>; notes?: OrbitNote[] };
           return {
-            ...old,
             tasks: (old.tasks ?? []).map((t) => ({
               ...t,
               sub_tasks: t.sub_tasks ?? [],
             })),
+            notes: old.notes ?? [],
             projects: [],
-          };
+            lastSavedAt: null,
+          } as unknown as OrbitState;
         }
-        return persistedState as OrbitState;
+        if (version === 2) {
+          await migrateLocalStorageToIDB();
+        }
+        return _persistedState as OrbitState;
       },
     },
   ),

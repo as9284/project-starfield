@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import {
   ListTodo,
   ArrowLeft,
@@ -31,8 +32,9 @@ import {
   FileText,
   Search,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import StarField from "../components/StarField";
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { OrbitDatePicker } from "../components/OrbitDatePicker";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { renderMarkdown, stripMarkdown } from "../lib/markdown";
@@ -127,7 +129,7 @@ interface TaskCardProps {
   onToggle: (id: string) => void;
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, title: string) => void;
   onEdit: (task: OrbitTask) => void;
 }
 
@@ -143,7 +145,6 @@ function TaskCard({
   const due = task.due_date ? formatDueDate(task.due_date) : null;
   const subTasks = task.sub_tasks ?? [];
   const completedSubTasks = subTasks.filter((s) => s.completed).length;
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <motion.div
@@ -255,81 +256,45 @@ function TaskCard({
 
       {/* Actions */}
       <div
-        className={`flex items-center gap-0.5 shrink-0 transition-opacity ${
-          confirmDelete
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100"
-        }`}
+        className={`flex items-center gap-0.5 shrink-0 transition-opacity opacity-0 group-hover:opacity-100`}
       >
-        {confirmDelete ? (
-          <>
-            <span
-              className="text-[11px] mr-1"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              Delete?
-            </span>
-            <button
-              onClick={() => onDelete(task.id)}
-              className="p-1.5 rounded-lg transition-all duration-150"
-              style={{
-                color: "rgba(248, 113, 113, 0.9)",
-                background: "rgba(248, 113, 113, 0.1)",
-              }}
-              title="Confirm delete"
-            >
-              <Check size={13} />
-            </button>
-            <button
-              onClick={() => setConfirmDelete(false)}
-              className="p-1.5 rounded-lg transition-all duration-150"
-              style={{ color: "var(--color-text-muted)" }}
-              title="Cancel"
-            >
-              <X size={13} />
-            </button>
-          </>
-        ) : (
-          <>
-            {!task.archived && (
-              <button
-                onClick={() => onEdit(task)}
-                className="p-1.5 rounded-lg transition-all duration-150"
-                style={{ color: "var(--color-text-secondary)" }}
-                title="Edit"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-            {task.archived ? (
-              <button
-                onClick={() => onUnarchive(task.id)}
-                className="p-1.5 rounded-lg transition-all duration-150"
-                style={{ color: "var(--color-text-secondary)" }}
-                title="Restore"
-              >
-                <RotateCcw size={14} />
-              </button>
-            ) : (
-              <button
-                onClick={() => onArchive(task.id)}
-                className="p-1.5 rounded-lg transition-all duration-150"
-                style={{ color: "var(--color-text-secondary)" }}
-                title="Archive"
-              >
-                <Archive size={14} />
-              </button>
-            )}
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-lg transition-all duration-150"
-              style={{ color: "var(--color-text-secondary)" }}
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
-          </>
+        {!task.archived && (
+          <button
+            onClick={() => onEdit(task)}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Edit"
+          >
+            <Pencil size={14} />
+          </button>
         )}
+        {task.archived ? (
+          <button
+            onClick={() => onUnarchive(task.id)}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Restore"
+          >
+            <RotateCcw size={14} />
+          </button>
+        ) : (
+          <button
+            onClick={() => onArchive(task.id)}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Archive"
+          >
+            <Archive size={14} />
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(task.id, task.title)}
+          className="p-1.5 rounded-lg transition-all duration-150"
+          style={{ color: "var(--color-text-secondary)" }}
+          title="Delete"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </motion.div>
   );
@@ -340,11 +305,10 @@ function TaskCard({
 interface NoteCardProps {
   note: OrbitNote;
   onEdit: (note: OrbitNote) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, title: string) => void;
 }
 
 function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <motion.div
       layout
@@ -382,56 +346,17 @@ function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           day: "numeric",
         })}
       </p>
-      {confirmDelete ? (
-        <div
-          className="absolute top-2 right-2 flex items-center gap-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span
-            className="text-[11px]"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            Delete?
-          </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(note.id);
-            }}
-            className="p-1 rounded-md"
-            style={{
-              color: "rgba(248, 113, 113, 0.9)",
-              background: "rgba(248, 113, 113, 0.1)",
-            }}
-            title="Confirm delete"
-          >
-            <Check size={11} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmDelete(false);
-            }}
-            className="p-1 rounded-md"
-            style={{ color: "var(--color-text-muted)" }}
-            title="Cancel"
-          >
-            <X size={11} />
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setConfirmDelete(true);
-          }}
-          className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-150"
-          style={{ color: "var(--color-text-secondary)" }}
-          title="Delete"
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(note.id, note.title);
+        }}
+        className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-150"
+        style={{ color: "var(--color-text-secondary)" }}
+        title="Delete"
+      >
+        <Trash2 size={14} />
+      </button>
     </motion.div>
   );
 }
@@ -560,15 +485,15 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
 
   return (
     <motion.div
-      className="fixed top-10.5 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)", paddingTop: "48px" }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-lg p-6 max-h-[88vh] overflow-y-auto"
+        className="glass rounded-2xl w-full max-w-lg p-6 max-h-[calc(100vh-48px)] overflow-y-auto"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -842,15 +767,15 @@ function NoteModal({ note, onSave, onClose }: NoteModalProps) {
 
   return (
     <motion.div
-      className="fixed top-10.5 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)", paddingTop: "48px" }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto"
+        className="glass rounded-2xl w-full max-w-lg max-h-[calc(100vh-48px)] overflow-y-auto"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -1068,7 +993,7 @@ interface ProjectCardProps {
   completedTaskCount: number;
   noteCount: number;
   onEdit: (p: OrbitProject) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, title: string) => void;
   onClick: (p: OrbitProject) => void;
 }
 
@@ -1084,7 +1009,6 @@ function ProjectCard({
   const colorStyle = getProjectColorStyle(project.color);
   const progress = taskCount > 0 ? (completedTaskCount / taskCount) * 100 : 0;
   const due = project.deadline ? formatDueDate(project.deadline) : null;
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <motion.div
@@ -1114,72 +1038,30 @@ function ProjectCard({
           </p>
         </div>
         <div
-          className={`flex items-center gap-0.5 shrink-0 transition-opacity ${
-            confirmDelete
-              ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
+          className={`flex items-center gap-0.5 shrink-0 transition-opacity opacity-0 group-hover:opacity-100`}
         >
-          {confirmDelete ? (
-            <>
-              <span
-                className="text-[11px] mr-0.5"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                Delete?
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(project.id);
-                }}
-                className="p-1 rounded-md"
-                style={{
-                  color: "rgba(248, 113, 113, 0.9)",
-                  background: "rgba(248, 113, 113, 0.1)",
-                }}
-                title="Confirm delete"
-              >
-                <Check size={12} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmDelete(false);
-                }}
-                className="p-1 rounded-md"
-                style={{ color: "var(--color-text-muted)" }}
-                title="Cancel"
-              >
-                <X size={12} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(project);
-                }}
-                className="p-1.5 rounded-lg transition-all duration-150"
-                style={{ color: "var(--color-text-secondary)" }}
-                title="Edit"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmDelete(true);
-                }}
-                className="p-1.5 rounded-lg transition-all duration-150"
-                style={{ color: "var(--color-text-secondary)" }}
-                title="Delete"
-              >
-                <Trash2 size={13} />
-              </button>
-            </>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(project);
+            }}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Edit"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(project.id, project.name);
+            }}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: "var(--color-text-secondary)" }}
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
         </div>
       </div>
 
@@ -1294,8 +1176,8 @@ function ProjectModal({ project, onSave, onClose }: ProjectModalProps) {
 
   return (
     <motion.div
-      className="fixed top-10.5 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)", paddingTop: "48px" }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1469,8 +1351,8 @@ function ProjectDetailModal({
 
   return (
     <motion.div
-      className="fixed top-10.5 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(6, 6, 14, 0.75)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6, 6, 14, 0.75)", paddingTop: "48px" }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1478,7 +1360,7 @@ function ProjectDetailModal({
     >
       <motion.div
         className="glass rounded-2xl w-full max-w-xl overflow-hidden flex flex-col"
-        style={{ maxHeight: "82vh" }}
+        style={{ maxHeight: "calc(100vh - 48px)" }}
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -1980,17 +1862,15 @@ function WritingAssistantView() {
 // ── Meeting Mode View ────────────────────────────────────────────────────────
 
 function MeetingModeView({
-  createTask,
-  addSubTask,
+  createTaskWithSubTasks,
   createNote,
 }: {
-  createTask: (data: {
+  createTaskWithSubTasks: (data: {
     title: string;
     description?: string | null;
     priority?: Priority;
     due_date?: string | null;
-  }) => string;
-  addSubTask: (taskId: string, title: string) => string;
+  }, subTaskTitles: string[]) => string;
   createNote: (data: { title: string; content?: string | null }) => string;
 }) {
   const {
@@ -2087,15 +1967,14 @@ function MeetingModeView({
         content: result.artifacts.note.content,
       });
 
-      const taskId = createTask({
-        title: result.artifacts.task.title,
-        description: result.artifacts.task.description || undefined,
-        priority: result.artifacts.task.priority,
-      });
-
-      for (const subTitle of result.artifacts.task.subTasks) {
-        addSubTask(taskId, subTitle);
-      }
+      createTaskWithSubTasks(
+        {
+          title: result.artifacts.task.title,
+          description: result.artifacts.task.description || undefined,
+          priority: result.artifacts.task.priority,
+        },
+        result.artifacts.task.subTasks,
+      );
 
       endSession({
         createdAt: new Date().toISOString(),
@@ -2110,7 +1989,7 @@ function MeetingModeView({
     } finally {
       setEnding(false);
     }
-  }, [activeSession, createNote, createTask, addSubTask, endSession]);
+  }, [activeSession, createNote, createTaskWithSubTasks, endSession]);
 
   const handleDiscard = useCallback(() => {
     discardActiveSession();
@@ -2585,14 +2464,14 @@ export default function Orbit() {
     tasks,
     notes,
     projects,
-    createTask,
-    updateTask,
+    lastSavedAt,
+    createTaskWithSubTasks,
+    updateTaskWithSubTasks,
     completeTask,
     uncompleteTask,
     archiveTask,
     unarchiveTask,
     deleteTask,
-    addSubTask,
     toggleSubTask,
     updateSubTask,
     deleteSubTask,
@@ -2634,6 +2513,13 @@ export default function Orbit() {
   const [taskSearch, setTaskSearch] = useState("");
   const [noteSearch, setNoteSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+
+  type DeletingItem =
+    | { type: "task"; id: string; title: string }
+    | { type: "note"; id: string; title: string }
+    | { type: "project"; id: string; title: string }
+    | null;
+  const [deletingItem, setDeletingItem] = useState<DeletingItem>(null);
 
   // Consume pending tab switch requested by Luna (e.g. OPEN_MEETING)
   useEffect(() => {
@@ -2752,34 +2638,25 @@ export default function Orbit() {
     subTasks: OrbitSubTask[];
   }) => {
     if (taskModal === "new") {
-      const taskId = createTask(data);
-      for (const st of data.subTasks) {
-        addSubTask(taskId, st.title);
-      }
+      const titles = data.subTasks.map((st) => st.title);
+      createTaskWithSubTasks(data, titles);
     } else if (taskModal) {
       const existingTask = tasks.find((t) => t.id === taskModal.id);
-      updateTask(taskModal.id, data);
-      // Reconcile sub-tasks: remove deleted ones, add new ones, toggle changed ones
+      const newTitles = data.subTasks
+        .filter((st) => !st.id)
+        .map((st) => st.title);
+      updateTaskWithSubTasks(taskModal.id, data, newTitles);
       if (existingTask) {
-        const existingIds = new Set(existingTask.sub_tasks.map((s) => s.id));
         const newIds = new Set(data.subTasks.map((s) => s.id));
-        // Delete removed sub-tasks
         for (const st of existingTask.sub_tasks) {
           if (!newIds.has(st.id)) deleteSubTask(taskModal.id, st.id);
         }
-        // Add new sub-tasks and sync existing ones
         for (const st of data.subTasks) {
-          if (!existingIds.has(st.id)) {
-            const newId = addSubTask(taskModal.id, st.title);
-            if (st.completed) toggleSubTask(taskModal.id, newId);
-          } else {
-            // Update title if changed
-            const orig = existingTask.sub_tasks.find((s) => s.id === st.id);
-            if (orig && orig.title !== st.title)
-              updateSubTask(taskModal.id, st.id, st.title);
-            if (orig && orig.completed !== st.completed)
-              toggleSubTask(taskModal.id, st.id);
-          }
+          if (!st.id) continue;
+          const orig = existingTask.sub_tasks.find((e) => e.id === st.id);
+          if (!orig) continue;
+          if (orig.title !== st.title) updateSubTask(taskModal.id, st.id, st.title);
+          if (orig.completed !== st.completed) toggleSubTask(taskModal.id, st.id);
         }
       }
     }
@@ -2895,6 +2772,18 @@ export default function Orbit() {
           >
             constellation
           </span>
+          {lastSavedAt && (
+            <span
+              className="ml-auto flex items-center gap-1.5 text-[11px]"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "rgba(52, 211, 153, 0.7)" }}
+              />
+              Saved
+            </span>
+          )}
         </div>
 
         {/* Content */}
@@ -3125,7 +3014,7 @@ export default function Orbit() {
                                 onToggle={handleToggle}
                                 onArchive={archiveTask}
                                 onUnarchive={unarchiveTask}
-                                onDelete={deleteTask}
+                                onDelete={(id, title) => setDeletingItem({ type: "task", id, title })}
                                 onEdit={(t) => setTaskModal(t)}
                               />
                             ))}
@@ -3200,7 +3089,7 @@ export default function Orbit() {
                                 key={note.id}
                                 note={note}
                                 onEdit={(n) => setNoteModal(n)}
-                                onDelete={deleteNote}
+                                onDelete={(id, title) => setDeletingItem({ type: "note", id, title })}
                               />
                             ))}
                           </AnimatePresence>
@@ -3283,7 +3172,7 @@ export default function Orbit() {
                                   completedTaskCount={completedTaskCount}
                                   noteCount={noteCount}
                                   onEdit={(p) => setProjectModal(p)}
-                                  onDelete={deleteProject}
+                                  onDelete={(id, title) => setDeletingItem({ type: "project", id, title })}
                                   onClick={(p) => setDetailProject(p)}
                                 />
                               ),
@@ -3301,8 +3190,7 @@ export default function Orbit() {
                 {/* Meeting Mode view */}
                 {tab === "meeting" && (
                   <MeetingModeView
-                    createTask={createTask}
-                    addSubTask={addSubTask}
+                    createTaskWithSubTasks={createTaskWithSubTasks}
                     createNote={createNote}
                   />
                 )}
@@ -3347,6 +3235,28 @@ export default function Orbit() {
             onUnlinkNote={unlinkNoteFromProject}
           />
         )}
+        <AnimatePresence>
+          {deletingItem && (
+            <ConfirmDeleteModal
+              key="delete-confirm"
+              title={
+                deletingItem.type === "task"
+                  ? "Delete task"
+                  : deletingItem.type === "note"
+                    ? "Delete note"
+                    : "Delete project"
+              }
+              itemTitle={deletingItem.title}
+              onConfirm={() => {
+                if (deletingItem?.type === "task") deleteTask(deletingItem.id);
+                else if (deletingItem?.type === "note") deleteNote(deletingItem.id);
+                else if (deletingItem?.type === "project") deleteProject(deletingItem.id);
+                setDeletingItem(null);
+              }}
+              onCancel={() => setDeletingItem(null)}
+            />
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </div>
   );
