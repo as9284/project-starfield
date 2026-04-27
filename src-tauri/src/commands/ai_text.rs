@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::command;
 
 const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
-const DEEPSEEK_MODEL: &str = "deepseek-chat";
+const DEEPSEEK_MODEL: &str = "deepseek-v4-flash";
 
 #[derive(Debug, Serialize)]
 struct AiTextRequest {
