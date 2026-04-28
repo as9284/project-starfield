@@ -493,14 +493,14 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-lg p-6 max-h-[calc(100vh-48px)] overflow-y-auto"
+        className="glass rounded-2xl w-full max-w-lg max-h-[calc(100vh-48px-1rem)] overflow-hidden flex flex-col"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between px-6 pt-6 pb-0 shrink-0">
           <h3
             className="text-base font-semibold"
             style={{ color: "var(--color-text-primary)" }}
@@ -515,7 +515,8 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto min-h-0">
+        <form onSubmit={handleSubmit} className="p-6 pt-5 flex flex-col gap-5">
           {/* Title */}
           <input
             ref={titleRef}
@@ -709,6 +710,7 @@ function TaskModal({ task, onSave, onClose }: TaskModalProps) {
             </button>
           </div>
         </form>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -775,13 +777,14 @@ function NoteModal({ note, onSave, onClose }: NoteModalProps) {
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-lg max-h-[calc(100vh-48px)] overflow-y-auto"
+        className="glass rounded-2xl w-full max-w-lg max-h-[calc(100vh-48px-1rem)] overflow-hidden flex flex-col"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex-1 overflow-y-auto min-h-0">
         {mode === "preview" && note ? (
           /* ── Preview mode ── */
           <div className="p-6 flex flex-col gap-5">
@@ -931,6 +934,7 @@ function NoteModal({ note, onSave, onClose }: NoteModalProps) {
             </form>
           </div>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -1184,13 +1188,15 @@ function ProjectModal({ project, onSave, onClose }: ProjectModalProps) {
       onClick={handleBackdrop}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-md p-5"
+        className="glass rounded-2xl w-full max-w-md max-h-[calc(100vh-48px-1rem)] overflow-hidden flex flex-col"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="p-5">
         <div className="flex items-center justify-between mb-4">
           <h3
             className="text-sm font-semibold"
@@ -1301,6 +1307,8 @@ function ProjectModal({ project, onSave, onClose }: ProjectModalProps) {
             </button>
           </div>
         </form>
+        </div>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -1360,7 +1368,7 @@ function ProjectDetailModal({
     >
       <motion.div
         className="glass rounded-2xl w-full max-w-xl overflow-hidden flex flex-col"
-        style={{ maxHeight: "calc(100vh - 48px)" }}
+        style={{ maxHeight: "calc(100vh - 48px - 1rem)" }}
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}

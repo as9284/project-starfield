@@ -38,13 +38,15 @@ export function ConfirmDeleteModal({
       }}
     >
       <motion.div
-        className="glass rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+        className="glass rounded-2xl w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col"
         initial={{ scale: 0.92, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.92, opacity: 0 }}
         transition={{ duration: 0.15 }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="p-6 flex flex-col gap-4">
         <div className="flex items-start gap-3">
           <div
             className="p-2.5 rounded-xl shrink-0"
@@ -101,6 +103,8 @@ export function ConfirmDeleteModal({
           >
             Delete
           </button>
+        </div>
+        </div>
         </div>
       </motion.div>
     </motion.div>

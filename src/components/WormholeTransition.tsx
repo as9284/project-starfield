@@ -139,7 +139,8 @@ export function WormholeTransition({
 
     const cx = W / 2;
     const cy = H / 2;
-    const maxR = Math.sqrt(cx * cx + cy * cy) * 1.1;
+    // Inscribed circle radius — guarantees nothing ever draws past the viewport edge
+    const maxR = Math.min(cx, cy);
 
     const [ar, ag, ab] = hexToRgb(accentHex);
     const accent = (a: number) => `rgba(${ar},${ag},${ab},${a})`;
@@ -333,9 +334,11 @@ export function WormholeTransition({
     <motion.div
       style={{
         position: "fixed",
-        inset: 0,
+        inset: "var(--window-frame-current-gap, 12px)",
+        borderRadius: "var(--window-shell-current-radius, 18px)",
         zIndex: 9999,
         pointerEvents: "none",
+        overflow: "hidden",
       }}
       initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
@@ -344,7 +347,12 @@ export function WormholeTransition({
     >
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%" }}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          borderRadius: "inherit",
+        }}
       />
     </motion.div>,
     document.body,
