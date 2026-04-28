@@ -137,33 +137,186 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 20px;
   background: var(--color-space-900);
   overflow: hidden;
   pointer-events: none;
   user-select: none;
 }
 
+/* Nebula ambient glow */
+.splash-nebula {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 50% 45%,
+      rgba(100, 55, 224, 0.18) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 55% 55%,
+      rgba(217, 70, 239, 0.1) 0%,
+      transparent 55%
+    );
+  pointer-events: none;
+  animation: splashNebula 8s ease-in-out infinite alternate;
+}
+
+@keyframes splashNebula {
+  from {
+    transform: translate(-2%, -1%) scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate(2%, 1%) scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* Floating starfield */
+.splash-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.splash-star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--color-star-mid);
+  opacity: 0;
+  animation: splashStarTwinkle ease-in-out infinite alternate;
+}
+
+@keyframes splashStarTwinkle {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+}
+
+/* Orbital accent ring */
+.splash-orbit {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 1px solid rgba(196, 181, 253, 0.08);
+  pointer-events: none;
+}
+
+.splash-orbit::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: rgba(196, 181, 253, 0.25);
+  animation: splashOrbitSpin 6s linear infinite;
+}
+
+@keyframes splashOrbitSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Icon wrapper */
+.splash-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-icon-glow {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(124, 79, 240, 0.25) 0%,
+    rgba(124, 79, 240, 0.08) 40%,
+    transparent 70%
+  );
+  animation: splashGlowPulse 3s ease-in-out infinite;
+}
+
+@keyframes splashGlowPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
 .splash-icon {
-  filter: drop-shadow(0 0 24px rgba(124, 79, 240, 0.55))
-    drop-shadow(0 0 60px rgba(124, 79, 240, 0.2));
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 28px rgba(124, 79, 240, 0.6))
+    drop-shadow(0 0 72px rgba(124, 79, 240, 0.25));
+}
+
+/* Text block */
+.splash-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 1;
 }
 
 .splash-title {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--color-purple-200);
+  letter-spacing: 0.12em;
+  color: var(--color-purple-100);
+  text-shadow: 0 0 20px rgba(167, 139, 250, 0.3);
 }
 
-.splash-dot {
+.splash-subtitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+/* Wave loader */
+.splash-loader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  z-index: 1;
+}
+
+.splash-loader-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--color-purple-400);
-  margin-top: 4px;
 }
 
 /* ── App shell ──────────────────────────────────────────────────────────── */
