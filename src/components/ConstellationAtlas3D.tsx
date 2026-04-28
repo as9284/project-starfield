@@ -9,7 +9,7 @@
  */
 
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type RootState } from "@react-three/fiber";
 import { Text, Billboard, OrbitControls, Line } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -17,6 +17,7 @@ import {
   type ConstellationEntry,
   type ConstellationId,
 } from "../lib/constellation-catalog";
+import { useAppStore } from "../store/useAppStore";
 
 // ── Reusable temp vectors ────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ function NebulaParticles({ count = 300 }: { count?: number }) {
 // ── Smooth intro camera ──────────────────────────────────────────────────────
 
 function IntroCamera() {
-  const { camera } = useThree();
+  const { camera, invalidate } = useThree();
   const progress = useRef(0);
   const startPos = useMemo(() => new THREE.Vector3(0, 22, 40), []);
   const endPos = useMemo(() => new THREE.Vector3(0, 9, 20), []);
@@ -106,6 +107,7 @@ function IntroCamera() {
     progress.current = Math.min(1, progress.current + delta * 0.5);
     const t = 1 - Math.pow(1 - progress.current, 3);
     camera.position.lerpVectors(startPos, endPos, t);
+    invalidate();
   });
 
   return null;
@@ -794,7 +796,7 @@ interface CameraFocusProps {
 }
 
 function CameraFocus({ focusedId, introRef }: CameraFocusProps) {
-  const { controls, camera } = useThree();
+  const { controls, camera, invalidate } = useThree();
   const canControl = useRef(false);
 
   useFrame((state, delta) => {
@@ -825,6 +827,7 @@ function CameraFocus({ focusedId, introRef }: CameraFocusProps) {
         _v3.set(px + _focusOffset.x, _focusOffset.y, pz + _focusOffset.z);
         camera.position.lerp(_v3, 1 - Math.pow(0.1, delta));
       }
+      invalidate();
     } else {
       ctrl.target.lerp(_origin, 1 - Math.pow(0.12, delta));
       if (
@@ -832,6 +835,7 @@ function CameraFocus({ focusedId, introRef }: CameraFocusProps) {
         camera.position.distanceTo(_defaultCamPos) > 0.5
       ) {
         camera.position.lerp(_defaultCamPos, 1 - Math.pow(0.08, delta));
+        invalidate();
       }
     }
     ctrl.update();
@@ -1025,12 +1029,13 @@ interface SceneProps {
   onFocus: (id: ConstellationId | null) => void;
   onHoverChange?: (id: ConstellationId | null) => void;
   focusedId: ConstellationId | null;
+  performanceMode?: boolean;
 }
 
 function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
   const [hovered, setHovered] = useState<ConstellationId | null>(null);
+  const performanceMode = useAppStore((s) => s.performanceMode);
 
-  // Intro animation progress — written to a ref to avoid per-frame React re-renders
   const introStartTime = useRef(performance.now());
   const introValuesRef = useRef<number[]>(CONSTELLATIONS.map(() => 0));
   const introCompleteRef = useRef(false);
@@ -1077,7 +1082,7 @@ function Scene({ activeView, onFocus, onHoverChange, focusedId }: SceneProps) {
       <fog attach="fog" args={["#06060e", 20, 45]} />
 
       {/* Nebula background particles */}
-      <NebulaParticles />
+      <NebulaParticles count={performanceMode ? 120 : 300} />
 
       {/* Central star */}
       <LunaCore />
@@ -1188,7 +1193,7 @@ export default function ConstellationAtlas3D({
         powerPreference: "high-performance",
       }}
       dpr={1}
-      frameloop="always"
+      frameloop="while-pending"
     >
       <Scene
         activeView={activeView}

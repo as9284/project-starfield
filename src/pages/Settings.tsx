@@ -22,6 +22,7 @@ import {
   Cpu,
   Zap,
   Settings as SettingsIcon,
+  Gauge,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
@@ -45,6 +46,7 @@ import {
 // ── Section IDs ─────────────────────────────────────────────────────────────
 
 type SectionId =
+  | "general"
   | "updates"
   | "ai"
   | "websearch"
@@ -59,6 +61,12 @@ const SECTIONS: {
   icon: LucideIcon;
   keywords: string[];
 }[] = [
+  {
+    id: "general",
+    label: "General",
+    icon: Gauge,
+    keywords: ["performance", "mode", "gpu", "animation", "quality", "general"],
+  },
   {
     id: "updates",
     label: "App Updates",
@@ -348,6 +356,8 @@ export default function Settings() {
     removeMemory,
     clearMemories,
     importMemories,
+    performanceMode,
+    setPerformanceMode,
   } = useAppStore();
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -625,6 +635,102 @@ export default function Settings() {
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <div className="settings-content" ref={contentRef}>
         <div className="settings-content-inner">
+          {/* ── General ──────────────────────────────────────────────── */}
+          {visibleSections.some((s) => s.id === "general") && (
+            <section
+              id="settings-general"
+              ref={(el) => {
+                sectionRefs.current["general"] = el;
+              }}
+              className="settings-section"
+            >
+              <SectionHeader
+                icon={Gauge}
+                label="General"
+                color="purple"
+              />
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
+                      Performance Mode
+                    </label>
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--color-text-muted)", margin: 0 }}
+                    >
+                      Reduces animation quality and frame rate to lower GPU usage.
+                      Recommended for laptops and Optimus systems.
+                    </p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={performanceMode}
+                    onClick={() => setPerformanceMode(!performanceMode)}
+                    className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                    style={{
+                      background: performanceMode
+                        ? "var(--color-purple-600)"
+                        : "rgba(124, 79, 240, 0.2)",
+                      border: `1px solid ${performanceMode ? "var(--color-purple-500)" : "rgba(124, 79, 240, 0.3)"}`,
+                    }}
+                  >
+                    <span
+                      className="inline-block h-3 w-3 transform rounded-full bg-white transition-transform"
+                      style={{
+                        transform: performanceMode
+                          ? "translateX(20px)"
+                          : "translateX(4px)",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-xs font-medium"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Active GPU
+                  </label>
+                  <div
+                    className="flex items-center gap-2 rounded-md px-3 py-2"
+                    style={{
+                      background: "rgba(124, 79, 240, 0.06)",
+                      border: "1px solid rgba(124, 79, 240, 0.12)",
+                    }}
+                  >
+                    <Cpu size={12} style={{ color: "var(--color-purple-400)" }} />
+                    <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                      {(() => {
+                        try {
+                          const canvas = document.createElement("canvas");
+                          const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+                          if (gl && gl instanceof WebGLRenderingContext) {
+                            const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+                          if (debugInfo) {
+                            return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                          }
+                        }
+                      } catch {
+                        // WebGL not available
+                      }
+                      return "Unknown GPU";
+                      })()}
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--color-text-dim)", margin: 0 }}>
+                    Detected via WebGL. To change GPU: Windows Settings → Display → Graphics.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* ── App Updates ─────────────────────────────────────────── */}
           {visibleSections.some((s) => s.id === "updates") && (
             <section

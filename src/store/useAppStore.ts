@@ -80,6 +80,10 @@ interface AppState {
   isStreaming: boolean;
   setIsStreaming: (v: boolean) => void;
 
+  // Performance mode — reduces animation quality to lower GPU usage
+  performanceMode: boolean;
+  setPerformanceMode: (v: boolean) => void;
+
   // Wormhole launch transition
   wormholeTarget: {
     id: Exclude<AppView, "luna" | "settings">;
@@ -335,6 +339,9 @@ export const useAppStore = create<AppState>()(
         isStreaming: false,
         setIsStreaming: (v) => set({ isStreaming: v }),
 
+        performanceMode: false,
+        setPerformanceMode: (v) => set({ performanceMode: v }),
+
         wormholeTarget: null,
         startWormhole: (id, color) => set({ wormholeTarget: { id, color } }),
         clearWormhole: () => set({ wormholeTarget: null }),
@@ -351,6 +358,7 @@ export const useAppStore = create<AppState>()(
         memories: s.memories,
         hasDeepSeekKey: s.hasDeepSeekKey,
         hasTavilyKey: s.hasTavilyKey,
+        performanceMode: s.performanceMode,
       }),
       migrate: (persisted, version) => {
         if (version === 1) {

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import { useVisibilityPausedRAF } from "../hooks/useVisibilityPausedRAF";
 
 export type EntityMood = "idle" | "listening" | "thinking" | "speaking";
 
@@ -140,10 +141,9 @@ export function CosmicEntity({
   mood = "idle",
   className,
 }: CosmicEntityProps) {
-  // Layer 1: aurora blobs — CSS-blurred into a soft nebula cloud
-  // Layer 2: core        — sharp luminous sphere + subtle orbital ring
   const auroraRef = useRef<HTMLCanvasElement>(null);
   const coreRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const stateRef = useRef({
     time: 0,
@@ -152,47 +152,19 @@ export function CosmicEntity({
   const moodRef = useRef<EntityMood>(mood);
   moodRef.current = mood;
 
-  useEffect(() => {
-    const aCanvas = auroraRef.current;
-    const cCanvas = coreRef.current;
-    if (!aCanvas || !cCanvas) return;
+  const half = size / 2;
+  const pad = Math.round(size * 0.35);
+  const aSide = size + pad * 2;
+  const cSide = size + pad * 2;
 
-    const aC = aCanvas.getContext("2d", { alpha: true });
-    const cC = cCanvas.getContext("2d", { alpha: true });
-    if (!aC || !cC) return;
-
-    const half = size / 2;
-    // Both canvases are expanded by `pad` on each side so:
-    //   - the CSS blur on the aurora layer decays naturally, and
-    //   - the core corona gradient never clips at the canvas edge.
-
-    const pad = Math.round(size * 0.35); // generous: covers corona + blur
-    const aSide = size + pad * 2; // aurora canvas px
-    const cSide = size + pad * 2; // core canvas px
-
-    for (const [cv, ctx2, side] of [
-      [aCanvas, aC, aSide],
-      [cCanvas, cC, cSide],
-    ] as const) {
-      cv.width = side * DPR;
-      cv.height = side * DPR;
-      cv.style.width = `${side}px`;
-      cv.style.height = `${side}px`;
-      ctx2.setTransform(DPR, 0, 0, DPR, 0, 0);
-    }
-
-    let frameId: number;
-    let last = performance.now();
-
-    const draw = (now: number) => {
-      const dt = Math.min((now - last) / 1000, 0.05);
-      last = now;
+  const draw = useCallback(
+    (now: number, aC: CanvasRenderingContext2D, cC: CanvasRenderingContext2D) => {
+      const dt = Math.min((now - performance.now()) / 1000, 0.05);
 
       const s = stateRef.current;
       s.time += dt;
       const t = s.time;
 
-      // Graceful lerp toward target mood (~1 s to 80% convergence at 60 fps)
       const target = MOODS[moodRef.current];
       const lr = 1.5 * dt;
       const c = s.cur;
@@ -205,7 +177,6 @@ export function CosmicEntity({
       c.blobAlpha = lerp(c.blobAlpha, target.blobAlpha, lr);
       c.coreSize = lerp(c.coreSize, target.coreSize, lr);
 
-      /* ── Aurora layer ──────────────────────────────────────────────── */
       aC.clearRect(0, 0, aSide, aSide);
       aC.save();
       aC.translate(half + pad, half + pad);
@@ -235,16 +206,13 @@ export function CosmicEntity({
 
       aC.restore();
 
-      /* ── Core layer ────────────────────────────────────────────────── */
       cC.clearRect(0, 0, cSide, cSide);
       cC.save();
       cC.translate(half + pad, half + pad);
 
-      // Very slow breathing — period ≈ 16.5 s
       const breath = Math.sin(t * 0.38) * 0.5 + 0.5;
       const coreR = half * c.coreSize * (1 + breath * 0.05);
 
-      // Outer corona
       const corona = cC.createRadialGradient(
         0,
         0,
@@ -268,7 +236,6 @@ export function CosmicEntity({
       cC.arc(0, 0, coreR * 4.2, 0, TAU);
       cC.fill();
 
-      // Sphere with off-centre highlight for depth
       const hlX = coreR * -0.18;
       const hlY = coreR * -0.22;
       const sphere = cC.createRadialGradient(hlX, hlY, 0, 0, 0, coreR);
@@ -283,7 +250,6 @@ export function CosmicEntity({
       cC.arc(0, 0, coreR, 0, TAU);
       cC.fill();
 
-      // Slow orbital ring — one rotation per ≈115 s
       cC.save();
       cC.rotate(t * 0.055);
       cC.scale(1, 0.26);
@@ -295,19 +261,54 @@ export function CosmicEntity({
       cC.restore();
 
       cC.restore();
+    },
+    [aSide, cSide, half, pad],
+  );
 
-      frameId = requestAnimationFrame(draw);
-    };
+  const drawFrame = useCallback(
+    (now: number) => {
+      const aCanvas = auroraRef.current;
+      const cCanvas = coreRef.current;
+      if (!aCanvas || !cCanvas) return;
+      const aC = aCanvas.getContext("2d", { alpha: true });
+      const cC = cCanvas.getContext("2d", { alpha: true });
+      if (!aC || !cC) return;
+      draw(now, aC, cC);
+    },
+    [draw],
+  );
 
-    frameId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frameId);
-  }, [size]);
+  const { setElement } = useVisibilityPausedRAF(drawFrame, [drawFrame]);
+
+  useEffect(() => {
+    const aCanvas = auroraRef.current;
+    const cCanvas = coreRef.current;
+    if (!aCanvas || !cCanvas) return;
+
+    const aC = aCanvas.getContext("2d", { alpha: true });
+    const cC = cCanvas.getContext("2d", { alpha: true });
+    if (!aC || !cC) return;
+
+    for (const [cv, ctx2, side] of [
+      [aCanvas, aC, aSide],
+      [cCanvas, cC, cSide],
+    ] as const) {
+      cv.width = side * DPR;
+      cv.height = side * DPR;
+      cv.style.width = `${side}px`;
+      cv.style.height = `${side}px`;
+      ctx2.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+  }, [aSide, cSide]);
 
   const blurPx = Math.max(3, Math.round(size * 0.088));
-  const pad = Math.round(size * 0.35);
 
   return (
     <div
+      ref={(el) => {
+        (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+        setElement(el as unknown as HTMLCanvasElement);
+      }}
       className={className}
       style={{
         position: "relative",
@@ -316,9 +317,6 @@ export function CosmicEntity({
         overflow: "visible",
       }}
     >
-      {/* Both canvases are expanded by `pad` on each side and negatively offset
-          so the visual centre stays aligned. This gives the CSS blur and the
-          core corona room to fade to zero before hitting any canvas edge. */}
       <canvas
         ref={auroraRef}
         style={{

@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useAppStore } from "../store/useAppStore";
 
 interface AiGlobeProps {
   size?: number;
   className?: string;
 }
 
+const prefersReducedMotion = typeof window !== "undefined"
+  ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  : false;
+
 export function AiGlobe({ size = 320, className }: AiGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const performanceMode = useAppStore((s) => s.performanceMode);
+  const shouldReduceMotion = prefersReducedMotion || performanceMode;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -157,17 +164,16 @@ export function AiGlobe({ size = 320, className }: AiGlobeProps) {
               "0 0 18px rgba(150, 120, 255, 0.2), inset 0 0 12px rgba(150, 120, 255, 0.08)",
             zIndex: 2,
           }}
-          animate={{
-            rotate: [0, 360],
-            opacity: 0.8,
-          }}
-          transition={{
-            rotate: {
-              duration: 26,
-              repeat: Infinity,
-              ease: "linear",
-            },
-          }}
+          animate={
+            shouldReduceMotion
+              ? { opacity: 0.8 }
+              : { rotate: [0, 360], opacity: 0.8 }
+          }
+          transition={
+            shouldReduceMotion
+              ? { opacity: { duration: 2 } }
+              : { rotate: { duration: 26, repeat: Infinity, ease: "linear" } }
+          }
         />
 
         {/* Secondary Counter-rotating Orbit */}
@@ -184,13 +190,16 @@ export function AiGlobe({ size = 320, className }: AiGlobeProps) {
             boxShadow: "0 0 12px rgba(112, 164, 255, 0.14)",
             zIndex: 2,
           }}
-          animate={{
-            rotate: [360, 0],
-            opacity: 0.7,
-          }}
-          transition={{
-            rotate: { duration: 35, repeat: Infinity, ease: "linear" },
-          }}
+          animate={
+            shouldReduceMotion
+              ? { opacity: 0.7 }
+              : { rotate: [360, 0], opacity: 0.7 }
+          }
+          transition={
+            shouldReduceMotion
+              ? { opacity: { duration: 2 } }
+              : { rotate: { duration: 35, repeat: Infinity, ease: "linear" } }
+          }
         />
 
 

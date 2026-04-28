@@ -3863,3 +3863,24 @@ body {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* ── Reduced Motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .luna-mode-pulse,
+  .status-dot {
+    animation: none;
+  }
+
+  @keyframes luna-float {
+    0%, 100% { transform: translateY(0); }
+  }
+
+  .luna-orb {
+    animation: none;
+  }
+
+  .page-loader-ring {
+    animation: none;
+    border-top-color: var(--color-purple-400);
+  }
+}
