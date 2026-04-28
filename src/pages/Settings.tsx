@@ -905,7 +905,7 @@ export default function Settings() {
               <p className="settings-desc">
                 Luna uses{" "}
                 <span style={{ color: "var(--color-purple-300)" }}>
-                  DeepSeek-V3.2
+                  DeepSeek-V4 Flash
                 </span>{" "}
                 in non-thinking mode via the official <code>deepseek-chat</code>{" "}
                 alias, with thinking explicitly disabled in the request payload.

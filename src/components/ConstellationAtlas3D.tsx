@@ -9,7 +9,7 @@
  */
 
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Canvas, useFrame, useThree, type RootState } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Text, Billboard, OrbitControls, Line } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -1193,7 +1193,7 @@ export default function ConstellationAtlas3D({
         powerPreference: "high-performance",
       }}
       dpr={1}
-      frameloop="while-pending"
+      frameloop="demand"
     >
       <Scene
         activeView={activeView}
