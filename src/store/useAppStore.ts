@@ -84,6 +84,16 @@ interface AppState {
   performanceMode: boolean;
   setPerformanceMode: (v: boolean) => void;
 
+  // TTS (Luna Voice)
+  ttsEnabled: boolean;
+  setTtsEnabled: (v: boolean) => void;
+  ttsVoice: string;
+  setTtsVoice: (v: string) => void;
+  ttsSpeed: number;
+  setTtsSpeed: (v: number) => void;
+  ttsModelDownloaded: boolean;
+  setTtsModelDownloaded: (v: boolean) => void;
+
   // Wormhole launch transition
   wormholeTarget: {
     id: Exclude<AppView, "luna" | "settings">;
@@ -342,6 +352,15 @@ export const useAppStore = create<AppState>()(
         performanceMode: false,
         setPerformanceMode: (v) => set({ performanceMode: v }),
 
+        ttsEnabled: false,
+        setTtsEnabled: (v) => set({ ttsEnabled: v }),
+        ttsVoice: "af_heart",
+        setTtsVoice: (v) => set({ ttsVoice: v }),
+        ttsSpeed: 1.0,
+        setTtsSpeed: (v) => set({ ttsSpeed: v }),
+        ttsModelDownloaded: false,
+        setTtsModelDownloaded: (v) => set({ ttsModelDownloaded: v }),
+
         wormholeTarget: null,
         startWormhole: (id, color) => set({ wormholeTarget: { id, color } }),
         clearWormhole: () => set({ wormholeTarget: null }),
@@ -359,6 +378,10 @@ export const useAppStore = create<AppState>()(
         hasDeepSeekKey: s.hasDeepSeekKey,
         hasTavilyKey: s.hasTavilyKey,
         performanceMode: s.performanceMode,
+        ttsEnabled: s.ttsEnabled,
+        ttsVoice: s.ttsVoice,
+        ttsSpeed: s.ttsSpeed,
+        ttsModelDownloaded: s.ttsModelDownloaded,
       }),
       migrate: (persisted, version) => {
         if (version === 1) {

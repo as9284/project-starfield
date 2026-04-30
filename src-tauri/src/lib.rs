@@ -13,6 +13,7 @@ use commands::{
         pulsar_get_downloads_dir, pulsar_install_ytdlp, PulsarState,
     },
     search::web_search,
+    tts::{check_tts_model, download_tts_model, speak_tts, TtsState},
 };
 use tauri::Manager;
 use tauri_plugin_store::StoreExt;
@@ -103,6 +104,7 @@ pub fn run() {
             }
 
             app.manage(PulsarState::new());
+            app.manage(TtsState::new());
 
             Ok(())
         })
@@ -132,6 +134,9 @@ pub fn run() {
             pulsar_cancel_download,
             pulsar_install_ytdlp,
             pulsar_delete_file,
+            check_tts_model,
+            download_tts_model,
+            speak_tts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Starfield");

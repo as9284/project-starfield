@@ -22,6 +22,7 @@ import {
   Search,
   Languages,
   Settings,
+  Volume2,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
@@ -36,7 +37,12 @@ import {
   type AppView,
 } from "../store/useAppStore";
 import { usePulsarStore } from "../store/usePulsarStore";
-import { streamLuna, webSearch, pulsarGetDownloadsDir } from "../lib/tauri";
+import {
+  streamLuna,
+  webSearch,
+  pulsarGetDownloadsDir,
+  checkTtsModel,
+} from "../lib/tauri";
 import type { ChatMessagePayload } from "../lib/tauri";
 import { extractMemories } from "../lib/memory";
 import { modLabel } from "../lib/platform";
@@ -76,6 +82,13 @@ import {
   resolveSlashInput,
   type SlashCommand,
 } from "../lib/slash-commands";
+import { TTSManager } from "../lib/tts";
+import {
+  TTS_VOICES,
+  TTS_MIN_SPEED,
+  TTS_MAX_SPEED,
+  TTS_SPEED_STEP,
+} from "../lib/tts-voices";
 
 type ControlledView = Exclude<AppView, "luna" | "settings">;
 
@@ -118,6 +131,14 @@ export default function Luna() {
     startWormhole,
     toggleConstellations,
     showConstellations,
+    ttsEnabled,
+    setTtsEnabled,
+    ttsVoice,
+    setTtsVoice,
+    ttsSpeed,
+    setTtsSpeed,
+    ttsModelDownloaded,
+    setTtsModelDownloaded,
   } = useAppStore();
 
   const { outputDir, setOutputDir } = usePulsarStore();
@@ -138,6 +159,7 @@ export default function Luna() {
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const streamAborted = useRef(false);
+  const ttsManagerRef = useRef<TTSManager | null>(null);
 
   const [controlsOpen, setControlsOpen] = useState(false);
   const [lunaControls, setLunaControls] =
@@ -242,6 +264,8 @@ export default function Luna() {
         // Remove the empty/partial assistant message left by the aborted stream
         state.removeLastAssistantMessage();
       }
+      ttsManagerRef.current?.dispose();
+      ttsManagerRef.current = null;
     };
   }, []);
 
@@ -263,6 +287,17 @@ export default function Luna() {
         .catch(() => {});
     }
   }, [outputDir, setOutputDir]);
+
+  // Verify TTS model status on mount (in case files were deleted externally)
+  useEffect(() => {
+    checkTtsModel()
+      .then((found) => {
+        if (found !== ttsModelDownloaded) {
+          setTtsModelDownloaded(found);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -328,6 +363,41 @@ export default function Luna() {
       fallbackView: ControlledView | null,
     ) => {
       let accumulated = "";
+      const ttsActive = ttsEnabled && ttsModelDownloaded;
+
+      // Track stripped text length so we only feed NEW stripped content to TTS
+      let ttsStrippedLen = 0;
+
+      // Set up TTS manager if voice is active
+      let maxRevealedChars = 0;
+      if (ttsActive) {
+        const mgr = new TTSManager();
+        mgr.setVoice(ttsVoice);
+        mgr.setSpeed(ttsSpeed);
+        ttsManagerRef.current = mgr;
+
+        mgr.onReveal((totalRevealed) => {
+          const fullText = stripCommandBlocks(
+            accumulated,
+            constellationHandlers,
+          );
+          // Never go backwards — onAllDone may fire mid-stream and reveal
+          // the full text; subsequent onReveal calls must not truncate it.
+          maxRevealedChars = Math.max(maxRevealedChars, totalRevealed);
+          const clamped = Math.min(maxRevealedChars, fullText.length);
+          updateLastAssistantMessage(fullText.slice(0, clamped));
+        });
+
+        mgr.onAllDone(() => {
+          const fullText = stripCommandBlocks(
+            accumulated,
+            constellationHandlers,
+          );
+          maxRevealedChars = fullText.length;
+          updateLastAssistantMessage(fullText);
+        });
+      }
+
       try {
         let searchContext = "";
         if (webSearchEnabled && hasTavilyKey) {
@@ -357,19 +427,42 @@ export default function Luna() {
           (event) => {
             if (event.type === "chunk") {
               accumulated += event.text;
-              updateLastAssistantMessage(
-                stripCommandBlocks(accumulated, constellationHandlers),
+
+              const stripped = stripCommandBlocks(
+                accumulated,
+                constellationHandlers,
               );
+
+              if (ttsActive && ttsManagerRef.current) {
+                // TTS mode: text reveals sync with audio playback
+                const delta = stripped.slice(ttsStrippedLen);
+                if (delta) {
+                  ttsManagerRef.current.feedChunk(delta);
+                }
+                ttsStrippedLen = stripped.length;
+              } else {
+                // Normal mode: show text immediately
+                updateLastAssistantMessage(stripped);
+              }
             }
           },
           memoryStrings,
           lunaControls,
         );
 
-        // Store clean content as final message
-        updateLastAssistantMessage(
-          stripCommandBlocks(accumulated, constellationHandlers),
-        );
+        // Stream complete — flush remaining TTS buffer
+        if (ttsActive && ttsManagerRef.current) {
+          await ttsManagerRef.current.flush();
+          // onAllDone will reveal full text when all audio finishes.
+          // Do NOT call updateLastAssistantMessage here — doing so would
+          // dump the full text while TTS is still playing, and the ongoing
+          // onReveal callbacks would truncate it back down.
+        } else {
+          // Normal mode: ensure final clean text is stored
+          updateLastAssistantMessage(
+            stripCommandBlocks(accumulated, constellationHandlers),
+          );
+        }
 
         if (isFirstMessage && activeConversationId) {
           renameConversation(
@@ -382,6 +475,7 @@ export default function Luna() {
         for (const mem of extracted) addMemory(mem);
         streamAborted.current = true; // Stream completed successfully
       } catch (e) {
+        ttsManagerRef.current?.cancel();
         updateLastAssistantMessage(`Error: ${String(e)}`);
         streamAborted.current = true; // Stream errored, no cleanup needed
       } finally {
@@ -400,6 +494,10 @@ export default function Luna() {
       hasTavilyKey,
       memoryStrings,
       lunaControls,
+      ttsEnabled,
+      ttsModelDownloaded,
+      ttsVoice,
+      ttsSpeed,
       updateLastAssistantMessage,
       activeConversationId,
       renameConversation,
@@ -498,6 +596,10 @@ export default function Luna() {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isStreaming) return;
+
+    // Cancel any ongoing TTS
+    ttsManagerRef.current?.cancel();
+    ttsManagerRef.current = null;
 
     // ── Slash command fast path ──────────────────────────────────────────
     if (text.startsWith("/")) {
@@ -598,6 +700,11 @@ export default function Luna() {
 
   const handleRetry = async () => {
     if (isStreaming) return;
+
+    // Cancel any ongoing TTS
+    ttsManagerRef.current?.cancel();
+    ttsManagerRef.current = null;
+
     let lastUserIndex = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "user") {
@@ -1509,6 +1616,100 @@ export default function Luna() {
                               ))}
                             </div>
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="luna-modal-section">
+                        <h3 className="luna-modal-section-title">Voice</h3>
+                        <p className="luna-modal-section-desc">
+                          Enable Luna&apos;s voice. Requires the voice model to be
+                          downloaded in Settings.
+                        </p>
+                        <div className="luna-modal-grid">
+                          <div className="luna-control-item">
+                            <label className="luna-control-label">
+                              <Volume2 size={12} />
+                              Luna Voice
+                            </label>
+                            <Switch
+                              checked={ttsEnabled && ttsModelDownloaded}
+                              onChange={(checked) => {
+                                if (!ttsModelDownloaded && checked) return;
+                                setTtsEnabled(checked);
+                              }}
+                            />
+                          </div>
+
+                          {ttsEnabled && ttsModelDownloaded && (
+                            <>
+                              <div className="luna-control-item">
+                                <label className="luna-control-label">
+                                  Voice
+                                </label>
+                                <select
+                                  className="luna-select"
+                                  value={ttsVoice}
+                                  onChange={(e) => setTtsVoice(e.target.value)}
+                                >
+                                  {TTS_VOICES.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                      {v.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="luna-control-item">
+                                <label className="luna-control-label">
+                                  Speed
+                                </label>
+                                <div className="flex items-center gap-2 w-full">
+                                  <input
+                                    type="range"
+                                    min={TTS_MIN_SPEED}
+                                    max={TTS_MAX_SPEED}
+                                    step={TTS_SPEED_STEP}
+                                    value={ttsSpeed}
+                                    onChange={(e) =>
+                                      setTtsSpeed(parseFloat(e.target.value))
+                                    }
+                                    className="luna-slider"
+                                  />
+                                  <span
+                                    className="text-xs tabular-nums w-8 text-right"
+                                    style={{
+                                      color: "var(--color-text-secondary)",
+                                    }}
+                                  >
+                                    {ttsSpeed.toFixed(1)}x
+                                  </span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {ttsEnabled && !ttsModelDownloaded && (
+                            <p
+                              className="text-xs"
+                              style={{
+                                color: "var(--color-text-secondary)",
+                                gridColumn: "1 / -1",
+                              }}
+                            >
+                              Download the voice model in{" "}
+                              <button
+                                type="button"
+                                className="settings-link"
+                                onClick={() => {
+                                  setControlsOpen(false);
+                                  setView("settings");
+                                }}
+                              >
+                                Settings
+                              </button>{" "}
+                              to enable voice.
+                            </p>
+                          )}
                         </div>
                       </div>
 

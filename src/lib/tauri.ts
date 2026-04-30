@@ -182,3 +182,23 @@ export const pulsarDeleteFile = (filePath: string) =>
 
 export const aiText = (prompt: string, maxTokens: number) =>
   invoke<string>("ai_text", { prompt, maxTokens });
+
+// ── TTS (Luna Voice) ────────────────────────────────────────────────────────
+
+export type TtsDownloadEvent =
+  | { type: "progress"; percent: number; downloaded_mb: number; total_mb: number }
+  | { type: "done" }
+  | { type: "error"; message: string };
+
+export const checkTtsModel = () => invoke<boolean>("check_tts_model");
+
+export const downloadTtsModel = (
+  onEvent: (e: TtsDownloadEvent) => void,
+) => {
+  const channel = new Channel<TtsDownloadEvent>();
+  channel.onmessage = onEvent;
+  return invoke<void>("download_tts_model", { channel });
+};
+
+export const speakTts = (text: string, voice: string, speed: number) =>
+  invoke<string>("speak_tts", { text, voice, speed });

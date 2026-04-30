@@ -23,6 +23,7 @@ import {
   Zap,
   Settings as SettingsIcon,
   Gauge,
+  Volume2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
@@ -30,6 +31,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { useAppStore } from "../store/useAppStore";
 import type { Memory } from "../store/useAppStore";
+import { Switch } from "../components/Switch";
 import { CONSTELLATIONS } from "../lib/constellation-catalog";
 import { modKey } from "../lib/platform";
 import {
@@ -41,6 +43,8 @@ import {
   deleteWeatherKey,
   pulsarCheckYtdlp,
   pulsarInstallYtdlp,
+  checkTtsModel,
+  downloadTtsModel,
 } from "../lib/tauri";
 
 // ── Section IDs ─────────────────────────────────────────────────────────────
@@ -53,7 +57,8 @@ type SectionId =
   | "weather"
   | "pulsar"
   | "memory"
-  | "shortcuts";
+  | "shortcuts"
+  | "voice";
 
 const SECTIONS: {
   id: SectionId;
@@ -123,6 +128,12 @@ const SECTIONS: {
     label: "Shortcuts",
     icon: Keyboard,
     keywords: ["keyboard", "shortcut", "hotkey", "keybind", "ctrl", "cmd"],
+  },
+  {
+    id: "voice",
+    label: "Luna Voice",
+    icon: Volume2,
+    keywords: ["tts", "voice", "speech", "talk", "audio", "sound", "luna voice"],
   },
 ];
 
@@ -358,6 +369,10 @@ export default function Settings() {
     importMemories,
     performanceMode,
     setPerformanceMode,
+    ttsEnabled,
+    setTtsEnabled,
+    ttsModelDownloaded,
+    setTtsModelDownloaded,
   } = useAppStore();
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -396,6 +411,60 @@ export default function Settings() {
       setYtdlpStatus(ok ? "found" : "failed");
     } catch {
       setYtdlpStatus("failed");
+    }
+  };
+
+  // ── TTS model status ──────────────────────────────────────────────────────
+  const [ttsChecking, setTtsChecking] = useState(true);
+  const [ttsDownloading, setTtsDownloading] = useState(false);
+  const [ttsDownloadProgress, setTtsDownloadProgress] = useState(0);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (ttsModelDownloaded) {
+      setTtsChecking(false);
+      return;
+    }
+    checkTtsModel()
+      .then((found) => {
+        setTtsModelDownloaded(found);
+        setTtsChecking(false);
+      })
+      .catch(() => setTtsChecking(false));
+  }, [ttsModelDownloaded, setTtsModelDownloaded]);
+
+  const handleDownloadTtsModel = async () => {
+    setTtsDownloading(true);
+    setTtsError(null);
+    setTtsDownloadProgress(0);
+    try {
+      await downloadTtsModel((event) => {
+        if (event.type === "progress") {
+          setTtsDownloadProgress(Math.round(event.percent));
+        } else if (event.type === "done") {
+          setTtsModelDownloaded(true);
+          setTtsDownloading(false);
+        } else if (event.type === "error") {
+          setTtsError(event.message);
+          setTtsDownloading(false);
+        }
+      });
+    } catch (e) {
+      setTtsError(String(e));
+      setTtsDownloading(false);
+    }
+  };
+
+  const handleTtsToggle = async (checked: boolean) => {
+    setTtsEnabled(checked);
+    if (checked && !ttsModelDownloaded) {
+      // Check if model exists (maybe user downloaded externally)
+      try {
+        const found = await checkTtsModel();
+        setTtsModelDownloaded(found);
+      } catch {
+        // not found
+      }
     }
   };
 
@@ -1204,6 +1273,121 @@ export default function Settings() {
                 Luna automatically extracts personal facts and preferences from
                 your conversations. These memories help her provide more
                 personalized responses.
+              </p>
+            </section>
+          )}
+
+          {/* ── Luna Voice (TTS) ──────────────────────────────────────── */}
+          {visibleSections.some((s) => s.id === "voice") && (
+            <section
+              id="settings-voice"
+              ref={(el) => {
+                sectionRefs.current["voice"] = el;
+              }}
+              className="settings-section"
+            >
+              <SectionHeader
+                icon={Volume2}
+                label="Luna Voice"
+                color="purple"
+              />
+
+              <div className="flex items-center justify-between">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Enable Luna Voice
+                </label>
+                <Switch
+                  checked={ttsEnabled}
+                  onChange={(checked) => void handleTtsToggle(checked)}
+                />
+              </div>
+
+              {ttsEnabled && (
+                <div className="flex flex-col gap-2 mt-2">
+                  {ttsChecking ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2
+                        size={16}
+                        className="animate-spin"
+                        style={{ color: "var(--color-purple-400)" }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        Checking voice model…
+                      </span>
+                    </div>
+                  ) : ttsModelDownloaded ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2
+                        size={16}
+                        style={{ color: "#86efac", flexShrink: 0 }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        Voice model ready
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      {!ttsDownloading ? (
+                        <button
+                          className="settings-ytdlp-install-btn"
+                          onClick={() => void handleDownloadTtsModel()}
+                        >
+                          <Download size={14} />
+                          Download Voice Model (~86 MB)
+                        </button>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Loader2
+                              size={16}
+                              className="animate-spin"
+                              style={{ color: "var(--color-purple-400)" }}
+                            />
+                            <span
+                              className="text-xs"
+                              style={{ color: "var(--color-text-secondary)" }}
+                            >
+                              Downloading… {ttsDownloadProgress}%
+                            </span>
+                          </div>
+                          <div
+                            className="h-1.5 rounded-full overflow-hidden"
+                            style={{ background: "rgba(124, 79, 240, 0.15)" }}
+                          >
+                            <div
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${ttsDownloadProgress}%`,
+                                background: "var(--color-purple-400)",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {ttsError && (
+                    <p className="text-xs" style={{ color: "#fca5a5" }}>
+                      {ttsError}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p className="settings-desc">
+                When enabled, Luna speaks her responses aloud with word-by-word
+                text sync. The voice model runs entirely on your device — no
+                cloud TTS service is used.
               </p>
             </section>
           )}
