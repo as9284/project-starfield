@@ -55,7 +55,6 @@ pub struct TtsState {
     session: std::sync::Mutex<Option<Session>>,
     voices: RwLock<HashMap<String, Vec<f32>>>,
     vocab: OnceCell<HashMap<char, i64>>,
-    use_gpu: std::sync::Mutex<bool>,
 }
 
 impl TtsState {
@@ -64,7 +63,6 @@ impl TtsState {
             session: std::sync::Mutex::new(None),
             voices: RwLock::new(HashMap::new()),
             vocab: OnceCell::new(),
-            use_gpu: std::sync::Mutex::new(false),
         }
     }
 }
@@ -490,15 +488,27 @@ pub async fn speak_tts(
     }
     let style_slice = &voice_vec[style_start..style_end];
 
-    // 6. Prepare tensors — use Tensor::from_array for ort v2 compatibility
-    let input_ids_val = Tensor::from_array(([1usize, seq_len], token_ids.into_boxed_slice()))
+    // 6. Run inference
+    let wav = run_inference(session, &token_ids, seq_len, style_slice, speed)?;
+
+    Ok(Response::new(wav))
+}
+
+/// Synchronous ONNX inference helper. No async/await, so no Send issues with guards.
+fn run_inference(
+    session: &mut Session,
+    token_ids: &[i64],
+    seq_len: usize,
+    style_slice: &[f32],
+    speed: f32,
+) -> Result<Vec<u8>, String> {
+    let input_ids_val = Tensor::from_array(([1usize, seq_len], token_ids.to_vec().into_boxed_slice()))
         .map_err(|e| format!("Tensor input_ids: {e}"))?;
     let style_val = Tensor::from_array(([1usize, 256usize], style_slice.to_vec().into_boxed_slice()))
         .map_err(|e| format!("Tensor style: {e}"))?;
     let speed_val = Tensor::from_array(([1usize], vec![speed].into_boxed_slice()))
         .map_err(|e| format!("Tensor speed: {e}"))?;
 
-    // 7. Run inference
     let outputs = session
         .run(ort::inputs![
             "input_ids" => input_ids_val,
@@ -507,102 +517,10 @@ pub async fn speak_tts(
         ])
         .map_err(|e| format!("ONNX inference: {e}"))?;
 
-    // 8. Extract audio samples
     let audio_output = outputs[0].try_extract_tensor::<f32>()
         .map_err(|e| format!("Extract tensor: {e}"))?;
     let audio_samples: Vec<f32> = audio_output.1.iter().copied().collect();
-
-    // 9. Encode as WAV and return raw bytes
-    let wav_bytes = encode_wav(&audio_samples)?;
-    Ok(Response::new(wav_bytes))
-}
-
-// ── GPU detection ────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GpuInfo {
-    pub has_dedicated: bool,
-    pub vendor: String,
-    pub description: String,
-}
-
-#[command]
-pub fn detect_gpu() -> GpuInfo {
-    detect_gpu_impl()
-}
-
-#[cfg(target_os = "windows")]
-fn detect_gpu_impl() -> GpuInfo {
-    use winreg::enums::*;
-    let hklm = winreg::RegKey::predef(HKEY_LOCAL_MACHINE);
-    let path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
-
-    let mut result = GpuInfo {
-        has_dedicated: false,
-        vendor: "unknown".to_string(),
-        description: "Unknown".to_string(),
-    };
-
-    if let Ok(adapters) = hklm.open_subkey_with_flags(path, KEY_READ) {
-        for name in adapters.enum_keys().filter_map(|k| k.ok()) {
-            if let Ok(subkey) = adapters.open_subkey_with_flags(&name, KEY_READ) {
-                let desc: String = subkey.get_value("DriverDesc").unwrap_or_default();
-                let provider: String = subkey.get_value("ProviderName").unwrap_or_default();
-                let chip: String = subkey.get_value("ChipType").unwrap_or_default();
-
-                let lower = format!("{} {} {}", desc, provider, chip).to_lowercase();
-
-                if lower.contains("microsoft basic")
-                    || lower.contains("software")
-                    || lower.contains("mirror")
-                {
-                    continue;
-                }
-
-                if lower.contains("nvidia") {
-                    result.has_dedicated = true;
-                    result.vendor = "nvidia".to_string();
-                    result.description = desc;
-                    break;
-                } else if lower.contains("amd") || lower.contains("radeon") {
-                    result.has_dedicated = true;
-                    result.vendor = "amd".to_string();
-                    result.description = desc;
-                    break;
-                } else if lower.contains("intel") && lower.contains("arc") {
-                    result.has_dedicated = true;
-                    result.vendor = "intel".to_string();
-                    result.description = desc;
-                    break;
-                }
-            }
-        }
-    }
-
-    result
-}
-
-#[cfg(not(target_os = "windows"))]
-fn detect_gpu_impl() -> GpuInfo {
-    GpuInfo {
-        has_dedicated: false,
-        vendor: "unknown".to_string(),
-        description: "Unknown".to_string(),
-    }
-}
-
-#[command]
-pub fn set_tts_gpu(enabled: bool, state: tauri::State<'_, TtsState>) -> Result<(), String> {
-    let mut guard = state.use_gpu.lock().map_err(|e| format!("Lock gpu: {e}"))?;
-    if *guard != enabled {
-        *guard = enabled;
-        drop(guard);
-        // Invalidate cached session so new GPU preference takes effect
-        let mut session = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
-        *session = None;
-        println!("[TTS] GPU preference changed to {}, session invalidated", enabled);
-    }
-    Ok(())
+    encode_wav(&audio_samples)
 }
 
 // ── Phoneme conversion ───────────────────────────────────────────────────────
@@ -822,8 +740,6 @@ fn get_or_load_voice<'a>(
 // ── ONNX session ─────────────────────────────────────────────────────────────
 
 async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'_, Option<Session>>, String> {
-    let use_gpu = *state.use_gpu.lock().map_err(|e| format!("Lock gpu: {e}"))?;
-
     // Quick check — if already loaded, return immediately without blocking I/O
     {
         let guard = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
@@ -841,35 +757,11 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
     }
 
     // Load the model in spawn_blocking to avoid blocking the Tokio worker thread
-    println!("[TTS] Loading ONNX model from disk (GPU={})...", use_gpu);
     let session = tokio::task::spawn_blocking(move || -> Result<Session, String> {
-        if use_gpu {
-            // Try DirectML (GPU) first; if unavailable, fall back to CPU
-            let builder = Session::builder()
-                .map_err(|e| format!("Session builder: {e}"))?;
-            match builder.with_execution_providers([ort::ep::DirectML::default().build()]) {
-                Ok(mut b) => {
-                    b.commit_from_file(&mp)
-                        .map_err(|e| format!("Load model (DML): {e}"))
-                        .map(|s| {
-                            println!("[TTS] ONNX model loaded on DirectML (GPU)");
-                            s
-                        })
-                }
-                Err(e) => {
-                    println!("[TTS] DirectML unavailable ({}), falling back to CPU", e);
-                    Session::builder()
-                        .map_err(|e| format!("Session builder: {e}"))?
-                        .commit_from_file(&mp)
-                        .map_err(|e| format!("Load model (CPU fallback): {e}"))
-                }
-            }
-        } else {
-            Session::builder()
-                .map_err(|e| format!("Session builder: {e}"))?
-                .commit_from_file(&mp)
-                .map_err(|e| format!("Load model (CPU): {e}"))
-        }
+        Session::builder()
+            .map_err(|e| format!("Session builder: {e}"))?
+            .commit_from_file(&mp)
+            .map_err(|e| format!("Load model: {e}"))
     })
     .await
     .map_err(|e| format!("spawn_blocking join: {e}"))??;

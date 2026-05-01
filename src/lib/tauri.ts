@@ -203,13 +203,4 @@ export const downloadTtsModel = (
 export const speakTts = (text: string, voice: string, speed: number) =>
   invoke<ArrayBuffer>("speak_tts", { text, voice, speed });
 
-export interface GpuInfo {
-  has_dedicated: boolean;
-  vendor: string;
-  description: string;
-}
 
-export const detectGpu = () => invoke<GpuInfo>("detect_gpu");
-
-export const setTtsGpu = (enabled: boolean) =>
-  invoke<void>("set_tts_gpu", { enabled });

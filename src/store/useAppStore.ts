@@ -93,9 +93,6 @@ interface AppState {
   setTtsSpeed: (v: number) => void;
   ttsModelDownloaded: boolean;
   setTtsModelDownloaded: (v: boolean) => void;
-  ttsGpu: boolean;
-  setTtsGpu: (v: boolean) => void;
-
   // Wormhole launch transition
   wormholeTarget: {
     id: Exclude<AppView, "luna" | "settings">;
@@ -362,9 +359,6 @@ export const useAppStore = create<AppState>()(
         setTtsSpeed: (v) => set({ ttsSpeed: v }),
         ttsModelDownloaded: false,
         setTtsModelDownloaded: (v) => set({ ttsModelDownloaded: v }),
-        ttsGpu: false,
-        setTtsGpu: (v) => set({ ttsGpu: v }),
-
         wormholeTarget: null,
         startWormhole: (id, color) => set({ wormholeTarget: { id, color } }),
         clearWormhole: () => set({ wormholeTarget: null }),
@@ -386,7 +380,6 @@ export const useAppStore = create<AppState>()(
         ttsVoice: s.ttsVoice,
         ttsSpeed: s.ttsSpeed,
         ttsModelDownloaded: s.ttsModelDownloaded,
-        ttsGpu: s.ttsGpu,
       }),
       migrate: (persisted, version) => {
         if (version === 1) {
