@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use futures_util::StreamExt;
 use hound::{SampleFormat, WavSpec, WavWriter};
 use once_cell::sync::OnceCell;
@@ -9,7 +8,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::RwLock;
-use tauri::{command, ipc::Channel};
+use tauri::{command, ipc::Channel, ipc::Response};
 
 // ── espeak-ng auto-install URLs (thewh1teagle/espeakng-loader) ─────────────
 
@@ -56,6 +55,7 @@ pub struct TtsState {
     session: std::sync::Mutex<Option<Session>>,
     voices: RwLock<HashMap<String, Vec<f32>>>,
     vocab: OnceCell<HashMap<char, i64>>,
+    use_gpu: std::sync::Mutex<bool>,
 }
 
 impl TtsState {
@@ -64,6 +64,7 @@ impl TtsState {
             session: std::sync::Mutex::new(None),
             voices: RwLock::new(HashMap::new()),
             vocab: OnceCell::new(),
+            use_gpu: std::sync::Mutex::new(false),
         }
     }
 }
@@ -434,7 +435,7 @@ pub async fn speak_tts(
     voice: String,
     speed: f32,
     state: tauri::State<'_, TtsState>,
-) -> Result<String, String> {
+) -> Result<Response, String> {
     // Clamp speed to model-acceptable range
     let speed = speed.clamp(0.5, 2.0);
 
@@ -471,8 +472,8 @@ pub async fn speak_tts(
     token_ids.push(0);
     let seq_len = token_ids.len();
 
-    // 4. Load ONNX session (cached after first call)
-    let mut session_guard = get_or_load_session(&state)?;
+    // 4. Load ONNX session (cached after first call, uses spawn_blocking)
+    let mut session_guard = get_or_load_session(&state).await?;
     let session = session_guard.as_mut().ok_or("Session not loaded")?;
 
     // 5. Load voice and select style vector
@@ -511,20 +512,107 @@ pub async fn speak_tts(
         .map_err(|e| format!("Extract tensor: {e}"))?;
     let audio_samples: Vec<f32> = audio_output.1.iter().copied().collect();
 
-    // 9. Encode as WAV
+    // 9. Encode as WAV and return raw bytes
     let wav_bytes = encode_wav(&audio_samples)?;
+    Ok(Response::new(wav_bytes))
+}
 
-    // 10. Base64
-    Ok(B64.encode(&wav_bytes))
+// ── GPU detection ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GpuInfo {
+    pub has_dedicated: bool,
+    pub vendor: String,
+    pub description: String,
+}
+
+#[command]
+pub fn detect_gpu() -> GpuInfo {
+    detect_gpu_impl()
+}
+
+#[cfg(target_os = "windows")]
+fn detect_gpu_impl() -> GpuInfo {
+    use winreg::enums::*;
+    let hklm = winreg::RegKey::predef(HKEY_LOCAL_MACHINE);
+    let path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
+
+    let mut result = GpuInfo {
+        has_dedicated: false,
+        vendor: "unknown".to_string(),
+        description: "Unknown".to_string(),
+    };
+
+    if let Ok(adapters) = hklm.open_subkey_with_flags(path, KEY_READ) {
+        for name in adapters.enum_keys().filter_map(|k| k.ok()) {
+            if let Ok(subkey) = adapters.open_subkey_with_flags(&name, KEY_READ) {
+                let desc: String = subkey.get_value("DriverDesc").unwrap_or_default();
+                let provider: String = subkey.get_value("ProviderName").unwrap_or_default();
+                let chip: String = subkey.get_value("ChipType").unwrap_or_default();
+
+                let lower = format!("{} {} {}", desc, provider, chip).to_lowercase();
+
+                if lower.contains("microsoft basic")
+                    || lower.contains("software")
+                    || lower.contains("mirror")
+                {
+                    continue;
+                }
+
+                if lower.contains("nvidia") {
+                    result.has_dedicated = true;
+                    result.vendor = "nvidia".to_string();
+                    result.description = desc;
+                    break;
+                } else if lower.contains("amd") || lower.contains("radeon") {
+                    result.has_dedicated = true;
+                    result.vendor = "amd".to_string();
+                    result.description = desc;
+                    break;
+                } else if lower.contains("intel") && lower.contains("arc") {
+                    result.has_dedicated = true;
+                    result.vendor = "intel".to_string();
+                    result.description = desc;
+                    break;
+                }
+            }
+        }
+    }
+
+    result
+}
+
+#[cfg(not(target_os = "windows"))]
+fn detect_gpu_impl() -> GpuInfo {
+    GpuInfo {
+        has_dedicated: false,
+        vendor: "unknown".to_string(),
+        description: "Unknown".to_string(),
+    }
+}
+
+#[command]
+pub fn set_tts_gpu(enabled: bool, state: tauri::State<'_, TtsState>) -> Result<(), String> {
+    let mut guard = state.use_gpu.lock().map_err(|e| format!("Lock gpu: {e}"))?;
+    if *guard != enabled {
+        *guard = enabled;
+        drop(guard);
+        // Invalidate cached session so new GPU preference takes effect
+        let mut session = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
+        *session = None;
+        println!("[TTS] GPU preference changed to {}, session invalidated", enabled);
+    }
+    Ok(())
 }
 
 // ── Phoneme conversion ───────────────────────────────────────────────────────
 
-async fn text_to_phonemes(text: &str) -> Result<String, String> {
-    let espeak = espeak_path().ok_or("Cannot determine espeak-ng path")?;
+fn is_pause_punct(ch: char) -> bool {
+    matches!(ch, ',' | '.' | '!' | '?' | ';' | ':' | '\u{2014}' | '\u{2026}')
+}
 
-    let mut cmd = tokio::process::Command::new(&espeak);
-    // Use --ipa without --no-wrap (Windows build doesn't support --no-wrap)
+async fn run_espeak_raw(espeak: &std::path::PathBuf, text: &str) -> Result<String, String> {
+    let mut cmd = tokio::process::Command::new(espeak);
     cmd.args(["-q", "--ipa", "-v", "en-us", text]);
 
     #[cfg(target_os = "windows")]
@@ -543,8 +631,87 @@ async fn text_to_phonemes(text: &str) -> Result<String, String> {
     }
 
     let ipa = String::from_utf8_lossy(&output.stdout);
-    let cleaned = ipa.trim().replace('\r', "").replace('\n', "");
-    Ok(cleaned)
+    // Replace newlines with spaces so multi-line espeak-ng output doesn't
+    // concatenate words. Trim and normalise.
+    Ok(ipa.trim().replace('\r', "").replace('\n', " "))
+}
+
+async fn text_to_phonemes(text: &str) -> Result<String, String> {
+    let espeak = espeak_path().ok_or("Cannot determine espeak-ng path")?;
+
+    // Scan the original text to record where each punctuation mark occurs
+    // (how many words precede it). This lets us re-insert punctuation tokens
+    // at the correct word boundaries in the IPA output.
+    let mut punctuations: Vec<(usize, char)> = Vec::new();
+    let mut word_count = 0;
+    let mut in_word = false;
+
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            in_word = false;
+        } else if is_pause_punct(ch) {
+            punctuations.push((word_count, ch));
+            in_word = false;
+        } else {
+            if !in_word {
+                word_count += 1;
+                in_word = true;
+            }
+        }
+    }
+
+    // Strip pause punctuation and normalise whitespace so espeak-ng receives
+    // a clean single-line string.
+    let text_no_punct: String = text.chars().filter(|&c| !is_pause_punct(c)).collect();
+    let text_no_punct = text_no_punct.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if text_no_punct.is_empty() {
+        // Edge case: text is only punctuation — return tokens as-is.
+        return Ok(punctuations.into_iter().map(|(_, c)| c).collect());
+    }
+
+    let ipa = run_espeak_raw(&espeak, &text_no_punct).await?;
+    let ipa_words: Vec<&str> = ipa.split_whitespace().collect();
+
+    // If espeak-ng expanded/contracted words (e.g. "100" → "one hundred"),
+    // word counts won't match. Fall back to raw IPA — pauses will be missing
+    // but audio will still be intelligible.
+    if ipa_words.len() != word_count {
+        return Ok(ipa);
+    }
+
+    // Reconstruct IPA with punctuation inserted as separate tokens surrounded
+    // by spaces. The Kokoro vocab treats comma/period/etc. as distinct pause
+    // tokens; they must be clearly separated from phoneme characters so the
+    // model's learned token-to-audio alignment places the pause correctly.
+    let mut result = String::new();
+    let mut punct_idx = 0;
+
+    // Leading punctuation (before the first word)
+    while punct_idx < punctuations.len() && punctuations[punct_idx].0 == 0 {
+        result.push(punctuations[punct_idx].1);
+        punct_idx += 1;
+    }
+    if !result.is_empty() && word_count > 0 {
+        result.push(' ');
+    }
+
+    for (i, word) in ipa_words.iter().enumerate() {
+        if !result.is_empty() && !result.ends_with(' ') {
+            result.push(' ');
+        }
+        result.push_str(word);
+
+        // Append every punctuation mark that follows this word, each
+        // preceded by a space so it forms a distinct token.
+        while punct_idx < punctuations.len() && punctuations[punct_idx].0 == i + 1 {
+            result.push(' ');
+            result.push(punctuations[punct_idx].1);
+            punct_idx += 1;
+        }
+    }
+
+    Ok(result)
 }
 
 // ── Vocabulary ───────────────────────────────────────────────────────────────
@@ -654,14 +821,15 @@ fn get_or_load_voice<'a>(
 
 // ── ONNX session ─────────────────────────────────────────────────────────────
 
-fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'_, Option<Session>>, String> {
-    let mut guard = state
-        .session
-        .lock()
-        .map_err(|e| format!("Lock session: {e}"))?;
+async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'_, Option<Session>>, String> {
+    let use_gpu = *state.use_gpu.lock().map_err(|e| format!("Lock gpu: {e}"))?;
 
-    if guard.is_some() {
-        return Ok(guard);
+    // Quick check — if already loaded, return immediately without blocking I/O
+    {
+        let guard = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
+        if guard.is_some() {
+            return Ok(guard);
+        }
     }
 
     let mp = model_path().ok_or("Model path error")?;
@@ -672,14 +840,45 @@ fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'_, Opt
         ));
     }
 
-    println!("[TTS] Loading ONNX model from disk (one-time)...");
-    let session = Session::builder()
-        .map_err(|e| format!("Session builder: {e}"))?
-        .commit_from_file(&mp)
-        .map_err(|e| format!("Load model: {e}"))?;
-    println!("[TTS] ONNX model loaded and cached");
+    // Load the model in spawn_blocking to avoid blocking the Tokio worker thread
+    println!("[TTS] Loading ONNX model from disk (GPU={})...", use_gpu);
+    let session = tokio::task::spawn_blocking(move || -> Result<Session, String> {
+        if use_gpu {
+            // Try DirectML (GPU) first; if unavailable, fall back to CPU
+            let builder = Session::builder()
+                .map_err(|e| format!("Session builder: {e}"))?;
+            match builder.with_execution_providers([ort::ep::DirectML::default().build()]) {
+                Ok(mut b) => {
+                    b.commit_from_file(&mp)
+                        .map_err(|e| format!("Load model (DML): {e}"))
+                        .map(|s| {
+                            println!("[TTS] ONNX model loaded on DirectML (GPU)");
+                            s
+                        })
+                }
+                Err(e) => {
+                    println!("[TTS] DirectML unavailable ({}), falling back to CPU", e);
+                    Session::builder()
+                        .map_err(|e| format!("Session builder: {e}"))?
+                        .commit_from_file(&mp)
+                        .map_err(|e| format!("Load model (CPU fallback): {e}"))
+                }
+            }
+        } else {
+            Session::builder()
+                .map_err(|e| format!("Session builder: {e}"))?
+                .commit_from_file(&mp)
+                .map_err(|e| format!("Load model (CPU): {e}"))
+        }
+    })
+    .await
+    .map_err(|e| format!("spawn_blocking join: {e}"))??;
 
-    *guard = Some(session);
+    // Double-check — another task might have loaded it while we were doing I/O
+    let mut guard = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
+    if guard.is_none() {
+        *guard = Some(session);
+    }
     Ok(guard)
 }
 

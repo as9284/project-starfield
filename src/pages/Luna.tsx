@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import {
   Trash2,
   Globe,
@@ -12,8 +13,8 @@ import {
   Sparkles,
   RotateCcw,
   Pencil,
-  Check,
   Copy,
+  Check,
   CheckCheck,
   HelpCircle,
   ShoppingCart,
@@ -23,6 +24,7 @@ import {
   Languages,
   Settings,
   Volume2,
+  ChevronDown,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import ReactMarkdown from "react-markdown";
@@ -31,6 +33,7 @@ import type { Components } from "react-markdown";
 import { CosmicEntity, type EntityMood } from "../components/CosmicEntity";
 import { StarParticles } from "../components/StarParticles";
 import { Switch } from "../components/Switch";
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import {
   useAppStore,
   MAX_CONVERSATION_TITLE_LENGTH,
@@ -106,6 +109,83 @@ function relativeTime(ts: number): string {
   return `${Math.floor(days / 7)}w`;
 }
 
+// ── Voice Dropdown ────────────────────────────────────────────────────────────
+
+function VoiceDropdown({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const clickHandler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", clickHandler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", clickHandler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [open]);
+
+  const selected = TTS_VOICES.find((v) => v.id === value);
+
+  return (
+    <div ref={ref} className="luna-voice-dropdown">
+      <button
+        type="button"
+        className="luna-voice-dropdown-btn"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="luna-voice-dropdown-btn-label">
+          {selected?.name ?? "Select voice"}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`luna-voice-dropdown-chevron ${open ? "luna-voice-dropdown-chevron-open" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="luna-voice-dropdown-menu">
+          {TTS_VOICES.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className={`luna-voice-dropdown-item ${v.id === value ? "luna-voice-dropdown-item-active" : ""}`}
+              onClick={() => {
+                onChange(v.id);
+                setOpen(false);
+              }}
+            >
+              <div className="luna-voice-dropdown-item-info">
+                <span className="luna-voice-dropdown-item-name">
+                  {v.name}
+                </span>
+                <span className="luna-voice-dropdown-item-style">
+                  {v.style}
+                </span>
+              </div>
+              {v.id === value && (
+                <Check size={12} style={{ color: "var(--color-purple-400)" }} />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function Luna() {
@@ -148,7 +228,7 @@ export default function Luna() {
 
   const [input, setInput] = useState("");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [confirmDeleteConvId, setConfirmDeleteConvId] = useState<string | null>(
+  const [deletingConv, setDeletingConv] = useState<{ id: string; title: string } | null>(
     null,
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -160,6 +240,8 @@ export default function Luna() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const streamAborted = useRef(false);
   const ttsManagerRef = useRef<TTSManager | null>(null);
+  const speechBufferingRef = useRef(false);
+  const speechPlayingRef = useRef(false);
 
   const [controlsOpen, setControlsOpen] = useState(false);
   const [lunaControls, setLunaControls] =
@@ -264,8 +346,10 @@ export default function Luna() {
         // Remove the empty/partial assistant message left by the aborted stream
         state.removeLastAssistantMessage();
       }
-      ttsManagerRef.current?.dispose();
-      ttsManagerRef.current = null;
+    speechBufferingRef.current = false;
+    speechPlayingRef.current = false;
+    ttsManagerRef.current?.dispose();
+    ttsManagerRef.current = null;
     };
   }, []);
 
@@ -365,36 +449,45 @@ export default function Luna() {
       let accumulated = "";
       const ttsActive = ttsEnabled && ttsModelDownloaded;
 
-      // Track stripped text length so we only feed NEW stripped content to TTS
-      let ttsStrippedLen = 0;
-
-      // Set up TTS manager if voice is active
-      let maxRevealedChars = 0;
       if (ttsActive) {
         const mgr = new TTSManager();
         mgr.setVoice(ttsVoice);
         mgr.setSpeed(ttsSpeed);
         ttsManagerRef.current = mgr;
+        speechBufferingRef.current = true;
 
         mgr.onReveal((totalRevealed) => {
+          speechBufferingRef.current = false;
+          speechPlayingRef.current = true;
           const fullText = stripCommandBlocks(
             accumulated,
             constellationHandlers,
           );
-          // Never go backwards — onAllDone may fire mid-stream and reveal
-          // the full text; subsequent onReveal calls must not truncate it.
-          maxRevealedChars = Math.max(maxRevealedChars, totalRevealed);
-          const clamped = Math.min(maxRevealedChars, fullText.length);
+          const clamped = Math.min(totalRevealed, fullText.length);
           updateLastAssistantMessage(fullText.slice(0, clamped));
         });
 
         mgr.onAllDone(() => {
+          speechBufferingRef.current = false;
+          speechPlayingRef.current = false;
           const fullText = stripCommandBlocks(
             accumulated,
             constellationHandlers,
           );
-          maxRevealedChars = fullText.length;
           updateLastAssistantMessage(fullText);
+        });
+
+        mgr.onError((err) => {
+          speechBufferingRef.current = false;
+          speechPlayingRef.current = false;
+          console.error("[TTS] error:", err);
+          const fullText = stripCommandBlocks(
+            accumulated,
+            constellationHandlers,
+          );
+          if (fullText) {
+            updateLastAssistantMessage(fullText);
+          }
         });
       }
 
@@ -434,14 +527,8 @@ export default function Luna() {
               );
 
               if (ttsActive && ttsManagerRef.current) {
-                // TTS mode: text reveals sync with audio playback
-                const delta = stripped.slice(ttsStrippedLen);
-                if (delta) {
-                  ttsManagerRef.current.feedChunk(delta);
-                }
-                ttsStrippedLen = stripped.length;
+                ttsManagerRef.current.feedChunk(stripped);
               } else {
-                // Normal mode: show text immediately
                 updateLastAssistantMessage(stripped);
               }
             }
@@ -450,15 +537,9 @@ export default function Luna() {
           lunaControls,
         );
 
-        // Stream complete — flush remaining TTS buffer
         if (ttsActive && ttsManagerRef.current) {
-          await ttsManagerRef.current.flush();
-          // onAllDone will reveal full text when all audio finishes.
-          // Do NOT call updateLastAssistantMessage here — doing so would
-          // dump the full text while TTS is still playing, and the ongoing
-          // onReveal callbacks would truncate it back down.
+          await ttsManagerRef.current.finalize();
         } else {
-          // Normal mode: ensure final clean text is stored
           updateLastAssistantMessage(
             stripCommandBlocks(accumulated, constellationHandlers),
           );
@@ -473,11 +554,13 @@ export default function Luna() {
 
         const extracted = extractMemories(text, accumulated);
         for (const mem of extracted) addMemory(mem);
-        streamAborted.current = true; // Stream completed successfully
+        streamAborted.current = true;
       } catch (e) {
+        speechBufferingRef.current = false;
+        speechPlayingRef.current = false;
         ttsManagerRef.current?.cancel();
         updateLastAssistantMessage(`Error: ${String(e)}`);
-        streamAborted.current = true; // Stream errored, no cleanup needed
+        streamAborted.current = true;
       } finally {
         setIsStreaming(false);
         const shouldExecute =
@@ -598,6 +681,8 @@ export default function Luna() {
     if (!text || isStreaming) return;
 
     // Cancel any ongoing TTS
+    speechBufferingRef.current = false;
+    speechPlayingRef.current = false;
     ttsManagerRef.current?.cancel();
     ttsManagerRef.current = null;
 
@@ -702,6 +787,8 @@ export default function Luna() {
     if (isStreaming) return;
 
     // Cancel any ongoing TTS
+    speechBufferingRef.current = false;
+    speechPlayingRef.current = false;
     ttsManagerRef.current?.cancel();
     ttsManagerRef.current = null;
 
@@ -885,6 +972,10 @@ export default function Luna() {
       lastMsg?.role === "assistant" && lastMsg.content.length > 0
         ? "speaking"
         : "thinking";
+  } else if (speechPlayingRef.current) {
+    entityMood = "speaking";
+  } else if (speechBufferingRef.current) {
+    entityMood = "thinking";
   } else if (input.trim().length > 0) {
     entityMood = "listening";
   }
@@ -1004,7 +1095,6 @@ export default function Luna() {
                       duration: 0.2,
                       delay: Math.min(i * 0.03, 0.15),
                     }}
-                    whileHover={{ x: 2 }}
                   >
                     <MessageSquare
                       size={13}
@@ -1014,53 +1104,16 @@ export default function Luna() {
                     <span className="luna-sidebar-item-time">
                       {relativeTime(c.updatedAt)}
                     </span>
-                    {confirmDeleteConvId === c.id ? (
-                      <span
-                        className="luna-sidebar-item-delete flex items-center gap-0.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span
-                          className="text-[10px] mr-0.5"
-                          style={{ color: "var(--color-text-muted)" }}
-                        >
-                          Delete?
-                        </span>
-                        <button
-                          className="inline-flex items-center p-0.5 rounded"
-                          style={{ color: "rgba(248, 113, 113, 0.9)" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteConversation(c.id);
-                            setConfirmDeleteConvId(null);
-                          }}
-                          title="Confirm delete"
-                        >
-                          <Check size={11} />
-                        </button>
-                        <button
-                          className="inline-flex items-center p-0.5 rounded"
-                          style={{ color: "var(--color-text-muted)" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmDeleteConvId(null);
-                          }}
-                          title="Cancel"
-                        >
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ) : (
                       <button
                         className="luna-sidebar-item-delete"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setConfirmDeleteConvId(c.id);
+                          setDeletingConv({ id: c.id, title: c.title });
                         }}
                         title="Delete conversation"
                       >
                         <X size={12} />
                       </button>
-                    )}
                   </motion.button>
                 ))}
               </AnimatePresence>
@@ -1151,7 +1204,7 @@ export default function Luna() {
                     !msg.content &&
                     !hasClarificationCard &&
                     i === messages.length - 1 &&
-                    isStreaming;
+                    (isStreaming || speechBufferingRef.current);
                   const isStreamingWithContent =
                     msg.role === "assistant" &&
                     !!msg.content &&
@@ -1640,53 +1693,41 @@ export default function Luna() {
                             />
                           </div>
 
-                          {ttsEnabled && ttsModelDownloaded && (
-                            <>
-                              <div className="luna-control-item">
-                                <label className="luna-control-label">
-                                  Voice
-                                </label>
-                                <select
-                                  className="luna-select"
-                                  value={ttsVoice}
-                                  onChange={(e) => setTtsVoice(e.target.value)}
-                                >
-                                  {TTS_VOICES.map((v) => (
-                                    <option key={v.id} value={v.id}>
-                                      {v.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                           {ttsEnabled && ttsModelDownloaded && (
+                             <>
+                               <div className="luna-control-item">
+                                 <label className="luna-control-label">
+                                   Voice
+                                 </label>
+                                 <VoiceDropdown
+                                   value={ttsVoice}
+                                   onChange={setTtsVoice}
+                                 />
+                               </div>
 
-                              <div className="luna-control-item">
-                                <label className="luna-control-label">
-                                  Speed
-                                </label>
-                                <div className="flex items-center gap-2 w-full">
-                                  <input
-                                    type="range"
-                                    min={TTS_MIN_SPEED}
-                                    max={TTS_MAX_SPEED}
-                                    step={TTS_SPEED_STEP}
-                                    value={ttsSpeed}
-                                    onChange={(e) =>
-                                      setTtsSpeed(parseFloat(e.target.value))
-                                    }
-                                    className="luna-slider"
-                                  />
-                                  <span
-                                    className="text-xs tabular-nums w-8 text-right"
-                                    style={{
-                                      color: "var(--color-text-secondary)",
-                                    }}
-                                  >
-                                    {ttsSpeed.toFixed(1)}x
-                                  </span>
-                                </div>
-                              </div>
-                            </>
-                          )}
+                               <div className="luna-control-item">
+                                 <label className="luna-control-label">
+                                   Speed
+                                 </label>
+                                 <div className="luna-speed-row">
+                                   <input
+                                     type="range"
+                                     min={TTS_MIN_SPEED}
+                                     max={TTS_MAX_SPEED}
+                                     step={TTS_SPEED_STEP}
+                                     value={ttsSpeed}
+                                     onChange={(e) =>
+                                       setTtsSpeed(parseFloat(e.target.value))
+                                     }
+                                     className="luna-slider"
+                                   />
+                                   <span className="luna-speed-value">
+                                     {ttsSpeed.toFixed(1)}x
+                                   </span>
+                                 </div>
+                               </div>
+                             </>
+                           )}
 
                           {ttsEnabled && !ttsModelDownloaded && (
                             <p
@@ -1896,6 +1937,23 @@ export default function Luna() {
           </div>
         </div>
       </div>
+
+      {/* Delete conversation confirmation modal */}
+      {deletingConv &&
+        createPortal(
+          <AnimatePresence>
+            <ConfirmDeleteModal
+              title="Delete conversation"
+              itemTitle={deletingConv.title}
+              onConfirm={() => {
+                deleteConversation(deletingConv.id);
+                setDeletingConv(null);
+              }}
+              onCancel={() => setDeletingConv(null)}
+            />
+          </AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }

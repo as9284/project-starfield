@@ -16,7 +16,7 @@ import Luna from "./pages/Luna";
 import { WormholeTransition } from "./components/WormholeTransition";
 import { useAppStore } from "./store/useAppStore";
 import type { AppView } from "./store/useAppStore";
-import { getDeepSeekKey, getTavilyKey, getWeatherKey, win } from "./lib/tauri";
+import { getDeepSeekKey, getTavilyKey, getWeatherKey, setTtsGpu as setTtsGpuBackend, win } from "./lib/tauri";
 import { buildShortcutMap } from "./lib/constellation-catalog";
 
 const SHORTCUT_MAP = buildShortcutMap();
@@ -120,6 +120,7 @@ export default function App() {
     wormholeTarget,
     clearWormhole,
     closeConstellations,
+    ttsGpu,
   } = useAppStore();
 
   const isStreamingRef = useRef(isStreaming);
@@ -244,6 +245,16 @@ export default function App() {
       }
     });
   }, [setHasDeepSeekKey, setHasTavilyKey, setHasWeatherKey]);
+
+  // Sync persisted TTS GPU preference to backend on startup.
+  // Zustand rehydrates async, so we watch ttsGpu and sync once it becomes true.
+  const ttsGpuSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!ttsGpuSyncedRef.current && ttsGpu) {
+      ttsGpuSyncedRef.current = true;
+      setTtsGpuBackend(true).catch(() => {});
+    }
+  }, [ttsGpu]);
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────
   // Use refs for state values so the listener is never re-attached

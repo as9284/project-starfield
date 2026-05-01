@@ -9,14 +9,6 @@ interface CosmicEntityProps {
   className?: string;
 }
 
-// ─── IMPLEMENTATION NOTE ──────────────────────────────────────────────────────
-// Two-layer canvas design for smoothness:
-//   1. Aurora canvas  — 5 large colour blobs in Lissajous orbits, CSS-blurred
-//                       into a soft, fluid nebula cloud.
-//   2. Core canvas    — Sharp, luminous sphere + slow orbital ring on top.
-// No high-frequency particles or wobble noise — all motion < 0.5 Hz.
-// ─────────────────────────────────────────────────────────────────────────────
-
 const TAU = Math.PI * 2;
 const DPR =
   typeof window !== "undefined" ? Math.min(window.devicePixelRatio, 2) : 1;
@@ -25,116 +17,73 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-/* ─── Mood parameters ────────────────────────────────────────────────── */
+// ── Mood parameters ───────────────────────────────────────────────────────────
 
 interface MoodState {
-  hue: number; // dominant hue (degrees)
-  spread: number; // blob orbit radius (fraction of half)
-  glow: number; // corona glow intensity 0–1
-  saturation: number; // colour saturation 0–100
-  colorRange: number; // hue spread across blobs (degrees)
-  speed: number; // animation speed multiplier
-  blobAlpha: number; // blob opacity
-  coreSize: number; // core sphere radius (fraction of half)
+  hue: number;
+  spread: number;
+  glow: number;
+  saturation: number;
+  colorRange: number;
+  speed: number;
+  blobAlpha: number;
+  coreSize: number;
 }
 
 const MOODS: Record<EntityMood, MoodState> = {
   idle: {
-    hue: 262,
-    spread: 0.22,
-    glow: 0.55,
-    saturation: 70,
-    colorRange: 42,
-    speed: 0.26,
-    blobAlpha: 0.85,
-    coreSize: 0.3,
+    hue: 268,
+    spread: 0.18,
+    glow: 0.42,
+    saturation: 64,
+    colorRange: 38,
+    speed: 0.20,
+    blobAlpha: 0.82,
+    coreSize: 0.30,
   },
   listening: {
-    hue: 256,
-    spread: 0.28,
-    glow: 0.68,
-    saturation: 78,
-    colorRange: 50,
-    speed: 0.42,
-    blobAlpha: 0.92,
+    hue: 260,
+    spread: 0.22,
+    glow: 0.52,
+    saturation: 70,
+    colorRange: 44,
+    speed: 0.28,
+    blobAlpha: 0.88,
     coreSize: 0.33,
   },
   thinking: {
-    hue: 244,
-    spread: 0.34,
-    glow: 0.85,
-    saturation: 85,
-    colorRange: 64,
-    speed: 0.78,
-    blobAlpha: 0.97,
+    hue: 248,
+    spread: 0.26,
+    glow: 0.65,
+    saturation: 80,
+    colorRange: 56,
+    speed: 0.48,
+    blobAlpha: 0.94,
     coreSize: 0.28,
   },
   speaking: {
-    hue: 270,
-    spread: 0.3,
-    glow: 0.92,
-    saturation: 84,
-    colorRange: 58,
-    speed: 0.56,
+    hue: 272,
+    spread: 0.24,
+    glow: 0.58,
+    saturation: 72,
+    colorRange: 48,
+    speed: 0.36,
     blobAlpha: 1.0,
-    coreSize: 0.35,
+    coreSize: 0.34,
   },
 };
 
-/* ─── Blob definitions ───────────────────────────────────────────────── */
-/**
- * Each blob drifts in a Lissajous orbit (independent X/Y frequencies)
- * for a non-repeating, fluid path. Fixed constants — no randomness per frame.
- */
+// ── Aurora blobs ──────────────────────────────────────────────────────────────
+
 const BLOBS = [
-  {
-    hueShift: 0,
-    freqX: 0.31,
-    freqY: 0.19,
-    phaseX: 0.0,
-    phaseY: 0.0,
-    orb: 1.0,
-    sz: 0.5,
-  },
-  {
-    hueShift: 28,
-    freqX: 0.19,
-    freqY: 0.27,
-    phaseX: 2.09,
-    phaseY: 1.57,
-    orb: 0.82,
-    sz: 0.44,
-  },
-  {
-    hueShift: -22,
-    freqX: 0.23,
-    freqY: 0.15,
-    phaseX: 4.19,
-    phaseY: 3.14,
-    orb: 0.9,
-    sz: 0.48,
-  },
-  {
-    hueShift: 42,
-    freqX: 0.15,
-    freqY: 0.23,
-    phaseX: 1.05,
-    phaseY: 5.24,
-    orb: 1.1,
-    sz: 0.38,
-  },
-  {
-    hueShift: -38,
-    freqX: 0.27,
-    freqY: 0.12,
-    phaseX: 3.67,
-    phaseY: 2.62,
-    orb: 0.72,
-    sz: 0.42,
-  },
+  { hueShift: 0,   freqX: 0.31, freqY: 0.19, phaseX: 0.0,  phaseY: 0.0,  orb: 1.0,  sz: 0.50 },
+  { hueShift: 28,  freqX: 0.19, freqY: 0.27, phaseX: 2.09, phaseY: 1.57, orb: 0.82, sz: 0.44 },
+  { hueShift: -22, freqX: 0.23, freqY: 0.15, phaseX: 4.19, phaseY: 3.14, orb: 0.90, sz: 0.48 },
+  { hueShift: 42,  freqX: 0.15, freqY: 0.23, phaseX: 1.05, phaseY: 5.24, orb: 1.1,  sz: 0.38 },
+  { hueShift: -38, freqX: 0.27, freqY: 0.12, phaseX: 3.67, phaseY: 2.62, orb: 0.72, sz: 0.42 },
 ] as const;
 
-/* ─── Component ──────────────────────────────────────────────────────── */
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function CosmicEntity({
   size = 240,
@@ -166,7 +115,7 @@ export function CosmicEntity({
       const t = s.time;
 
       const target = MOODS[moodRef.current];
-      const lr = 1.5 * dt;
+      const lr = 1.8 * dt;
       const c = s.cur;
       c.hue = lerp(c.hue, target.hue, lr);
       c.spread = lerp(c.spread, target.spread, lr);
@@ -177,6 +126,7 @@ export function CosmicEntity({
       c.blobAlpha = lerp(c.blobAlpha, target.blobAlpha, lr);
       c.coreSize = lerp(c.coreSize, target.coreSize, lr);
 
+      // ── Aurora layer (CSS-blurred blobs) ───────────────────────────────
       aC.clearRect(0, 0, aSide, aSide);
       aC.save();
       aC.translate(half + pad, half + pad);
@@ -191,11 +141,11 @@ export function CosmicEntity({
         const grad = aC.createRadialGradient(bx, by, 0, bx, by, bSz);
         grad.addColorStop(
           0,
-          `hsla(${bHue},      ${c.saturation + 12}%, 62%, ${c.blobAlpha * 0.58})`,
+          `hsla(${bHue}, ${c.saturation + 12}%, 62%, ${c.blobAlpha * 0.52})`,
         );
         grad.addColorStop(
           0.4,
-          `hsla(${bHue + 12}, ${c.saturation}%,      48%, ${c.blobAlpha * 0.2})`,
+          `hsla(${bHue + 12}, ${c.saturation}%, 44%, ${c.blobAlpha * 0.16})`,
         );
         grad.addColorStop(1, "transparent");
         aC.fillStyle = grad;
@@ -206,56 +156,47 @@ export function CosmicEntity({
 
       aC.restore();
 
+      // ── Core layer (sphere + ring) ─────────────────────────────────────
       cC.clearRect(0, 0, cSide, cSide);
       cC.save();
       cC.translate(half + pad, half + pad);
 
-      const breath = Math.sin(t * 0.38) * 0.5 + 0.5;
-      const coreR = half * c.coreSize * (1 + breath * 0.05);
+      const breath = Math.sin(t * 0.32) * 0.5 + 0.5;
+      const coreR = half * c.coreSize * (1 + breath * 0.04);
 
-      const corona = cC.createRadialGradient(
-        0,
-        0,
-        coreR * 0.5,
-        0,
-        0,
-        coreR * 4.2,
-      );
-      corona.addColorStop(0, `hsla(${c.hue},      82%, 76%, ${c.glow * 0.6})`);
-      corona.addColorStop(
-        0.25,
-        `hsla(${c.hue + 15}, 70%, 62%, ${c.glow * 0.22})`,
-      );
-      corona.addColorStop(
-        0.6,
-        `hsla(${c.hue + 25}, 58%, 52%, ${c.glow * 0.07})`,
-      );
+      // Corona glow
+      const corona = cC.createRadialGradient(0, 0, coreR * 0.5, 0, 0, coreR * 4.0);
+      corona.addColorStop(0, `hsla(${c.hue}, 80%, 72%, ${c.glow * 0.55})`);
+      corona.addColorStop(0.25, `hsla(${c.hue + 15}, 66%, 58%, ${c.glow * 0.18})`);
+      corona.addColorStop(0.6, `hsla(${c.hue + 25}, 52%, 46%, ${c.glow * 0.05})`);
       corona.addColorStop(1, "transparent");
       cC.fillStyle = corona;
       cC.beginPath();
-      cC.arc(0, 0, coreR * 4.2, 0, TAU);
+      cC.arc(0, 0, coreR * 4.0, 0, TAU);
       cC.fill();
 
+      // Planet sphere
       const hlX = coreR * -0.18;
       const hlY = coreR * -0.22;
       const sphere = cC.createRadialGradient(hlX, hlY, 0, 0, 0, coreR);
       sphere.addColorStop(0, "hsla(0, 0%, 100%, 0.97)");
       sphere.addColorStop(0.12, `hsla(${c.hue + 35}, 45%, 93%, 0.88)`);
       sphere.addColorStop(0.35, `hsla(${c.hue + 20}, 68%, 76%, 0.70)`);
-      sphere.addColorStop(0.65, `hsla(${c.hue + 5},  78%, 54%, 0.50)`);
-      sphere.addColorStop(0.88, `hsla(${c.hue - 8},  82%, 38%, 0.24)`);
+      sphere.addColorStop(0.65, `hsla(${c.hue + 5}, 78%, 54%, 0.50)`);
+      sphere.addColorStop(0.88, `hsla(${c.hue - 8}, 82%, 38%, 0.24)`);
       sphere.addColorStop(1, `hsla(${c.hue - 15}, 85%, 25%, 0)`);
       cC.fillStyle = sphere;
       cC.beginPath();
       cC.arc(0, 0, coreR, 0, TAU);
       cC.fill();
 
+      // Orbital ring
       cC.save();
-      cC.rotate(t * 0.055);
-      cC.scale(1, 0.26);
+      cC.rotate(t * 0.048);
+      cC.scale(1, 0.24);
       cC.beginPath();
-      cC.arc(0, 0, half * 0.64, 0, TAU);
-      cC.strokeStyle = `hsla(${c.hue + 28}, 72%, 76%, ${c.glow * 0.18})`;
+      cC.arc(0, 0, half * 0.66, 0, TAU);
+      cC.strokeStyle = `hsla(${c.hue + 28}, 66%, 72%, ${c.glow * 0.15})`;
       cC.lineWidth = 1;
       cC.stroke();
       cC.restore();
@@ -289,14 +230,14 @@ export function CosmicEntity({
     const cC = cCanvas.getContext("2d", { alpha: true });
     if (!aC || !cC) return;
 
-    for (const [cv, ctx2, side] of [
+    for (const [cv, ctx2, s] of [
       [aCanvas, aC, aSide],
       [cCanvas, cC, cSide],
     ] as const) {
-      cv.width = side * DPR;
-      cv.height = side * DPR;
-      cv.style.width = `${side}px`;
-      cv.style.height = `${side}px`;
+      cv.width = s * DPR;
+      cv.height = s * DPR;
+      cv.style.width = `${s}px`;
+      cv.style.height = `${s}px`;
       ctx2.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
   }, [aSide, cSide]);

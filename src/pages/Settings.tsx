@@ -45,7 +45,10 @@ import {
   pulsarInstallYtdlp,
   checkTtsModel,
   downloadTtsModel,
+  detectGpu,
+  setTtsGpu as setTtsGpuBackend,
 } from "../lib/tauri";
+import type { GpuInfo } from "../lib/tauri";
 
 // ── Section IDs ─────────────────────────────────────────────────────────────
 
@@ -124,16 +127,16 @@ const SECTIONS: {
     keywords: ["memory", "memories", "export", "import", "clear", "personal"],
   },
   {
-    id: "shortcuts",
-    label: "Shortcuts",
-    icon: Keyboard,
-    keywords: ["keyboard", "shortcut", "hotkey", "keybind", "ctrl", "cmd"],
-  },
-  {
     id: "voice",
     label: "Luna Voice",
     icon: Volume2,
     keywords: ["tts", "voice", "speech", "talk", "audio", "sound", "luna voice"],
+  },
+  {
+    id: "shortcuts",
+    label: "Shortcuts",
+    icon: Keyboard,
+    keywords: ["keyboard", "shortcut", "hotkey", "keybind", "ctrl", "cmd"],
   },
 ];
 
@@ -373,6 +376,8 @@ export default function Settings() {
     setTtsEnabled,
     ttsModelDownloaded,
     setTtsModelDownloaded,
+    ttsGpu,
+    setTtsGpu,
   } = useAppStore();
 
   const [confirmClear, setConfirmClear] = useState(false);
@@ -419,6 +424,7 @@ export default function Settings() {
   const [ttsDownloading, setTtsDownloading] = useState(false);
   const [ttsDownloadProgress, setTtsDownloadProgress] = useState(0);
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [gpuInfo, setGpuInfo] = useState<GpuInfo | null>(null);
 
   useEffect(() => {
     if (ttsModelDownloaded) {
@@ -432,6 +438,12 @@ export default function Settings() {
       })
       .catch(() => setTtsChecking(false));
   }, [ttsModelDownloaded, setTtsModelDownloaded]);
+
+  useEffect(() => {
+    detectGpu()
+      .then((info) => setGpuInfo(info))
+      .catch(() => {});
+  }, []);
 
   const handleDownloadTtsModel = async () => {
     setTtsDownloading(true);
@@ -1381,6 +1393,36 @@ export default function Settings() {
                       {ttsError}
                     </p>
                   )}
+                </div>
+              )}
+
+              {gpuInfo?.has_dedicated && ttsModelDownloaded && (
+                <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(124, 79, 240, 0.15)" }}>
+                  <div>
+                    <label
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
+                      GPU Acceleration
+                    </label>
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      {gpuInfo.description}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={ttsGpu}
+                    onChange={async (checked) => {
+                      setTtsGpu(checked);
+                      try {
+                        await setTtsGpuBackend(checked);
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  />
                 </div>
               )}
 
