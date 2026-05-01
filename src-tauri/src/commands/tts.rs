@@ -578,9 +578,13 @@ async fn text_to_phonemes(text: &str) -> Result<String, String> {
         }
     }
 
-    // Strip pause punctuation and normalise whitespace so espeak-ng receives
-    // a clean single-line string.
-    let text_no_punct: String = text.chars().filter(|&c| !is_pause_punct(c)).collect();
+    // Replace pause punctuation with spaces so espeak-ng receives a clean
+    // single-line string while preserving word boundaries (e.g. "hello—world"
+    // stays two words instead of becoming "helloworld").
+    let text_no_punct: String = text
+        .chars()
+        .map(|c| if is_pause_punct(c) { ' ' } else { c })
+        .collect();
     let text_no_punct = text_no_punct.split_whitespace().collect::<Vec<_>>().join(" ");
 
     if text_no_punct.is_empty() {

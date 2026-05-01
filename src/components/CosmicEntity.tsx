@@ -13,236 +13,106 @@ const TAU = Math.PI * 2;
 const DPR =
   typeof window !== "undefined" ? Math.min(window.devicePixelRatio, 2) : 1;
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-// ── Mood parameters ───────────────────────────────────────────────────────────
-
-interface MoodState {
-  hue: number;
-  spread: number;
-  glow: number;
-  saturation: number;
-  colorRange: number;
-  speed: number;
-  blobAlpha: number;
-  coreSize: number;
-}
-
-const MOODS: Record<EntityMood, MoodState> = {
-  idle: {
-    hue: 268,
-    spread: 0.18,
-    glow: 0.42,
-    saturation: 64,
-    colorRange: 38,
-    speed: 0.20,
-    blobAlpha: 0.82,
-    coreSize: 0.30,
-  },
-  listening: {
-    hue: 260,
-    spread: 0.22,
-    glow: 0.52,
-    saturation: 70,
-    colorRange: 44,
-    speed: 0.28,
-    blobAlpha: 0.88,
-    coreSize: 0.33,
-  },
-  thinking: {
-    hue: 248,
-    spread: 0.26,
-    glow: 0.65,
-    saturation: 80,
-    colorRange: 56,
-    speed: 0.48,
-    blobAlpha: 0.94,
-    coreSize: 0.28,
-  },
-  speaking: {
-    hue: 272,
-    spread: 0.24,
-    glow: 0.58,
-    saturation: 72,
-    colorRange: 48,
-    speed: 0.36,
-    blobAlpha: 1.0,
-    coreSize: 0.34,
-  },
-};
-
-// ── Aurora blobs ──────────────────────────────────────────────────────────────
-
-const BLOBS = [
-  { hueShift: 0,   freqX: 0.31, freqY: 0.19, phaseX: 0.0,  phaseY: 0.0,  orb: 1.0,  sz: 0.50 },
-  { hueShift: 28,  freqX: 0.19, freqY: 0.27, phaseX: 2.09, phaseY: 1.57, orb: 0.82, sz: 0.44 },
-  { hueShift: -22, freqX: 0.23, freqY: 0.15, phaseX: 4.19, phaseY: 3.14, orb: 0.90, sz: 0.48 },
-  { hueShift: 42,  freqX: 0.15, freqY: 0.23, phaseX: 1.05, phaseY: 5.24, orb: 1.1,  sz: 0.38 },
-  { hueShift: -38, freqX: 0.27, freqY: 0.12, phaseX: 3.67, phaseY: 2.62, orb: 0.72, sz: 0.42 },
-] as const;
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CosmicEntity({
   size = 240,
-  mood = "idle",
   className,
 }: CosmicEntityProps) {
-  const auroraRef = useRef<HTMLCanvasElement>(null);
-  const coreRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const stateRef = useRef({
-    time: 0,
-    cur: { ...MOODS[mood] } as MoodState,
-  });
-  const moodRef = useRef<EntityMood>(mood);
-  moodRef.current = mood;
+  const timeRef = useRef(0);
 
   const half = size / 2;
   const pad = Math.round(size * 0.35);
-  const aSide = size + pad * 2;
-  const cSide = size + pad * 2;
+  const side = size + pad * 2;
+  const coreR = half * 0.32;
+  const ringR = half * 0.66;
 
   const draw = useCallback(
-    (now: number, aC: CanvasRenderingContext2D, cC: CanvasRenderingContext2D) => {
+    (now: number, ctx: CanvasRenderingContext2D) => {
       const dt = Math.min((now - performance.now()) / 1000, 0.05);
+      timeRef.current += dt;
+      const t = timeRef.current;
 
-      const s = stateRef.current;
-      s.time += dt;
-      const t = s.time;
+      const hue = 268;
+      const glow = 0.42;
+      const ringAlpha = 0.15;
 
-      const target = MOODS[moodRef.current];
-      const lr = 1.8 * dt;
-      const c = s.cur;
-      c.hue = lerp(c.hue, target.hue, lr);
-      c.spread = lerp(c.spread, target.spread, lr);
-      c.glow = lerp(c.glow, target.glow, lr);
-      c.saturation = lerp(c.saturation, target.saturation, lr);
-      c.colorRange = lerp(c.colorRange, target.colorRange, lr);
-      c.speed = lerp(c.speed, target.speed, lr);
-      c.blobAlpha = lerp(c.blobAlpha, target.blobAlpha, lr);
-      c.coreSize = lerp(c.coreSize, target.coreSize, lr);
+      ctx.clearRect(0, 0, side, side);
+      ctx.save();
+      ctx.translate(half + pad, half + pad);
 
-      // ── Aurora layer (CSS-blurred blobs) ───────────────────────────────
-      aC.clearRect(0, 0, aSide, aSide);
-      aC.save();
-      aC.translate(half + pad, half + pad);
-
-      for (const b of BLOBS) {
-        const ts = t * c.speed;
-        const bx = Math.cos(b.freqX * ts + b.phaseX) * c.spread * b.orb * half;
-        const by = Math.sin(b.freqY * ts + b.phaseY) * c.spread * b.orb * half;
-        const bSz = b.sz * half;
-        const bHue = c.hue + (b.hueShift / 42) * c.colorRange;
-
-        const grad = aC.createRadialGradient(bx, by, 0, bx, by, bSz);
-        grad.addColorStop(
-          0,
-          `hsla(${bHue}, ${c.saturation + 12}%, 62%, ${c.blobAlpha * 0.52})`,
-        );
-        grad.addColorStop(
-          0.4,
-          `hsla(${bHue + 12}, ${c.saturation}%, 44%, ${c.blobAlpha * 0.16})`,
-        );
-        grad.addColorStop(1, "transparent");
-        aC.fillStyle = grad;
-        aC.beginPath();
-        aC.arc(bx, by, bSz, 0, TAU);
-        aC.fill();
-      }
-
-      aC.restore();
-
-      // ── Core layer (sphere + ring) ─────────────────────────────────────
-      cC.clearRect(0, 0, cSide, cSide);
-      cC.save();
-      cC.translate(half + pad, half + pad);
-
-      const breath = Math.sin(t * 0.32) * 0.5 + 0.5;
-      const coreR = half * c.coreSize * (1 + breath * 0.04);
-
-      // Corona glow
-      const corona = cC.createRadialGradient(0, 0, coreR * 0.5, 0, 0, coreR * 4.0);
-      corona.addColorStop(0, `hsla(${c.hue}, 80%, 72%, ${c.glow * 0.55})`);
-      corona.addColorStop(0.25, `hsla(${c.hue + 15}, 66%, 58%, ${c.glow * 0.18})`);
-      corona.addColorStop(0.6, `hsla(${c.hue + 25}, 52%, 46%, ${c.glow * 0.05})`);
+      // ── Corona glow ────────────────────────────────────────────────────
+      const corona = ctx.createRadialGradient(
+        0, 0, coreR * 0.5,
+        0, 0, coreR * 4.0
+      );
+      corona.addColorStop(0, `hsla(${hue}, 80%, 72%, ${glow * 0.55})`);
+      corona.addColorStop(0.25, `hsla(${hue + 15}, 66%, 58%, ${glow * 0.18})`);
+      corona.addColorStop(0.6, `hsla(${hue + 25}, 52%, 46%, ${glow * 0.05})`);
       corona.addColorStop(1, "transparent");
-      cC.fillStyle = corona;
-      cC.beginPath();
-      cC.arc(0, 0, coreR * 4.0, 0, TAU);
-      cC.fill();
+      ctx.fillStyle = corona;
+      ctx.beginPath();
+      ctx.arc(0, 0, coreR * 4.0, 0, TAU);
+      ctx.fill();
 
-      // Planet sphere
+      // ── Planet sphere ──────────────────────────────────────────────────
       const hlX = coreR * -0.18;
       const hlY = coreR * -0.22;
-      const sphere = cC.createRadialGradient(hlX, hlY, 0, 0, 0, coreR);
+      const sphere = ctx.createRadialGradient(hlX, hlY, 0, 0, 0, coreR);
       sphere.addColorStop(0, "hsla(0, 0%, 100%, 0.97)");
-      sphere.addColorStop(0.12, `hsla(${c.hue + 35}, 45%, 93%, 0.88)`);
-      sphere.addColorStop(0.35, `hsla(${c.hue + 20}, 68%, 76%, 0.70)`);
-      sphere.addColorStop(0.65, `hsla(${c.hue + 5}, 78%, 54%, 0.50)`);
-      sphere.addColorStop(0.88, `hsla(${c.hue - 8}, 82%, 38%, 0.24)`);
-      sphere.addColorStop(1, `hsla(${c.hue - 15}, 85%, 25%, 0)`);
-      cC.fillStyle = sphere;
-      cC.beginPath();
-      cC.arc(0, 0, coreR, 0, TAU);
-      cC.fill();
+      sphere.addColorStop(0.12, `hsla(${hue + 35}, 45%, 93%, 0.88)`);
+      sphere.addColorStop(0.35, `hsla(${hue + 20}, 68%, 76%, 0.70)`);
+      sphere.addColorStop(0.65, `hsla(${hue + 5}, 78%, 54%, 0.50)`);
+      sphere.addColorStop(0.88, `hsla(${hue - 8}, 82%, 38%, 0.24)`);
+      sphere.addColorStop(1, `hsla(${hue - 15}, 85%, 25%, 0)`);
+      ctx.fillStyle = sphere;
+      ctx.beginPath();
+      ctx.arc(0, 0, coreR, 0, TAU);
+      ctx.fill();
 
-      // Orbital ring
-      cC.save();
-      cC.rotate(t * 0.048);
-      cC.scale(1, 0.24);
-      cC.beginPath();
-      cC.arc(0, 0, half * 0.66, 0, TAU);
-      cC.strokeStyle = `hsla(${c.hue + 28}, 66%, 72%, ${c.glow * 0.15})`;
-      cC.lineWidth = 1;
-      cC.stroke();
-      cC.restore();
+      // ── Orbital ring ───────────────────────────────────────────────────
+      ctx.save();
+      ctx.rotate(t * 0.048);
+      ctx.scale(1, 0.24);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, TAU);
+      ctx.strokeStyle = `hsla(${hue + 28}, 66%, 72%, ${ringAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
 
-      cC.restore();
+      ctx.restore();
     },
-    [aSide, cSide, half, pad],
+    [side, half, pad, coreR, ringR]
   );
 
   const drawFrame = useCallback(
     (now: number) => {
-      const aCanvas = auroraRef.current;
-      const cCanvas = coreRef.current;
-      if (!aCanvas || !cCanvas) return;
-      const aC = aCanvas.getContext("2d", { alpha: true });
-      const cC = cCanvas.getContext("2d", { alpha: true });
-      if (!aC || !cC) return;
-      draw(now, aC, cC);
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return;
+      draw(now, ctx);
     },
-    [draw],
+    [draw]
   );
 
   const { setElement } = useVisibilityPausedRAF(drawFrame, [drawFrame]);
 
   useEffect(() => {
-    const aCanvas = auroraRef.current;
-    const cCanvas = coreRef.current;
-    if (!aCanvas || !cCanvas) return;
-
-    const aC = aCanvas.getContext("2d", { alpha: true });
-    const cC = cCanvas.getContext("2d", { alpha: true });
-    if (!aC || !cC) return;
-
-    for (const [cv, ctx2, s] of [
-      [aCanvas, aC, aSide],
-      [cCanvas, cC, cSide],
-    ] as const) {
-      cv.width = s * DPR;
-      cv.height = s * DPR;
-      cv.style.width = `${s}px`;
-      cv.style.height = `${s}px`;
-      ctx2.setTransform(DPR, 0, 0, DPR, 0, 0);
-    }
-  }, [aSide, cSide]);
-
-  const blurPx = Math.max(3, Math.round(size * 0.088));
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+    canvas.width = side * DPR;
+    canvas.height = side * DPR;
+    canvas.style.width = `${side}px`;
+    canvas.style.height = `${side}px`;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }, [side]);
 
   return (
     <div
@@ -259,19 +129,7 @@ export function CosmicEntity({
       }}
     >
       <canvas
-        ref={auroraRef}
-        style={{
-          position: "absolute",
-          left: -pad,
-          top: -pad,
-          filter: `blur(${blurPx}px)`,
-          width: size + pad * 2,
-          height: size + pad * 2,
-          pointerEvents: "none",
-        }}
-      />
-      <canvas
-        ref={coreRef}
+        ref={canvasRef}
         style={{
           position: "absolute",
           left: -pad,
