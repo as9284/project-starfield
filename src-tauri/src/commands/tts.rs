@@ -1,7 +1,9 @@
 use futures_util::StreamExt;
 use hound::{SampleFormat, WavSpec, WavWriter};
 use once_cell::sync::OnceCell;
+use ort::ep::CPU;
 use ort::session::Session;
+use ort::session::builder::GraphOptimizationLevel;
 use ort::value::Tensor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,12 +21,12 @@ const ESPEAK_NG_DATA_URL: &str = "https://github.com/thewh1teagle/espeakng-loade
 
 // ── Model URLs ───────────────────────────────────────────────────────────────
 
-const MODEL_URL: &str = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx";
+const MODEL_URL: &str = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_uint8.onnx";
 const VOICE_BASE_URL: &str =
     "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices";
 const CONFIG_URL: &str = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/config.json";
 
-const MODEL_FILENAME: &str = "model_quantized.onnx";
+const MODEL_FILENAME: &str = "model_uint8.onnx";
 const CONFIG_FILENAME: &str = "config.json";
 const SAMPLE_RATE: u32 = 24000;
 
@@ -111,6 +113,10 @@ fn config_path() -> Option<PathBuf> {
     Some(tts_dir()?.join(CONFIG_FILENAME))
 }
 
+fn optimized_model_path() -> Option<PathBuf> {
+    Some(tts_dir()?.join("model_optimized.onnx"))
+}
+
 fn espeak_dir() -> Option<PathBuf> {
     Some(tts_dir()?.join("espeak-ng"))
 }
@@ -184,7 +190,14 @@ fn find_espeak_data_path() -> Option<PathBuf> {
 // ── espeak-ng auto-install (Windows only) ───────────────────────────────────
 
 #[cfg(target_os = "windows")]
+static ESPEAK_VERIFIED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(target_os = "windows")]
 async fn ensure_espeak_ng() -> Result<(), String> {
+    if ESPEAK_VERIFIED.load(std::sync::atomic::Ordering::Relaxed) {
+        return Ok(());
+    }
+
     let exe = espeak_path().ok_or("Cannot determine espeak-ng path")?;
     if exe.exists() {
         // Verify it actually works
@@ -195,6 +208,7 @@ async fn ensure_espeak_ng() -> Result<(), String> {
             .output()
             .await;
         if test.is_ok() && test.unwrap().status.success() {
+            ESPEAK_VERIFIED.store(true, std::sync::atomic::Ordering::Relaxed);
             return Ok(());
         }
         println!("[TTS] espeak-ng exists but failed test, re-installing...");
@@ -365,6 +379,13 @@ pub async fn check_tts_model() -> Result<bool, String> {
     if !mp.exists() {
         return Ok(false);
     }
+    // Verify file isn't truncated (model_uint8.onnx should be ~170 MB)
+    let meta = std::fs::metadata(&mp).map_err(|e| e.to_string())?;
+    if meta.len() < 160_000_000 {
+        println!("[TTS] Model file too small ({} bytes), re-download required", meta.len());
+        let _ = std::fs::remove_file(&mp);
+        return Ok(false);
+    }
     let vp = voice_path("af_heart").ok_or("Cannot determine voice path")?;
     Ok(vp.exists())
 }
@@ -372,6 +393,7 @@ pub async fn check_tts_model() -> Result<bool, String> {
 #[command]
 pub async fn download_tts_model(
     channel: Channel<TtsDownloadEvent>,
+    state: tauri::State<'_ , TtsState>,
 ) -> Result<(), String> {
     let dir = tts_dir().ok_or("Cannot determine TTS directory")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("Create dir: {e}"))?;
@@ -386,12 +408,28 @@ pub async fn download_tts_model(
             .map_err(|e| format!("Config download: {e}"))?;
     }
 
-    // 2. Download model (~86 MB)
+    // 2. Download model (~177 MB uint8)
+    // Remove old model variants to avoid confusion
+    for old_name in ["model_quantized.onnx", "model.onnx", "model_optimized.onnx"] {
+        let old = dir.join(old_name);
+        if old.exists() {
+            let _ = std::fs::remove_file(&old);
+        }
+    }
     let mp = model_path().ok_or("Model path error")?;
-    if !mp.exists() {
+    let model_was_missing = !mp.exists();
+    if model_was_missing {
         download_file_with_progress(MODEL_URL, &mp, &channel, 0.01, 0.89)
             .await
             .map_err(|e| format!("Model download: {e}"))?;
+    }
+
+    // If we downloaded a new model, invalidate any cached ONNX session
+    if model_was_missing {
+        if let Ok(mut guard) = state.session.lock() {
+            *guard = None;
+            println!("[TTS] Cleared cached session after model download");
+        }
     }
 
     // 3. Download voice files (~524 KB each)
@@ -434,6 +472,8 @@ pub async fn speak_tts(
     speed: f32,
     state: tauri::State<'_, TtsState>,
 ) -> Result<Response, String> {
+    let total_t0 = std::time::Instant::now();
+
     // Clamp speed to model-acceptable range
     let speed = speed.clamp(0.5, 2.0);
 
@@ -442,7 +482,9 @@ pub async fn speak_tts(
     ensure_espeak_ng().await.map_err(|e| format!("espeak-ng install: {e}"))?;
 
     // 1. Text → phonemes (async subprocess)
+    let t0 = std::time::Instant::now();
     let phonemes = text_to_phonemes(&text).await?;
+    println!("[TTS] Phoneme conversion took {:?}", t0.elapsed());
     if phonemes.is_empty() {
         return Err("No phonemes produced from input text".to_string());
     }
@@ -489,7 +531,10 @@ pub async fn speak_tts(
     let style_slice = &voice_vec[style_start..style_end];
 
     // 6. Run inference
+    let t0 = std::time::Instant::now();
     let wav = run_inference(session, &token_ids, seq_len, style_slice, speed)?;
+    println!("[TTS] ONNX inference took {:?}", t0.elapsed());
+    println!("[TTS] Total synthesis took {:?}", total_t0.elapsed());
 
     Ok(Response::new(wav))
 }
@@ -538,10 +583,12 @@ async fn run_espeak_raw(espeak: &std::path::PathBuf, text: &str) -> Result<Strin
         cmd.env("ESPEAK_DATA_PATH", &data_dir);
     }
 
+    let t0 = std::time::Instant::now();
     let output = cmd
         .output()
         .await
         .map_err(|e| format!("espeak-ng failed: {e}"))?;
+    println!("[TTS] espeak-ng subprocess took {:?}", t0.elapsed());
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -760,12 +807,92 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
         ));
     }
 
+    // Clean up old quantized model to save ~90 MB disk space
+    if let Some(dir) = tts_dir() {
+        let old = dir.join("model_quantized.onnx");
+        if old.exists() {
+            let _ = std::fs::remove_file(&old);
+        }
+    }
+
     // Load the model in spawn_blocking to avoid blocking the Tokio worker thread
     let session = tokio::task::spawn_blocking(move || -> Result<Session, String> {
-        Session::builder()
+        // Use 2 threads — transformer inference on a laptop CPU is memory-bandwidth
+        // bound; more threads just create thermal throttling without speedup.
+        let threads = 2;
+
+        let opt_path = optimized_model_path();
+        let use_optimized = opt_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+
+        println!(
+            "[TTS] Loading ONNX model with {threads} threads (optimized={})...",
+            use_optimized
+        );
+        let t0 = std::time::Instant::now();
+
+        let cpu_ep = CPU::default().with_arena_allocator(true).build();
+
+        let mut builder = Session::builder()
             .map_err(|e| format!("Session builder: {e}"))?
-            .commit_from_file(&mp)
-            .map_err(|e| format!("Load model: {e}"))
+            .with_execution_providers([cpu_ep])
+            .map_err(|e| format!("CPU EP: {e}"))?
+            .with_intra_threads(threads)
+            .map_err(|e| format!("Intra threads: {e}"))?
+            .with_inter_threads(1)
+            .map_err(|e| format!("Inter threads: {e}"))?
+            .with_memory_pattern(true)
+            .map_err(|e| format!("Memory pattern: {e}"))?
+            .with_intra_op_spinning(true)
+            .map_err(|e| format!("Intra spinning: {e}"))?
+            .with_inter_op_spinning(true)
+            .map_err(|e| format!("Inter spinning: {e}"))?
+            .with_flush_to_zero()
+            .map_err(|e| format!("Flush to zero: {e}"))?;
+
+        let session = if use_optimized {
+            // Optimized model already exists — skip graph optimization entirely
+            builder = builder
+                .with_optimization_level(GraphOptimizationLevel::Disable)
+                .map_err(|e| format!("Optimization disable: {e}"))?;
+            builder
+                .commit_from_file(opt_path.unwrap())
+                .map_err(|e| format!("Load optimized model: {e}"))?
+        } else {
+            // First-time load: optimize graph and save optimized model for next time
+            builder = builder
+                .with_optimization_level(GraphOptimizationLevel::All)
+                .map_err(|e| format!("Optimization level: {e}"))?;
+            if let Some(ref op) = opt_path {
+                builder = builder
+                    .with_optimized_model_path(op)
+                    .map_err(|e| format!("Optimized model path: {e}"))?;
+            }
+            builder
+                .commit_from_file(&mp)
+                .map_err(|e| format!("Load model: {e}"))?
+        };
+
+        println!("[TTS] ONNX session loaded in {:?}", t0.elapsed());
+
+        // Warm-up inference to pre-compile kernels and prime caches
+        let warmup_t0 = std::time::Instant::now();
+        let warmup_ids: Vec<i64> = vec![0, 24, 47, 47, 57, 16, 57, 57, 47, 56, 60, 0];
+        let seq_len = warmup_ids.len();
+        let dummy_style = vec![0.0f32; 256];
+        let input_ids_val = Tensor::from_array(([1usize, seq_len], warmup_ids.into_boxed_slice()))
+            .map_err(|e| format!("Warmup tensor: {e}"))?;
+        let style_val = Tensor::from_array(([1usize, 256usize], dummy_style.into_boxed_slice()))
+            .map_err(|e| format!("Warmup style: {e}"))?;
+        let speed_val = Tensor::from_array(([1usize], vec![1.0f32].into_boxed_slice()))
+            .map_err(|e| format!("Warmup speed: {e}"))?;
+        let mut s = session;
+        let _ = s.run(ort::inputs![
+            "input_ids" => input_ids_val,
+            "style" => style_val,
+            "speed" => speed_val,
+        ]).map_err(|e| format!("Warmup inference: {e}"))?;
+        println!("[TTS] Warm-up inference took {:?}", warmup_t0.elapsed());
+        Ok(s)
     })
     .await
     .map_err(|e| format!("spawn_blocking join: {e}"))??;

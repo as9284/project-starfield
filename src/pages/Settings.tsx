@@ -1342,7 +1342,7 @@ export default function Settings() {
                           onClick={() => void handleDownloadTtsModel()}
                         >
                           <Download size={14} />
-                          Download Voice Model (~86 MB)
+                          Download Voice Model (~177 MB)
                         </button>
                       ) : (
                         <div className="flex flex-col gap-1">
