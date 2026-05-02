@@ -22,12 +22,12 @@ const ESPEAK_NG_DATA_URL: &str = "https://github.com/thewh1teagle/espeakng-loade
 
 // ── Model URLs ───────────────────────────────────────────────────────────────
 
-const MODEL_URL: &str = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_uint8.onnx";
+const MODEL_URL: &str = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model.onnx";
 const VOICE_BASE_URL: &str =
     "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices";
 const CONFIG_URL: &str = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/config.json";
 
-const MODEL_FILENAME: &str = "model_uint8.onnx";
+const MODEL_FILENAME: &str = "model.onnx";
 const CONFIG_FILENAME: &str = "config.json";
 const SAMPLE_RATE: u32 = 24000;
 
@@ -384,9 +384,9 @@ pub async fn check_tts_model() -> Result<bool, String> {
     if !mp.exists() {
         return Ok(false);
     }
-    // Verify file isn't truncated (model_uint8.onnx should be ~170 MB)
+    // Verify file isn't truncated (model.onnx should be ~326 MB)
     let meta = std::fs::metadata(&mp).map_err(|e| e.to_string())?;
-    if meta.len() < 160_000_000 {
+    if meta.len() < 300_000_000 {
         println!("[TTS] Model file too small ({} bytes), re-download required", meta.len());
         let _ = std::fs::remove_file(&mp);
         return Ok(false);
@@ -413,9 +413,12 @@ pub async fn download_tts_model(
             .map_err(|e| format!("Config download: {e}"))?;
     }
 
-    // 2. Download model (~177 MB uint8)
-    // Remove old model variants to avoid confusion
-    for old_name in ["model_quantized.onnx", "model.onnx", "model_optimized.onnx"] {
+    // 2. Download model (~326 MB fp32)
+    // Remove old model variants to avoid confusion.
+    // NOTE: do NOT delete model_optimized.onnx — it is the graph-optimized
+    // version saved by ONNX Runtime on first load and makes subsequent
+    // session creation ~10× faster.
+    for old_name in ["model_quantized.onnx", "model_uint8.onnx"] {
         let old = dir.join(old_name);
         if old.exists() {
             let _ = std::fs::remove_file(&old);
@@ -537,13 +540,41 @@ pub async fn speak_tts(
     // 5. Ensure ONNX session is loaded (cached after first call)
     ensure_session_loaded(&state).await?;
 
-    // 6. Run inference — lock only for the synchronous inference block
+    // 6. Run inference in spawn_blocking so the Tokio async thread stays
+    // responsive (user can cancel, UI events still process).
     let t0 = std::time::Instant::now();
-    let wav = {
+
+    // Move session out of the mutex, run inference on a blocking thread,
+    // then move it back. If anything panics or aborts, the next call will
+    // simply reload the session.
+    let mut session = {
         let mut guard = state.session.lock().await;
-        let session = guard.as_mut().ok_or("Session not loaded")?;
-        run_inference(session, &token_ids, seq_len, &style_vec, speed)?
+        guard.take().ok_or("Session not loaded")?
     };
+
+    let token_ids_clone = token_ids.clone();
+    let style_vec_clone = style_vec.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let wav = run_inference(
+            &mut session,
+            &token_ids_clone,
+            seq_len,
+            &style_vec_clone,
+            speed,
+        )?;
+        Ok::<_, String>((session, wav))
+    })
+    .await
+    .map_err(|e| format!("Inference spawn_blocking join: {e}"))?
+    .map_err(|e| format!("Inference failed: {e}"))?;
+
+    let (session, wav) = result;
+    {
+        let mut guard = state.session.lock().await;
+        *guard = Some(session);
+    }
+
     println!("[TTS] ONNX inference took {:?}", t0.elapsed());
     println!("[TTS] Total synthesis took {:?}", total_t0.elapsed());
 
@@ -889,7 +920,12 @@ async fn ensure_session_loaded(state: &TtsState) -> Result<(), String> {
             .with_inter_op_spinning(true)
             .map_err(|e| format!("Inter spinning: {e}"))?
             .with_flush_to_zero()
-            .map_err(|e| format!("Flush to zero: {e}"))?;
+            .map_err(|e| format!("Flush to zero: {e}"))?
+            // Prepack weights into GEMM-optimal layout (one-time load cost,
+            // faster every inference). Especially impactful on transformer
+            // matmuls with AVX-512.
+            .with_prepacking(true)
+            .map_err(|e| format!("Prepacking: {e}"))?;
 
         let session = if use_optimized {
             builder = builder
