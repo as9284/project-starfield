@@ -71,12 +71,12 @@ fn get_local_ytdlp_path() -> Option<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let local_app_data = std::env::var_os("LOCALAPPDATA")?;
-        return Some(
+        Some(
             std::path::PathBuf::from(local_app_data)
                 .join("starfield")
                 .join("bin")
                 .join("yt-dlp.exe"),
-        );
+        )
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -184,7 +184,7 @@ pub async fn pulsar_install_ytdlp() -> Result<bool, String> {
                 .map_err(|e| format!("Write error: {e}"))?;
         }
 
-        return Ok(true);
+        Ok(true)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -227,6 +227,7 @@ pub async fn pulsar_delete_file(file_path: String) -> Result<(), String> {
 /// `audio_format` — "mp3" | "flac" | "wav" | "ogg" | "m4a" | "opus" (used when format_arg is "audio")
 /// `playlist`   — when true, download the full playlist instead of one video
 #[command]
+#[allow(clippy::too_many_arguments)]
 pub async fn pulsar_download(
     download_id: String,
     url: String,

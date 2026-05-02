@@ -39,7 +39,7 @@ fn load_window_state(app: &tauri::AppHandle) -> Option<WindowState> {
 
 fn save_window_state(app: &tauri::AppHandle, state: &WindowState) {
     if let Ok(store) = app.store("settings.json") {
-        let _ = store.set(WINDOW_STATE_KEY, serde_json::to_value(state).unwrap());
+        store.set(WINDOW_STATE_KEY, serde_json::to_value(state).unwrap());
         let _ = store.save();
     }
 }

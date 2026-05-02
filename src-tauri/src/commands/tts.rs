@@ -80,7 +80,7 @@ fn tts_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let local = std::env::var_os("LOCALAPPDATA")?;
-        return Some(PathBuf::from(local).join("starfield").join("tts"));
+        Some(PathBuf::from(local).join("starfield").join("tts"))
     }
     #[cfg(target_os = "macos")]
     {
@@ -606,7 +606,7 @@ fn run_inference(
 
     let audio_output = outputs[0].try_extract_tensor::<f32>()
         .map_err(|e| format!("Extract tensor: {e}"))?;
-    let audio_samples: Vec<f32> = audio_output.1.iter().copied().collect();
+    let audio_samples: Vec<f32> = audio_output.1.to_vec();
     encode_wav(&audio_samples)
 }
 
@@ -659,11 +659,9 @@ async fn text_to_phonemes(text: &str) -> Result<String, String> {
         } else if is_pause_punct(ch) {
             punctuations.push((word_count, ch));
             in_word = false;
-        } else {
-            if !in_word {
-                word_count += 1;
-                in_word = true;
-            }
+        } else if !in_word {
+            word_count += 1;
+            in_word = true;
         }
     }
 
