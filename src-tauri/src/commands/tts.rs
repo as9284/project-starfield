@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 use tauri::{command, ipc::Channel, ipc::Response};
 
@@ -54,17 +55,21 @@ pub enum TtsDownloadEvent {
 // ── Managed state ────────────────────────────────────────────────────────────
 
 pub struct TtsState {
-    session: std::sync::Mutex<Option<Session>>,
+    session: tokio::sync::Mutex<Option<Session>>,
     voices: RwLock<HashMap<String, Vec<f32>>>,
     vocab: OnceCell<HashMap<char, i64>>,
+    load_count: AtomicUsize,
+    hit_count: AtomicUsize,
 }
 
 impl TtsState {
     pub fn new() -> Self {
         Self {
-            session: std::sync::Mutex::new(None),
+            session: tokio::sync::Mutex::new(None),
             voices: RwLock::new(HashMap::new()),
             vocab: OnceCell::new(),
+            load_count: AtomicUsize::new(0),
+            hit_count: AtomicUsize::new(0),
         }
     }
 }
@@ -426,10 +431,11 @@ pub async fn download_tts_model(
 
     // If we downloaded a new model, invalidate any cached ONNX session
     if model_was_missing {
-        if let Ok(mut guard) = state.session.lock() {
-            *guard = None;
-            println!("[TTS] Cleared cached session after model download");
-        }
+        let mut guard = state.session.lock().await;
+        *guard = None;
+        state.load_count.store(0, Ordering::Relaxed);
+        state.hit_count.store(0, Ordering::Relaxed);
+        println!("[TTS] Cleared cached session after model download");
     }
 
     // 3. Download voice files (~524 KB each)
@@ -512,27 +518,32 @@ pub async fn speak_tts(
     token_ids.push(0);
     let seq_len = token_ids.len();
 
-    // 4. Load ONNX session (cached after first call, uses spawn_blocking)
-    let mut session_guard = get_or_load_session(&state).await?;
-    let session = session_guard.as_mut().ok_or("Session not loaded")?;
+    // 4. Load voice and select style vector (clone so guard can drop before await)
+    let style_vec: Vec<f32> = {
+        let voice_data = get_or_load_voice(&state, &voice)?;
+        let style_idx = seq_len.min(510);
+        let style_start = style_idx * 256;
+        let style_end = style_start + 256;
+        let voice_vec = voice_data.get(&voice).ok_or("Voice not loaded")?;
+        if style_end > voice_vec.len() {
+            return Err(format!(
+                "Voice data too short for {} tokens (need index {})",
+                seq_len, style_idx
+            ));
+        }
+        voice_vec[style_start..style_end].to_vec()
+    };
 
-    // 5. Load voice and select style vector
-    let voice_data = get_or_load_voice(&state, &voice)?;
-    let style_idx = seq_len.min(510);
-    let style_start = style_idx * 256;
-    let style_end = style_start + 256;
-    let voice_vec = voice_data.get(&voice).ok_or("Voice not loaded")?;
-    if style_end > voice_vec.len() {
-        return Err(format!(
-            "Voice data too short for {} tokens (need index {})",
-            seq_len, style_idx
-        ));
-    }
-    let style_slice = &voice_vec[style_start..style_end];
+    // 5. Ensure ONNX session is loaded (cached after first call)
+    ensure_session_loaded(&state).await?;
 
-    // 6. Run inference
+    // 6. Run inference — lock only for the synchronous inference block
     let t0 = std::time::Instant::now();
-    let wav = run_inference(session, &token_ids, seq_len, style_slice, speed)?;
+    let wav = {
+        let mut guard = state.session.lock().await;
+        let session = guard.as_mut().ok_or("Session not loaded")?;
+        run_inference(session, &token_ids, seq_len, &style_vec, speed)?
+    };
     println!("[TTS] ONNX inference took {:?}", t0.elapsed());
     println!("[TTS] Total synthesis took {:?}", total_t0.elapsed());
 
@@ -642,13 +653,6 @@ async fn text_to_phonemes(text: &str) -> Result<String, String> {
     let ipa = run_espeak_raw(&espeak, &text_no_punct).await?;
     let ipa_words: Vec<&str> = ipa.split_whitespace().collect();
 
-    // If espeak-ng expanded/contracted words (e.g. "100" → "one hundred"),
-    // word counts won't match. Fall back to raw IPA — pauses will be missing
-    // but audio will still be intelligible.
-    if ipa_words.len() != word_count {
-        return Ok(ipa);
-    }
-
     // Reconstruct IPA with punctuation inserted as separate tokens surrounded
     // by spaces. The Kokoro vocab treats comma/period/etc. as distinct pause
     // tokens; they must be clearly separated from phoneme characters so the
@@ -665,19 +669,48 @@ async fn text_to_phonemes(text: &str) -> Result<String, String> {
         result.push(' ');
     }
 
-    for (i, word) in ipa_words.iter().enumerate() {
-        if !result.is_empty() && !result.ends_with(' ') {
-            result.push(' ');
+    if ipa_words.len() == word_count {
+        // Exact match — insert punctuation at precise word boundaries
+        for (i, word) in ipa_words.iter().enumerate() {
+            if !result.is_empty() && !result.ends_with(' ') {
+                result.push(' ');
+            }
+            result.push_str(word);
+            while punct_idx < punctuations.len() && punctuations[punct_idx].0 == i + 1 {
+                result.push(' ');
+                result.push(punctuations[punct_idx].1);
+                punct_idx += 1;
+            }
         }
-        result.push_str(word);
+    } else {
+        // espeak-ng expanded/contracted words (e.g. "100" → "one hundred").
+        // Map punctuation to approximate positions using the word-count ratio
+        // instead of dropping all pauses.
+        let ratio = ipa_words.len() as f32 / word_count.max(1) as f32;
+        println!(
+            "[TTS] Word count mismatch (orig={} ipa={}), using approximate pause insertion (ratio={:.2})",
+            word_count, ipa_words.len(), ratio
+        );
+        for (i, word) in ipa_words.iter().enumerate() {
+            if !result.is_empty() && !result.ends_with(' ') {
+                result.push(' ');
+            }
+            result.push_str(word);
+            // Map this IPA word's position back to an approximate original position
+            let orig_pos = ((i + 1) as f32 / ratio).round() as usize;
+            while punct_idx < punctuations.len() && punctuations[punct_idx].0 <= orig_pos {
+                result.push(' ');
+                result.push(punctuations[punct_idx].1);
+                punct_idx += 1;
+            }
+        }
+    }
 
-        // Append every punctuation mark that follows this word, each
-        // preceded by a space so it forms a distinct token.
-        while punct_idx < punctuations.len() && punctuations[punct_idx].0 == i + 1 {
-            result.push(' ');
-            result.push(punctuations[punct_idx].1);
-            punct_idx += 1;
-        }
+    // Append any trailing punctuation that wasn't inserted
+    while punct_idx < punctuations.len() {
+        result.push(' ');
+        result.push(punctuations[punct_idx].1);
+        punct_idx += 1;
     }
 
     Ok(result)
@@ -790,12 +823,16 @@ fn get_or_load_voice<'a>(
 
 // ── ONNX session ─────────────────────────────────────────────────────────────
 
-async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'_, Option<Session>>, String> {
-    // Quick check — if already loaded, return immediately without blocking I/O
+/// Ensure the ONNX session is loaded. Uses tokio::sync::Mutex so the lock is
+/// async-safe and the guard is Send across await points.
+async fn ensure_session_loaded(state: &TtsState) -> Result<(), String> {
+    // Fast path: try lock and check without blocking
     {
-        let guard = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
+        let guard = state.session.lock().await;
         if guard.is_some() {
-            return Ok(guard);
+            let hits = state.hit_count.fetch_add(1, Ordering::Relaxed) + 1;
+            println!("[TTS] Session cache HIT (#{})", hits);
+            return Ok(());
         }
     }
 
@@ -807,7 +844,7 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
         ));
     }
 
-    // Clean up old quantized model to save ~90 MB disk space
+    // Clean up old quantized model to save disk space
     if let Some(dir) = tts_dir() {
         let old = dir.join("model_quantized.onnx");
         if old.exists() {
@@ -817,9 +854,14 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
 
     // Load the model in spawn_blocking to avoid blocking the Tokio worker thread
     let session = tokio::task::spawn_blocking(move || -> Result<Session, String> {
-        // Use 2 threads — transformer inference on a laptop CPU is memory-bandwidth
-        // bound; more threads just create thermal throttling without speedup.
-        let threads = 2;
+        // Use physical-core count for intra-op parallelism. On hyperthreaded CPUs
+        // we divide logical threads by 2; cap at 8 to avoid oversubscription on
+        // high-core-count workstations.
+        let threads = (std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            / 2)
+            .clamp(2, 8);
 
         let opt_path = optimized_model_path();
         let use_optimized = opt_path.as_ref().map(|p| p.exists()).unwrap_or(false);
@@ -850,7 +892,6 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
             .map_err(|e| format!("Flush to zero: {e}"))?;
 
         let session = if use_optimized {
-            // Optimized model already exists — skip graph optimization entirely
             builder = builder
                 .with_optimization_level(GraphOptimizationLevel::Disable)
                 .map_err(|e| format!("Optimization disable: {e}"))?;
@@ -858,7 +899,6 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
                 .commit_from_file(opt_path.unwrap())
                 .map_err(|e| format!("Load optimized model: {e}"))?
         } else {
-            // First-time load: optimize graph and save optimized model for next time
             builder = builder
                 .with_optimization_level(GraphOptimizationLevel::All)
                 .map_err(|e| format!("Optimization level: {e}"))?;
@@ -897,12 +937,16 @@ async fn get_or_load_session(state: &TtsState) -> Result<std::sync::MutexGuard<'
     .await
     .map_err(|e| format!("spawn_blocking join: {e}"))??;
 
-    // Double-check — another task might have loaded it while we were doing I/O
-    let mut guard = state.session.lock().map_err(|e| format!("Lock session: {e}"))?;
+    // Store the loaded session — another task might have loaded while we were busy
+    let mut guard = state.session.lock().await;
     if guard.is_none() {
+        let loads = state.load_count.fetch_add(1, Ordering::Relaxed) + 1;
+        println!("[TTS] Session cached for reuse (load #{})", loads);
         *guard = Some(session);
+    } else {
+        println!("[TTS] Session was already loaded by another task, discarding duplicate");
     }
-    Ok(guard)
+    Ok(())
 }
 
 // ── WAV encoding ─────────────────────────────────────────────────────────────
