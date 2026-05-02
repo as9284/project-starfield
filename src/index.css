@@ -1935,6 +1935,165 @@ body {
   box-shadow: 0 0 12px rgba(124, 79, 240, 0.15);
 }
 
+/* ── Luna Voice Dropdown ──────────────────────────────────────────────── */
+
+.luna-voice-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.luna-voice-dropdown-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 79, 240, 0.15);
+  background: rgba(14, 13, 36, 0.6);
+  color: var(--color-text-primary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.luna-voice-dropdown-btn:hover {
+  border-color: rgba(124, 79, 240, 0.35);
+  box-shadow: 0 0 10px rgba(124, 79, 240, 0.08);
+}
+
+.luna-voice-dropdown-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.luna-voice-dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.luna-voice-dropdown-chevron-open {
+  transform: rotate(180deg);
+}
+
+.luna-voice-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 70;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 79, 240, 0.12);
+  background: rgba(16, 15, 40, 0.96);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(124, 79, 240, 0.08);
+  overflow: hidden;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.luna-voice-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.luna-voice-dropdown-item:hover {
+  background: rgba(124, 79, 240, 0.08);
+}
+
+.luna-voice-dropdown-item-active {
+  background: rgba(124, 79, 240, 0.1);
+  color: var(--color-text-primary);
+}
+
+.luna-voice-dropdown-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.luna-voice-dropdown-item-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.luna-voice-dropdown-item-style {
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Luna Speed Slider ────────────────────────────────────────────────── */
+
+.luna-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.luna-slider {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(124, 79, 240, 0.15);
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.luna-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-purple-500);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 6px rgba(124, 79, 240, 0.4);
+  transition: box-shadow 0.2s;
+}
+
+.luna-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 10px rgba(124, 79, 240, 0.6);
+}
+
+.luna-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-purple-500);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 6px rgba(124, 79, 240, 0.4);
+}
+
+.luna-speed-value {
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-purple-400);
+  width: 2.2rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* ── Luna Modes Grid ─────────────────────────────────────────────────── */
 .luna-modes-grid {
   display: grid;
@@ -2590,6 +2749,7 @@ body {
 .luna-sidebar-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.35rem 0;
 }
 
